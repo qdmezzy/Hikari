@@ -1,0 +1,19 @@
+# Root .gitignore for Hikari
+
+# Node
+node_modules/
+
+# Next build outputs (app lives in /web)
+/web/.next/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment files
+.env*
+
+# OS files
+.DS_Store
