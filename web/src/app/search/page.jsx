@@ -1,18 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import { MediaCard } from "@/components/MediaCard";
-
-type Media = {
-  id: number;
-  type: "ANIME" | "MANGA";
-  title: { romaji: string; english: string | null; native: string | null };
-  coverImage: { large: string };
-  format: string | null;
-  episodes: number | null;
-  chapters: number | null;
-  averageScore: number | null;
-};
+import { MediaCard } from "../../components/MediaCard";
 
 const QUERY = `
 query ($search: String, $type: MediaType, $page: Int, $perPage: Int) {
@@ -33,10 +20,10 @@ query ($search: String, $type: MediaType, $page: Int, $perPage: Int) {
 
 export default function SearchPage() {
   const [query, setQuery] = useState("");
-  const [type, setType] = useState<"ANIME" | "MANGA">("ANIME");
-  const [results, setResults] = useState<Media[]>([]);
+  const [type, setType] = useState("ANIME");
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
   async function runSearch() {
     const q = query.trim();
@@ -64,7 +51,7 @@ export default function SearchPage() {
       }
 
       setResults(data.data.Page.media);
-    } catch (e: any) {
+    } catch (e) {
       setError(e?.message || "Something broke");
     } finally {
       setLoading(false);
@@ -89,7 +76,7 @@ export default function SearchPage() {
         <select
           className="rounded-md border border-neutral-300 px-3 py-2"
           value={type}
-          onChange={(e) => setType(e.target.value as "ANIME" | "MANGA")}
+          onChange={(e) => setType(e.target.value)}
         >
           <option value="ANIME">Anime</option>
           <option value="MANGA">Manga</option>

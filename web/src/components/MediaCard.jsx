@@ -1,17 +1,6 @@
-import Link from "next/link";
+import { Link } from "react-router-dom";
 
-type Media = {
-  id: number;
-  type: "ANIME" | "MANGA";
-  title: { romaji: string; english: string | null; native: string | null };
-  coverImage: { large: string };
-  format: string | null;
-  episodes: number | null;
-  chapters: number | null;
-  averageScore: number | null;
-};
-
-export function MediaCard({ media }: { media: Media }) {
+export function MediaCard({ media }) {
   const title = media.title.english || media.title.romaji;
 
   const sub =
@@ -20,7 +9,7 @@ export function MediaCard({ media }: { media: Media }) {
       : `${media.format || "Manga"} · ${media.chapters ?? "?"} ch`;
 
   return (
-    <Link href={`/anime/${media.id}`} className="block">
+    <Link to={`/media/${media.id}`} className="block">
       <div className="w-full max-w-[200px] rounded-xl border border-neutral-200 overflow-hidden bg-white hover:shadow-sm transition">
         <div className="w-full aspect-[2/3] bg-neutral-200">
           <img
