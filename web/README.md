@@ -2,6 +2,27 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### 1. Set up Supabase
+
+1. Create a project at [Supabase](https://app.supabase.com)
+2. Run the database migrations:
+   - Go to your Supabase project → SQL Editor
+   - Run `web/db/migrations/001_create_supabase_tables.sql`
+   - Run `web/db/migrations/002_policies.sql`
+
+### 2. Configure Environment Variables
+
+Create a `.env.local` file in the `web` directory:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+Get these values from your Supabase project settings: https://app.supabase.com/project/_/settings/api
+
+### 3. Run the Development Server
+
 First, run the development server:
 
 ```bash

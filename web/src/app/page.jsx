@@ -1,4 +1,4 @@
-export default function Home() {
+export default function HomePage() {
   return (
     <main style={{ padding: 24 }}>
       <h1>Hikari</h1>
