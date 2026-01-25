@@ -17,6 +17,9 @@ Create a `.env.local` file in the `web` directory:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+MAL_CLIENT_ID=your-mal-client-id
+MAL_CLIENT_SECRET=your-mal-client-secret
+MAL_REDIRECT_URI=http://localhost:3000/api/mal/callback
 ```
 
 Get these values from your Supabase project settings: https://app.supabase.com/project/_/settings/api

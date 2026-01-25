@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from "next/link";
 
 export function MediaCard({ media }) {
   const title = media.title.english || media.title.romaji;
@@ -9,7 +9,7 @@ export function MediaCard({ media }) {
       : `${media.format || "Manga"} · ${media.chapters ?? "?"} ch`;
 
   return (
-    <Link to={`/media/${media.id}`} className="block">
+    <Link href={`/media/${media.id}`} className="block">
       <div className="w-full max-w-[200px] rounded-xl border border-neutral-200 overflow-hidden bg-white hover:shadow-sm transition">
         <div className="w-full aspect-[2/3] bg-neutral-200">
           <img
