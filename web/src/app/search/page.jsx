@@ -703,52 +703,28 @@ export default function SearchPage() {
                                 alt={title}
                                 className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-300"
                               />
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                                <div className="space-y-2 w-full">
-                                  <div className="flex gap-1">
-                                    {anime.genres?.slice(0, 2).map((g) => (
-                                      <Badge key={g} variant="secondary" className="text-[10px] bg-white/20 border-0">
-                                        {g}
-                                      </Badge>
-                                    ))}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                              <div className="absolute inset-x-0 bottom-0 p-4">
+                                <h3 className="font-semibold text-sm text-white drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)] group-hover:text-primary transition-colors">
+                                {title}
+                                </h3>
+                                <div className="flex items-center justify-between mt-1.5 text-xs text-white/75">
+                                  <div className="flex items-center gap-2">
+                                    <span>{countLabel}</span>
+                                    {isOngoing && countLabel !== "Ongoing" && (
+                                      <Badge className="bg-amber-500/20 text-amber-400 text-[10px]">Ongoing</Badge>
+                                    )}
                                   </div>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      className="flex-1 h-8 gap-1 bg-primary hover:bg-primary/90"
-                                      onClick={(e) => e.preventDefault()}
-                                    >
-                                      <Play className="h-3 w-3 fill-current" />
-                                      Watch
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="secondary"
-                                      className={`h-8 w-8 p-0 ${
-                                        quickAddState[anime.id] === "added"
-                                          ? "bg-emerald-500/30 text-emerald-100 hover:bg-emerald-500/30"
-                                          : "bg-white/20 hover:bg-white/30"
-                                      }`}
-                                      disabled={quickAddState[anime.id] === "adding" || quickAddState[anime.id] === "added"}
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        e.stopPropagation()
-                                        handleQuickAdd(anime)
-                                      }}
-                                    >
-                                      {quickAddState[anime.id] === "adding" ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                      ) : quickAddState[anime.id] === "added" ? (
-                                        <Check className="h-4 w-4" />
-                                      ) : (
-                                        <Plus className="h-4 w-4" />
-                                      )}
-                                    </Button>
-                                  </div>
+                                  {anime.averageScore && (
+                                    <div className="flex items-center gap-1">
+                                      <Star className="h-3 w-3 text-amber-400 fill-amber-400" />
+                                      <span>{(anime.averageScore / 10).toFixed(1)}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                            <div className="p-3">
+                            <div className="hidden p-3">
                               <h3 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
                                 {title}
                               </h3>

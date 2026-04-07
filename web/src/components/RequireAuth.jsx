@@ -3,6 +3,7 @@
 import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import useAuth from "@/hooks/useAuth"
+import { needsAuthOnboarding } from "@/lib/auth-onboarding"
 
 export default function RequireAuth({ children }) {
   const { user, loading } = useAuth()
@@ -13,6 +14,10 @@ export default function RequireAuth({ children }) {
     if (!loading && !user) {
       const next = encodeURIComponent(pathname || "/")
       router.replace(`/login?next=${next}`)
+    }
+    if (!loading && user && pathname !== "/onboarding" && needsAuthOnboarding(user)) {
+      const next = encodeURIComponent(pathname || "/")
+      router.replace(`/onboarding?next=${next}`)
     }
   }, [loading, user, router, pathname])
 
@@ -25,6 +30,7 @@ export default function RequireAuth({ children }) {
   }
 
   if (!user) return null
+  if (pathname !== "/onboarding" && needsAuthOnboarding(user)) return null
 
   return children
 }

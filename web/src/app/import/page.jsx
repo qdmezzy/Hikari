@@ -716,8 +716,8 @@ export default function ImportPage() {
                   )}
 
                   {importSummary && (
-                    <Button className="w-full gap-2" onClick={() => router.push("/dashboard")}>
-                      Go to Dashboard
+                    <Button className="w-full gap-2" onClick={() => router.push("/lists")}>
+                      Go to My List
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   )}

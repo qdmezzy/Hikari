@@ -41,7 +41,6 @@ import {
   AlertTriangle,
   Crown,
   Users,
-  Shuffle,
   Flag,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -50,6 +49,12 @@ import client from "@/lib/client"
 import { awardXp, XP_ACTIONS } from "@/lib/xp"
 import { addNotification } from "@/lib/notifications-store"
 import { reportContent } from "@/lib/reporting"
+import {
+  addUserNotInterestedMedia,
+  fetchUserNotInterestedMedia,
+  fetchUserTasteProfile,
+  upsertUserTasteProfile,
+} from "@/lib/recommendation-profile-store"
 
 const vibeFilters = [
   { id: "hype", label: "Hype", icon: Flame, color: "from-orange-500 to-red-500" },
@@ -72,7 +77,7 @@ const listOptions = [
 const contentModeOptions = [
   { id: "official", label: "Official", icon: Crown },
   { id: "fandom", label: "Fandom", icon: Users },
-  { id: "mixed", label: "Mixed", icon: Shuffle },
+  { id: "for-you", label: "For You", icon: Sparkles },
 ]
 
 const DISCOVER_QUERY = `
@@ -81,6 +86,9 @@ query ($page: Int, $perPage: Int) {
     pageInfo { hasNextPage }
     media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
       id
+      format
+      season
+      seasonYear
       title { romaji english }
       coverImage { extraLarge large }
       bannerImage
@@ -95,6 +103,10 @@ query ($page: Int, $perPage: Int) {
 `
 
 const FEED_CACHE_TTL = 1000 * 60 * 5
+const FOR_YOU_PROFILE_TTL = 1000 * 60 * 30
+const FOR_YOU_PROFILE_CACHE_PREFIX = "hikari:discover:for-you-profile:v1"
+const DISCOVER_TASTE_PROFILE_PREFIX = "hikari:discover:taste-profile:v1"
+const DISCOVER_NOT_INTERESTED_PREFIX = "hikari:discover:not-interested:v1"
 
 const getDiscoverCacheKey = (page) => `hikari:discover:official:${page}`
 
@@ -126,12 +138,190 @@ query ($search: String, $page: Int, $perPage: Int) {
 }
 `
 
+const PROFILE_MEDIA_QUERY = `
+query ($ids: [Int], $perPage: Int) {
+  Page(page: 1, perPage: $perPage) {
+    media(id_in: $ids, type: ANIME) {
+      id
+      title { romaji english }
+      genres
+      tags { name }
+    }
+  }
+}
+`
+
 const chunkIds = (ids, size) => {
   const batches = []
   for (let i = 0; i < ids.length; i += size) {
     batches.push(ids.slice(i, i + size))
   }
   return batches
+}
+
+const normalizeToken = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+
+const toTitleCase = (value = "") =>
+  String(value)
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ")
+
+const statusPreferenceWeight = {
+  watching: 3,
+  completed: 2,
+  plan_to_watch: 2,
+  on_hold: 1,
+  dropped: -3,
+}
+
+const vibeLabelLookup = Object.fromEntries(vibeFilters.map((vibe) => [vibe.id, vibe.label]))
+
+const getForYouProfileCacheKey = (userId) => `${FOR_YOU_PROFILE_CACHE_PREFIX}:${userId}`
+
+const readForYouProfileCache = (userId) => {
+  if (typeof window === "undefined" || !userId) return null
+  const raw = window.localStorage.getItem(getForYouProfileCacheKey(userId))
+  if (!raw) return null
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+const writeForYouProfileCache = (userId, payload) => {
+  if (typeof window === "undefined" || !userId) return
+  window.localStorage.setItem(getForYouProfileCacheKey(userId), JSON.stringify(payload))
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const clampWeight = (value, min = -25, max = 25) => Math.max(min, Math.min(max, value))
+
+  const getTasteProfileKey = (userId) => `${DISCOVER_TASTE_PROFILE_PREFIX}:${userId}`
+
+const defaultTasteProfile = () => ({
+  genreWeights: {},
+  tagWeights: {},
+  vibeWeights: {},
+  formatWeights: {},
+  updatedAt: Date.now(),
+})
+
+const readTasteProfile = (userId) => {
+  if (typeof window === "undefined" || !userId) return defaultTasteProfile()
+  const raw = window.localStorage.getItem(getTasteProfileKey(userId))
+  if (!raw) return defaultTasteProfile()
+  try {
+    const parsed = JSON.parse(raw)
+    return {
+      ...defaultTasteProfile(),
+      ...parsed,
+      genreWeights: parsed?.genreWeights && typeof parsed.genreWeights === "object" ? parsed.genreWeights : {},
+      tagWeights: parsed?.tagWeights && typeof parsed.tagWeights === "object" ? parsed.tagWeights : {},
+      vibeWeights: parsed?.vibeWeights && typeof parsed.vibeWeights === "object" ? parsed.vibeWeights : {},
+      formatWeights: parsed?.formatWeights && typeof parsed.formatWeights === "object" ? parsed.formatWeights : {},
+      updatedAt: typeof parsed?.updatedAt === "number" ? parsed.updatedAt : Date.now(),
+    }
+  } catch {
+    return defaultTasteProfile()
+  }
+}
+
+const writeTasteProfile = (userId, profile) => {
+  if (typeof window === "undefined" || !userId) return
+  try {
+    window.localStorage.setItem(getTasteProfileKey(userId), JSON.stringify(profile))
+  } catch {
+    // ignore quota errors
+  }
+}
+
+const applyTasteDelta = (profile, { genreDelta = {}, vibeDelta = {}, formatDelta = {} }) => {
+  const next = {
+    ...profile,
+    genreWeights: { ...(profile?.genreWeights || {}) },
+    tagWeights: { ...(profile?.tagWeights || {}) },
+    vibeWeights: { ...(profile?.vibeWeights || {}) },
+    formatWeights: { ...(profile?.formatWeights || {}) },
+    updatedAt: Date.now(),
+  }
+
+  Object.entries(genreDelta).forEach(([key, value]) => {
+    if (!key) return
+    next.genreWeights[key] = clampWeight((next.genreWeights[key] || 0) + value)
+  })
+  Object.entries(vibeDelta).forEach(([key, value]) => {
+    if (!key) return
+    next.vibeWeights[key] = clampWeight((next.vibeWeights[key] || 0) + value)
+  })
+  Object.entries(formatDelta).forEach(([key, value]) => {
+    if (!key) return
+    next.formatWeights[key] = clampWeight((next.formatWeights[key] || 0) + value)
+  })
+
+  return next
+}
+
+  const getNotInterestedKey = (userId) => `${DISCOVER_NOT_INTERESTED_PREFIX}:${userId}`
+
+const readNotInterested = (userId) => {
+  if (typeof window === "undefined" || !userId) return {}
+  const raw = window.localStorage.getItem(getNotInterestedKey(userId))
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === "object" ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+  const writeNotInterested = (userId, map) => {
+  if (typeof window === "undefined" || !userId) return
+  try {
+    window.localStorage.setItem(getNotInterestedKey(userId), JSON.stringify(map))
+  } catch {
+    // ignore
+  }
+
+}
+
+const mergeWeightMaps = (base = {}, extra = {}) => {
+  const merged = { ...base }
+  Object.entries(extra).forEach(([key, value]) => {
+    merged[key] = (merged[key] || 0) + value
+  })
+  return merged
+}
+
+const createJitter = (value = "") => {
+  let hash = 0
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash % 1000) / 100000
+}
+
+const dedupeReasons = (reasons = []) => {
+  const seen = new Set()
+  const result = []
+  reasons.forEach((reason) => {
+    const key = reason.toLowerCase()
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(reason)
+    }
+  })
+  return result
 }
 
 const getVibes = (genres = [], tags = []) => {
@@ -234,16 +424,22 @@ export default function DiscoverPage() {
   const [spoilersOff, setSpoilersOff] = useState(true)
   const [showSpoilerContent, setShowSpoilerContent] = useState(false)
   const [activeVibes, setActiveVibes] = useState([])
-  const [contentMode, setContentMode] = useState("mixed")
+  const [contentMode, setContentMode] = useState("for-you")
   const [isMuted, setIsMuted] = useState(true)
   const [isPlaying, setIsPlaying] = useState(true)
   const [liked, setLiked] = useState({})
   const [saved, setSaved] = useState({})
+  const [learnedProfile, setLearnedProfile] = useState(null)
+  const [tasteProfile, setTasteProfile] = useState(null)
+  const [notInterested, setNotInterested] = useState({})
+  const [reasonIndex, setReasonIndex] = useState(0)
   const [likeCounts, setLikeCounts] = useState({})
   const [commentCounts, setCommentCounts] = useState({})
   const [progress, setProgress] = useState(0)
   const [addToListOpen, setAddToListOpen] = useState(false)
   const [selectedList, setSelectedList] = useState({})
+
+  const [listStatusesReady, setListStatusesReady] = useState(false)
   const [listPendingId, setListPendingId] = useState(null)
   const [savePendingId, setSavePendingId] = useState(null)
   const [shareNoticeId, setShareNoticeId] = useState(null)
@@ -286,11 +482,118 @@ export default function DiscoverPage() {
   const [heartAnimating, setHeartAnimating] = useState(null)
   const [prefsReady, setPrefsReady] = useState(false)
 
+  const getErrorText = (error) => {
+    if (!error) return ""
+    const message = typeof error?.message === "string" ? error.message : ""
+    const details = typeof error?.details === "string" ? error.details : ""
+    const hint = typeof error?.hint === "string" ? error.hint : ""
+    return `${message} ${details} ${hint}`.toLowerCase()
+  }
+
+  const isMissingRelation = (error, relation) => {
+    const code = String(error?.code || "")
+    const text = getErrorText(error)
+    const needle = String(relation || "").toLowerCase()
+    return (
+      code === "42P01" ||
+      code === "42703" ||
+      code === "PGRST204" ||
+      (needle && text.includes(needle) && (text.includes("does not exist") || text.includes("unknown")))
+    )
+  }
+
+  const feedbackWeight = {
+    complete: 0.8,
+    like: 1.6,
+    save: 1.2,
+    plan_to_watch: 2.6,
+    quick_skip: -1.0,
+    not_interested: -3.8,
+  }
+
+  const scheduleTasteProfileSync = useCallback(
+    (profile) => {
+      if (!user?.id || !profile) return
+      if (tasteSyncTimerRef.current) {
+        clearTimeout(tasteSyncTimerRef.current)
+      }
+      tasteSyncTimerRef.current = setTimeout(() => {
+        upsertUserTasteProfile(client, user.id, profile)
+      }, 900)
+    },
+    [user?.id],
+  )
+
+  const applyDiscoverFeedback = useCallback(
+    (kind, clip) => {
+      if (!user?.id || !clip) return
+      const amount = feedbackWeight[kind] || 0
+      if (!amount) return
+
+      const vibeDelta = {}
+      const genreDelta = {}
+      const formatDelta = {}
+
+      ;(clip.tags || []).forEach((tag) => {
+        vibeDelta[tag] = (vibeDelta[tag] || 0) + amount
+      })
+
+      ;(clip.genres || []).forEach((genre) => {
+        const key = normalizeToken(genre)
+        if (!key) return
+        // Genres are broader than vibes; apply slightly less weight.
+        genreDelta[key] = (genreDelta[key] || 0) + amount * 0.75
+      })
+
+      if (clip.format) {
+        formatDelta[clip.format] = (formatDelta[clip.format] || 0) + amount * 0.5
+      }
+
+      const current = tasteProfileRef.current || readTasteProfile(user.id)
+      const next = applyTasteDelta(current, { genreDelta, vibeDelta, formatDelta })
+      tasteProfileRef.current = next
+      setTasteProfile(next)
+      writeTasteProfile(user.id, next)
+      scheduleTasteProfileSync(next)
+
+      if (kind === "not_interested") {
+        addUserNotInterestedMedia(client, user.id, clip.animeId)
+        setNotInterested((prev) => {
+          const nextHidden = { ...(prev || {}) }
+          nextHidden[String(clip.animeId)] = true
+          writeNotInterested(user.id, nextHidden)
+          return nextHidden
+        })
+      }
+    },
+    [user?.id, scheduleTasteProfileSync],
+  )
+
   const containerRef = useRef(null)
   const listMenuRef = useRef(null)
   const wasPlayingBeforeSpoilerRef = useRef(false)
   const playerRef = useRef(null)
+  const tasteProfileRef = useRef(null)
+  const currentClipRef = useRef(null)
+  const filteredClipsRef = useRef([])
+  const clipStartedAtRef = useRef(Date.now())
+  const isMutedRef = useRef(true)
+  const isPlayingRef = useRef(true)
+  const shouldBlurRef = useRef(false)
+  const isTransitioningRef = useRef(false)
+  const nextClipRef = useRef(null)
+  const tasteSyncTimerRef = useRef(null)
+  const loadMoreCooldownUntilRef = useRef(0)
+  const loadMoreInFlightRef = useRef(false)
   const [ytReady, setYtReady] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (tasteSyncTimerRef.current) {
+        clearTimeout(tasteSyncTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     try {
@@ -298,8 +601,9 @@ export default function DiscoverPage() {
       if (raw) {
         const prefs = JSON.parse(raw)
         const modeIds = contentModeOptions.map((option) => option.id)
-        if (modeIds.includes(prefs?.contentMode)) {
-          setContentMode(prefs.contentMode)
+        const preferredMode = prefs?.contentMode === "mixed" ? "for-you" : prefs?.contentMode
+        if (modeIds.includes(preferredMode)) {
+          setContentMode(preferredMode)
         }
         if (typeof prefs?.spoilersOff === "boolean") {
           setSpoilersOff(prefs.spoilersOff)
@@ -315,6 +619,62 @@ export default function DiscoverPage() {
       setPrefsReady(true)
     }
   }, [])
+
+  useEffect(() => {
+    if (!user?.id) {
+      setTasteProfile(null)
+      setNotInterested({})
+      tasteProfileRef.current = null
+      return
+    }
+
+    let active = true
+
+    // Seed from local cache immediately (fast UI), then sync from Supabase (cross-device).
+    const cachedTaste = readTasteProfile(user.id)
+    const cachedHidden = readNotInterested(user.id)
+    tasteProfileRef.current = cachedTaste
+    setTasteProfile(cachedTaste)
+    setNotInterested(cachedHidden)
+
+    const loadRemote = async () => {
+      const [tasteResult, remoteHidden] = await Promise.all([
+        fetchUserTasteProfile(client, user.id),
+        fetchUserNotInterestedMedia(client, user.id),
+      ])
+
+      if (!active) return
+
+      // Prefer the newer profile (local may contain recent offline feedback).
+      const remoteTaste = tasteResult?.found ? tasteResult.profile : null
+      const nextTaste = remoteTaste && remoteTaste.updatedAt >= cachedTaste?.updatedAt ? remoteTaste : cachedTaste
+      tasteProfileRef.current = nextTaste
+      setTasteProfile(nextTaste)
+      writeTasteProfile(user.id, nextTaste)
+
+      const nextHidden = { ...(cachedHidden || {}) }
+      ;(remoteHidden || []).forEach((mediaId) => {
+        nextHidden[String(mediaId)] = true
+      })
+      setNotInterested(nextHidden)
+      writeNotInterested(user.id, nextHidden)
+
+      // Ensure a row exists server-side if we only had local.
+      if (!tasteResult?.found) {
+        await upsertUserTasteProfile(client, user.id, nextTaste)
+      }
+    }
+
+    loadRemote()
+
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    tasteProfileRef.current = tasteProfile
+  }, [tasteProfile])
 
   useEffect(() => {
     if (!prefsReady) return
@@ -405,6 +765,9 @@ export default function DiscoverPage() {
               id: media.id,
               animeTitle: media.title?.english || media.title?.romaji || "Untitled",
               animeId: media.id,
+              format: media.format || null,
+              season: media.season || null,
+              seasonYear: media.seasonYear || null,
               clipTitle: "Official Trailer",
               thumbnail: media.trailer?.thumbnail || media.bannerImage || media.coverImage?.extraLarge,
               type: "Official",
@@ -415,6 +778,8 @@ export default function DiscoverPage() {
               comments: Math.max(10, Math.round((media.popularity || 0) / 40)),
               shares: Math.max(5, Math.round((media.popularity || 0) / 150)),
               description: (media.description || "").replace(/<[^>]+>/g, ""),
+              genres: media.genres || [],
+              tagNames: (media.tags || []).map((tag) => tag.name),
               trailerId,
             }
           })
@@ -468,6 +833,9 @@ export default function DiscoverPage() {
         id: row.id,
         animeTitle: row.media_title,
         animeId: row.media_id,
+        format: null,
+        season: null,
+        seasonYear: null,
         clipTitle: row.clip_title || "Fandom Clip",
         thumbnail: row.thumbnail_url || null,
         type: "Fandom",
@@ -479,6 +847,8 @@ export default function DiscoverPage() {
         comments: 0,
         shares: 0,
         description: row.clip_title || "Fandom submission.",
+        genres: [],
+        tagNames: row.tags || [],
         trailerId: row.video_id,
         creator: {
           id: row.user_id,
@@ -500,30 +870,395 @@ export default function DiscoverPage() {
     }
   }, [])
 
+  const interactionProfile = useMemo(() => {
+    const genreWeights = {}
+    const vibeWeights = {}
+    const titleWeights = {}
+    const sourceClips = [...clips, ...fandomClips]
+    const byAnime = sourceClips.reduce((acc, clip) => {
+      if (!acc[clip.animeId]) acc[clip.animeId] = []
+      acc[clip.animeId].push(clip)
+      return acc
+    }, {})
+
+    const applyClipWeight = (clip, weight) => {
+      if (!clip || !weight) return
+      ;(clip.tags || []).forEach((tag) => {
+        vibeWeights[tag] = (vibeWeights[tag] || 0) + weight
+      })
+      ;(clip.genres || []).forEach((genre) => {
+        const key = normalizeToken(genre)
+        if (!key) return
+        genreWeights[key] = (genreWeights[key] || 0) + weight
+      })
+      if (clip.animeTitle) {
+        titleWeights[clip.animeTitle] = (titleWeights[clip.animeTitle] || 0) + weight
+      }
+    }
+
+    sourceClips.forEach((clip) => {
+      const key = getClipKey(clip)
+      if (liked[key]) applyClipWeight(clip, 3.5)
+      if (saved[clip.animeId]) applyClipWeight(clip, 2.5)
+      const status = selectedList[clip.animeId]
+      if (status) {
+        applyClipWeight(clip, statusPreferenceWeight[status] || 0)
+      }
+    })
+
+    Object.entries(selectedList).forEach(([mediaId, status]) => {
+      const related = byAnime[Number(mediaId)] || []
+      related.forEach((clip) => applyClipWeight(clip, statusPreferenceWeight[status] || 0))
+    })
+
+    return {
+      genreWeights,
+      vibeWeights,
+      topGenres: Object.entries(genreWeights)
+        .filter(([, value]) => value > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([genre]) => genre)
+        .slice(0, 4),
+      topVibes: Object.entries(vibeWeights)
+        .filter(([, value]) => value > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([vibe]) => vibe)
+        .slice(0, 4),
+      seedTitles: Object.entries(titleWeights)
+        .filter(([, value]) => value > 0)
+        .sort((a, b) => b[1] - a[1])
+        .map(([title]) => title)
+        .slice(0, 6),
+    }
+  }, [clips, fandomClips, liked, saved, selectedList])
+
+  const forYouProfile = useMemo(() => {
+    const fallback = {
+      genreWeights: {},
+      vibeWeights: {},
+      formatWeights: {},
+      topGenres: [],
+      topVibes: [],
+      seedTitles: [],
+    }
+
+    const taste = tasteProfile || fallback
+
+    const mergedGenreWeights = mergeWeightMaps(
+      mergeWeightMaps(learnedProfile?.genreWeights || {}, interactionProfile.genreWeights),
+      taste.genreWeights || {},
+    )
+    const mergedVibeWeights = mergeWeightMaps(
+      mergeWeightMaps(learnedProfile?.vibeWeights || {}, interactionProfile.vibeWeights),
+      taste.vibeWeights || {},
+    )
+    const mergedFormatWeights = mergeWeightMaps({}, taste.formatWeights || {})
+
+    const topGenres = Object.entries(mergedGenreWeights)
+      .filter(([, value]) => value > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([genre]) => genre)
+      .slice(0, 4)
+
+    const topVibes = Object.entries(mergedVibeWeights)
+      .filter(([, value]) => value > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([vibe]) => vibe)
+      .slice(0, 4)
+
+    return {
+      genreWeights: mergedGenreWeights,
+      vibeWeights: mergedVibeWeights,
+      formatWeights: mergedFormatWeights,
+      topGenres,
+      topVibes,
+      seedTitles: dedupeReasons([...(learnedProfile?.seedTitles || []), ...(interactionProfile.seedTitles || [])]).slice(
+        0,
+        6,
+      ),
+    }
+  }, [learnedProfile, interactionProfile, tasteProfile])
+
+  const forYouClips = useMemo(() => {
+    const base = [...clips, ...fandomClips]
+    if (!base.length) return []
+
+    const deduped = []
+    const seenKeys = new Set()
+    base.forEach((clip) => {
+      if (!clip?.key || seenKeys.has(clip.key)) return
+      seenKeys.add(clip.key)
+      deduped.push(clip)
+    })
+
+    const shouldExcludeListed = Boolean(user?.id && listStatusesReady)
+    const listedIds = shouldExcludeListed ? new Set(Object.keys(selectedList).map((id) => Number(id)).filter(Boolean)) : null
+
+    const candidates = deduped.filter((clip) => {
+      const animeId = Number(clip.animeId)
+      if (Number.isFinite(animeId)) {
+        if (listedIds?.has(animeId)) return false
+        if (notInterested?.[String(animeId)]) return false
+      }
+      return true
+    })
+
+    if (!candidates.length) return []
+
+    const now = new Date()
+    const month = now.getMonth()
+    const year = now.getFullYear()
+    const currentSeason = month < 3 ? "WINTER" : month < 6 ? "SPRING" : month < 9 ? "SUMMER" : "FALL"
+
+    const topVibes = forYouProfile.topVibes || []
+    const topGenres = forYouProfile.topGenres || []
+
+    const scoreCandidate = (clip) => {
+      const clipKey = getClipKey(clip)
+      const reasons = []
+
+      const vibeMatches = (clip.tags || [])
+        .map((tag) => ({ tag, weight: forYouProfile.vibeWeights?.[tag] || 0 }))
+        .sort((a, b) => b.weight - a.weight)
+      const topVibeMatch = vibeMatches[0] || null
+
+      const genreMatches = (clip.genres || [])
+        .map((genre) => {
+          const key = normalizeToken(genre)
+          return { genre: key, weight: forYouProfile.genreWeights?.[key] || 0 }
+        })
+        .sort((a, b) => b.weight - a.weight)
+      const topGenreMatch = genreMatches[0] || null
+
+      const formatWeight = clip.format ? forYouProfile.formatWeights?.[clip.format] || 0 : 0
+
+      const isSeasonal = Boolean(
+        clip.season && clip.seasonYear && String(clip.season).toUpperCase() === currentSeason && Number(clip.seasonYear) === year,
+      )
+
+      let globalScore = clip.type === "Official" ? 1.25 : 0.95
+      globalScore += Math.min((clip.likes || 0) / 55000, 2.5)
+      if (isSeasonal) globalScore += 0.55
+
+      let personalScore = 0
+      if (liked[clipKey]) {
+        personalScore += 5.5
+        reasons.push(`Because you liked ${clip.animeTitle}`)
+      }
+      if (saved[clip.animeId]) {
+        personalScore += 3.4
+        reasons.push(`Because you saved ${clip.animeTitle}`)
+      }
+
+      if (topVibeMatch && topVibeMatch.weight) {
+        personalScore += topVibeMatch.weight * 0.6
+        if (topVibeMatch.weight > 0) {
+          reasons.push(`Because you liked ${vibeLabelLookup[topVibeMatch.tag] || topVibeMatch.tag}`)
+        }
+      }
+
+      if (topGenreMatch && topGenreMatch.weight) {
+        personalScore += topGenreMatch.weight * 0.35
+        if (topGenreMatch.weight > 0) {
+          reasons.push(`Because you watched ${toTitleCase(topGenreMatch.genre)}`)
+        }
+      }
+
+      if (formatWeight) {
+        personalScore += formatWeight * 0.25
+      }
+
+      const seedTitles = forYouProfile.seedTitles || []
+      const normalizedTitle = normalizeToken(clip.animeTitle)
+      const matchedSeed = seedTitles.find((seed) => {
+        const token = normalizeToken(seed)
+        if (!token || !normalizedTitle) return false
+        return token === normalizedTitle || token.includes(normalizedTitle) || normalizedTitle.includes(token)
+      })
+      if (matchedSeed && clip.type === "Fandom") {
+        personalScore += 1.4
+        reasons.push(`Because you liked ${matchedSeed}`)
+      }
+
+      if (isSeasonal) {
+        reasons.push("New this season")
+      }
+
+      const primaryVibe = topVibeMatch?.tag || (clip.tags || [])[0] || null
+      const primaryGenre = topGenreMatch?.genre || (clip.genres?.[0] ? normalizeToken(clip.genres[0]) : null)
+
+      const poolSignals = {
+        primaryVibe,
+        primaryGenre,
+        globalScore,
+        personalScore,
+        isSeasonal,
+      }
+
+      if (!reasons.length && topVibes.length) {
+        const fallbackVibe = topVibes[0]
+        reasons.push(`Because you liked ${vibeLabelLookup[fallbackVibe] || fallbackVibe}`)
+      }
+
+      if (!reasons.length && topGenres.length) {
+        reasons.push(`Because you watched ${toTitleCase(topGenres[0])}`)
+      }
+
+      if (!reasons.length) {
+        reasons.push(clip.type === "Fandom" ? "Because this fandom clip is trending now" : "Because this is trending now")
+      }
+
+      const forYouScore = personalScore * 1.0 + globalScore * 1.15 + createJitter(clip.key)
+
+      return {
+        ...clip,
+        ...poolSignals,
+        forYouScore,
+        forYouReasons: dedupeReasons(reasons).slice(0, 3),
+      }
+    }
+
+    const scored = candidates.map(scoreCandidate)
+
+    // Pools:
+    // - personal: strongly matches the user's taste profile
+    // - global: generally trending + seasonal
+    // - explore: outside top vibes/genres but still strong globally
+    const personalRanked = [...scored].sort(
+      (a, b) => b.personalScore + b.globalScore * 0.25 - (a.personalScore + a.globalScore * 0.25),
+    )
+    const globalRanked = [...scored].sort((a, b) => b.globalScore + b.personalScore * 0.08 - (a.globalScore + a.personalScore * 0.08))
+
+    const exploreRanked = scored
+      .filter((clip) => {
+        if (!topVibes.length && !topGenres.length) return true
+        const matchesTopVibe = clip.primaryVibe ? topVibes.includes(clip.primaryVibe) : false
+        const matchesTopGenre = clip.primaryGenre ? topGenres.includes(clip.primaryGenre) : false
+        if (matchesTopVibe || matchesTopGenre) return false
+        return clip.personalScore > -2
+      })
+      .sort((a, b) => b.globalScore + b.personalScore * 0.04 - (a.globalScore + a.personalScore * 0.04))
+
+    const pools = {
+      personal: personalRanked,
+      global: globalRanked,
+      explore: exploreRanked,
+    }
+
+    const pointers = {
+      personal: 0,
+      global: 0,
+      explore: 0,
+    }
+
+    const ratioPattern = ["personal", "personal", "personal", "personal", "personal", "personal", "personal", "global", "global", "explore"]
+    const picked = new Set()
+    const mixed = []
+
+    const takeNext = (poolId) => {
+      const pool = pools[poolId]
+      if (!pool?.length) return null
+      let idx = pointers[poolId] || 0
+      while (idx < pool.length && picked.has(pool[idx].key)) idx += 1
+      pointers[poolId] = idx + 1
+      const item = pool[idx]
+      if (!item || picked.has(item.key)) return null
+      picked.add(item.key)
+      return { ...item, forYouPool: poolId }
+    }
+
+    for (let step = 0; mixed.length < scored.length && step < scored.length * 3; step += 1) {
+      const desiredPool = ratioPattern[step % ratioPattern.length]
+      const item =
+        takeNext(desiredPool) || takeNext("personal") || takeNext("global") || takeNext("explore")
+      if (!item) break
+      mixed.push(item)
+    }
+
+      const applyVariety = (items) => {
+      const queue = [...items]
+      const output = []
+      const maxLookahead = 18
+
+      const violates = (candidate) => {
+        if (!candidate) return true
+        const last = output[output.length - 1]
+        const last2 = output[output.length - 2]
+        if (last && last2) {
+          if (candidate.animeId === last.animeId && last.animeId === last2.animeId) return true
+          if (candidate.primaryVibe && candidate.primaryVibe === last.primaryVibe && last.primaryVibe === last2.primaryVibe) return true
+          if (candidate.type && candidate.type === last.type && last.type === last2.type) {
+            const last3 = output[output.length - 3]
+            if (last3 && last3.type === candidate.type) return true
+          }
+        }
+        return false
+      }
+
+      while (queue.length) {
+        const lookahead = Math.min(queue.length, maxLookahead)
+        let pickIndex = -1
+        for (let i = 0; i < lookahead; i += 1) {
+          if (!violates(queue[i])) {
+            pickIndex = i
+            break
+          }
+        }
+        if (pickIndex === -1) pickIndex = 0
+        output.push(queue.splice(pickIndex, 1)[0])
+      }
+
+      // Ensure pool-specific reasons show up.
+      return output.map((clip) => {
+        const reasons = [...(clip.forYouReasons || [])]
+        if (clip.forYouPool === "explore" && !reasons.some((r) => /try something new/i.test(r))) {
+          reasons.unshift("Try something new")
+        }
+        if (clip.forYouPool === "global" && !reasons.length) {
+          reasons.push("Trending right now")
+        }
+        return { ...clip, forYouReasons: dedupeReasons(reasons).slice(0, 3) }
+      })
+    }
+
+    return applyVariety(mixed)
+  }, [clips, fandomClips, liked, saved, selectedList, forYouProfile, user?.id, listStatusesReady, notInterested])
+
   const allClips = useMemo(() => {
     if (contentMode === "official") return clips
     if (contentMode === "fandom") return fandomClips
+    return forYouClips
+  }, [clips, fandomClips, forYouClips, contentMode])
 
-    const mixed = []
-    let oi = 0
-    let fi = 0
-    let count = 0
-    while (oi < clips.length || fi < fandomClips.length) {
-      if (count % 4 < 3 && oi < clips.length) mixed.push(clips[oi++])
-      else if (fi < fandomClips.length) mixed.push(fandomClips[fi++])
-      else if (oi < clips.length) mixed.push(clips[oi++])
-      count += 1
-    }
-    return mixed
-  }, [clips, fandomClips, contentMode])
+  const listedMediaIds = useMemo(
+    () => new Set(Object.keys(selectedList).map((id) => Number(id)).filter(Boolean)),
+    [selectedList],
+  )
+
+  const discoverClips = useMemo(() => {
+    if (!user) return allClips
+    if (!listStatusesReady) return []
+    return allClips.filter((clip) => {
+      const animeId = Number(clip.animeId)
+      if (listedMediaIds.has(animeId)) return false
+      if (notInterested?.[String(animeId)]) return false
+      return true
+    })
+  }, [allClips, user, listedMediaIds, listStatusesReady, notInterested])
 
   const filteredClips = useMemo(() => {
-    if (!activeVibes.length) return allClips
-    return allClips.filter((clip) => clip.tags?.some((tag) => activeVibes.includes(tag)))
-  }, [allClips, activeVibes])
+    if (!activeVibes.length) return discoverClips
+    return discoverClips.filter((clip) => clip.tags?.some((tag) => activeVibes.includes(tag)))
+  }, [discoverClips, activeVibes])
 
   const currentClip = filteredClips[currentIndex]
   const currentClipKey = currentClip ? getClipKey(currentClip) : null
+  const currentForYouReasons = contentMode === "for-you" ? currentClip?.forYouReasons || [] : []
+  const activeForYouReason = currentForYouReasons.length
+    ? currentForYouReasons[reasonIndex % currentForYouReasons.length]
+    : ""
+  const listFilteredOutEverything =
+    Boolean(user) && listStatusesReady && allClips.length > 0 && discoverClips.length === 0
   const shouldBlur =
     currentClip && spoilersOff && currentClip.spoilerLevel !== "None" && !showSpoilerContent
   const isFandomClip = currentClip?.type === "Fandom"
@@ -531,6 +1266,31 @@ export default function DiscoverPage() {
     if (!currentClipKey) return null
     return `discover-player-${String(currentClipKey).replace(/[^a-zA-Z0-9_-]+/g, "-")}`
   }, [currentClipKey])
+
+  useEffect(() => {
+    currentClipRef.current = currentClip || null
+    clipStartedAtRef.current = Date.now()
+  }, [currentClipKey])
+
+  useEffect(() => {
+    filteredClipsRef.current = filteredClips
+  }, [filteredClips])
+
+  useEffect(() => {
+    isMutedRef.current = isMuted
+  }, [isMuted])
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
+
+  useEffect(() => {
+    shouldBlurRef.current = Boolean(shouldBlur)
+  }, [shouldBlur])
+
+  useEffect(() => {
+    isTransitioningRef.current = Boolean(isTransitioning)
+  }, [isTransitioning])
 
   useEffect(() => {
     if (shouldBlur) {
@@ -559,54 +1319,160 @@ export default function DiscoverPage() {
   }, [comments])
 
   useEffect(() => {
-    if (!user || !allClips.length) return
+    if (!user?.id) {
+      setSelectedList({})
+      setListStatusesReady(true)
+      return
+    }
 
+    let active = true
     const loadStatuses = async () => {
-      const ids = Array.from(new Set(allClips.map((clip) => clip.animeId))).filter(Boolean)
+      if (active) {
+        setListStatusesReady(false)
+      }
+      const statusMap = {}
+      const { data, error } = await client
+        .from("list_entries")
+        .select("media_id, status")
+        .eq("user_id", user.id)
+
+      if (error) {
+        console.warn("Failed to load list statuses:", error?.message || error)
+        if (active) {
+          setSelectedList({})
+          setListStatusesReady(true)
+        }
+        return
+      }
+
+      ;(data || []).forEach((entry) => {
+        statusMap[entry.media_id] = entry.status
+      })
+
+      if (active) {
+        setSelectedList(statusMap)
+        setListStatusesReady(true)
+      }
+    }
+
+    loadStatuses()
+
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    const sourceClips = [...clips, ...fandomClips]
+    if (!user || !sourceClips.length) return
+
+    let active = true
+    const loadLikes = async () => {
+      const ids = Array.from(new Set(sourceClips.map((clip) => clip.animeId))).filter(Boolean)
       if (!ids.length) return
 
       const batches = chunkIds(ids, 200)
-      const statusMap = {}
+      const likedMap = {}
 
       for (const batch of batches) {
         const { data, error } = await client
-          .from("list_entries")
-          .select("media_id, status")
+          .from("clip_likes")
+          .select("media_id, trailer_id")
           .eq("user_id", user.id)
           .in("media_id", batch)
 
         if (error) {
-          console.error("Failed to load list statuses:", error)
+          console.error("Failed to load liked clips:", error)
           continue
         }
 
         ;(data || []).forEach((entry) => {
-          statusMap[entry.media_id] = entry.status
+          likedMap[`${entry.media_id}:${entry.trailer_id}`] = true
         })
       }
 
-      setSelectedList(statusMap)
+      if (active) {
+        setLiked((prev) => ({ ...prev, ...likedMap }))
+      }
     }
 
-    loadStatuses()
-  }, [user, allClips])
+    loadLikes()
+
+    return () => {
+      active = false
+    }
+  }, [user, clips, fandomClips])
 
   useEffect(() => {
     if (!filteredClips.length || !hasMore || loadingMore || contentMode === "fandom") return
     if (currentIndex >= filteredClips.length - 4) {
+      const now = Date.now()
+      if (loadMoreInFlightRef.current) return
+      if (loadMoreCooldownUntilRef.current && now < loadMoreCooldownUntilRef.current) return
+
       const nextPage = page + 1
       setPage(nextPage)
       setLoadingMore(true)
-      fetch("/api/anilist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: DISCOVER_QUERY, variables: { page: nextPage, perPage: 30 } }),
-      })
-        .then((res) => res.json())
-        .then((json) => {
-          if (json?.errors) {
+      let cancelled = false
+      loadMoreInFlightRef.current = true
+
+      const cached = readDiscoverCache(nextPage)
+      if (cached?.items?.length) {
+        setClips((prev) => {
+          const seen = new Set(prev.map((clip) => clip.key))
+          const next = [...prev]
+          ;(cached.items || []).forEach((clip) => {
+            if (!clip || seen.has(clip.key)) return
+            seen.add(clip.key)
+            next.push(clip)
+          })
+          return next
+        })
+        setHasMore(Boolean(cached.hasNextPage))
+        setLoadingMore(false)
+        loadMoreInFlightRef.current = false
+        return () => {
+          cancelled = true
+        }
+      }
+
+      const fetchWithRetry = async (attempt = 0) => {
+        const response = await fetch("/api/anilist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: DISCOVER_QUERY, variables: { page: nextPage, perPage: 30 } }),
+        })
+        if (response.status === 429 && attempt < 2) {
+          const retryAfter = Number(response.headers.get("Retry-After"))
+          const delay = Number.isFinite(retryAfter) ? retryAfter * 1000 : 900 * (attempt + 1)
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          return fetchWithRetry(attempt + 1)
+        }
+        return response
+      }
+
+      ;(async () => {
+        try {
+          const res = await fetchWithRetry()
+          if (cancelled) return
+          let json = null
+          try {
+            json = await res.json()
+          } catch {
+            json = null
+          }
+
+          if (res.status === 429) {
+            // Back off a bit so quick skipping doesn't spam AniList.
+            loadMoreCooldownUntilRef.current = Date.now() + 12_000
+            setFeedError("Rate limited. Please wait a moment and try again.")
+            return
+          }
+
+          if (!res.ok || json?.errors) {
             throw new Error(json?.errors?.[0]?.message || "Failed to load more clips.")
           }
+
           const mediaList = json?.data?.Page?.media || []
           const hasNextPage = json?.data?.Page?.pageInfo?.hasNextPage ?? false
           const items = mediaList
@@ -620,6 +1486,9 @@ export default function DiscoverPage() {
                 id: media.id,
                 animeTitle: media.title?.english || media.title?.romaji || "Untitled",
                 animeId: media.id,
+                format: media.format || null,
+                season: media.season || null,
+                seasonYear: media.seasonYear || null,
                 clipTitle: "Official Trailer",
                 thumbnail: media.trailer?.thumbnail || media.bannerImage || media.coverImage?.extraLarge,
                 type: "Official",
@@ -630,10 +1499,14 @@ export default function DiscoverPage() {
                 comments: Math.max(10, Math.round((media.popularity || 0) / 40)),
                 shares: Math.max(5, Math.round((media.popularity || 0) / 150)),
                 description: (media.description || "").replace(/<[^>]+>/g, ""),
+                genres: media.genres || [],
+                tagNames: (media.tags || []).map((tag) => tag.name),
                 trailerId,
               }
             })
             .filter(Boolean)
+
+          writeDiscoverCache(nextPage, { items, hasNextPage, cachedAt: Date.now() })
 
           setClips((prev) => {
             const seen = new Set(prev.map((clip) => clip.key))
@@ -647,13 +1520,19 @@ export default function DiscoverPage() {
             return next
           })
           setHasMore(hasNextPage)
-          setLoadingMore(false)
-        })
-        .catch((err) => {
+        } catch (err) {
           console.error(err)
-          setLoadingMore(false)
-        })
+        } finally {
+          if (!cancelled) setLoadingMore(false)
+          loadMoreInFlightRef.current = false
+        }
+      })()
+
+      return () => {
+        cancelled = true
+      }
     }
+    return undefined
   }, [currentIndex, filteredClips.length, hasMore, loadingMore, page, contentMode])
 
   useEffect(() => {
@@ -666,6 +1545,10 @@ export default function DiscoverPage() {
   useEffect(() => {
     setCurrentIndex(0)
   }, [contentMode])
+
+  useEffect(() => {
+    setReasonIndex(0)
+  }, [currentClipKey])
 
   useEffect(() => {
     if (!user) {
@@ -694,6 +1577,144 @@ export default function DiscoverPage() {
       active = false
     }
   }, [user])
+
+  useEffect(() => {
+    if (!user?.id) {
+      setLearnedProfile(null)
+      return
+    }
+
+    const cached = readForYouProfileCache(user.id)
+    if (cached && Date.now() - cached.cachedAt < FOR_YOU_PROFILE_TTL) {
+      setLearnedProfile(cached.profile)
+      return
+    }
+
+    let active = true
+    const buildProfile = async () => {
+      try {
+        const [listResult, savedResult, likedResult] = await Promise.all([
+          client.from("list_entries").select("media_id, status").eq("user_id", user.id),
+          client.from("saved_clips").select("media_id").eq("user_id", user.id),
+          client.from("clip_likes").select("media_id").eq("user_id", user.id),
+        ])
+
+        const mediaWeights = {}
+        const applyWeight = (mediaId, delta) => {
+          if (!mediaId || !Number.isFinite(delta) || delta === 0) return
+          mediaWeights[mediaId] = (mediaWeights[mediaId] || 0) + delta
+        }
+
+        if (listResult.error) {
+          console.error("Failed to load list profile:", listResult.error)
+        } else {
+          ;(listResult.data || []).forEach((entry) => {
+            applyWeight(entry.media_id, statusPreferenceWeight[entry.status] || 0)
+          })
+        }
+
+        if (savedResult.error) {
+          console.error("Failed to load saved profile:", savedResult.error)
+        } else {
+          ;(savedResult.data || []).forEach((entry) => {
+            applyWeight(entry.media_id, 2)
+          })
+        }
+
+        if (likedResult.error) {
+          console.error("Failed to load likes profile:", likedResult.error)
+        } else {
+          ;(likedResult.data || []).forEach((entry) => {
+            applyWeight(entry.media_id, 3)
+          })
+        }
+
+        const topMediaIds = Object.entries(mediaWeights)
+          .filter(([, weight]) => weight > 0)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 60)
+          .map(([id]) => Number(id))
+          .filter(Boolean)
+
+        const genreWeights = {}
+        const vibeWeights = {}
+        const titleWeights = {}
+
+        for (const batch of chunkIds(topMediaIds, 30)) {
+          const response = await fetch("/api/anilist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: PROFILE_MEDIA_QUERY,
+              variables: { ids: batch, perPage: batch.length },
+            }),
+          })
+
+          if (!response.ok) {
+            continue
+          }
+
+          const json = await response.json()
+          const profileMedia = json?.data?.Page?.media || []
+          profileMedia.forEach((media) => {
+            const weight = mediaWeights[media.id] || 0
+            if (!weight) return
+
+            const title = media.title?.english || media.title?.romaji || null
+            if (title) {
+              titleWeights[title] = (titleWeights[title] || 0) + weight
+            }
+
+            const genres = media.genres || []
+            const tags = media.tags || []
+            genres.forEach((genre) => {
+              const key = normalizeToken(genre)
+              genreWeights[key] = (genreWeights[key] || 0) + weight
+            })
+
+            const vibes = getVibes(genres, tags)
+            vibes.forEach((vibe) => {
+              vibeWeights[vibe] = (vibeWeights[vibe] || 0) + weight * 1.1
+            })
+          })
+        }
+
+        const profile = {
+          genreWeights,
+          vibeWeights,
+          topGenres: Object.entries(genreWeights)
+            .filter(([, value]) => value > 0)
+            .sort((a, b) => b[1] - a[1])
+            .map(([genre]) => genre)
+            .slice(0, 4),
+          topVibes: Object.entries(vibeWeights)
+            .filter(([, value]) => value > 0)
+            .sort((a, b) => b[1] - a[1])
+            .map(([vibe]) => vibe)
+            .slice(0, 4),
+          seedTitles: Object.entries(titleWeights)
+            .filter(([, value]) => value > 0)
+            .sort((a, b) => b[1] - a[1])
+            .map(([title]) => title)
+            .slice(0, 6),
+        }
+
+        if (!active) return
+        setLearnedProfile(profile)
+        writeForYouProfileCache(user.id, { cachedAt: Date.now(), profile })
+      } catch (error) {
+        if (active) {
+          console.error("Failed to build For You profile:", error)
+        }
+      }
+    }
+
+    buildProfile()
+
+    return () => {
+      active = false
+    }
+  }, [user?.id])
   const fetchComments = useCallback(async () => {
     if (!currentClip) return
     setCommentsLoading(true)
@@ -708,8 +1729,12 @@ export default function DiscoverPage() {
       .order("created_at", { ascending: false })
 
     if (error) {
-      console.error("Failed to load comments:", error)
-      setCommentsError("Could not load comments.")
+      if (isMissingRelation(error, "clip_comments")) {
+        setCommentsError("Comments aren't set up yet. Run web/db/create-clip-comments.sql in Supabase.")
+      } else {
+        console.warn("Failed to load comments:", error?.message || error)
+        setCommentsError("Could not load comments.")
+      }
       setCommentsLoading(false)
       return
     }
@@ -762,7 +1787,9 @@ export default function DiscoverPage() {
       .eq("is_removed", false)
 
     if (commentError) {
-      console.error("Failed to load comment count:", commentError)
+      if (!isMissingRelation(commentError, "clip_comments")) {
+        console.warn("Failed to load comment count:", commentError?.message || commentError)
+      }
     }
 
     const { count: likeCount, error: likeError } = await client
@@ -772,7 +1799,9 @@ export default function DiscoverPage() {
       .eq("trailer_id", currentClip.trailerId)
 
     if (likeError) {
-      console.error("Failed to load like count:", likeError)
+      if (!isMissingRelation(likeError, "clip_likes")) {
+        console.warn("Failed to load like count:", likeError?.message || likeError)
+      }
     }
 
     let likedByUser = false
@@ -786,7 +1815,9 @@ export default function DiscoverPage() {
         .maybeSingle()
 
       if (likedError) {
-        console.error("Failed to load like state:", likedError)
+        if (!isMissingRelation(likedError, "clip_likes")) {
+          console.warn("Failed to load like state:", likedError?.message || likedError)
+        }
       }
       likedByUser = !!likeRow
     }
@@ -838,13 +1869,44 @@ export default function DiscoverPage() {
   }, [])
 
   const goToClip = useCallback(
-    (newIndex, dir) => {
+    (newIndex, dir, targetKey = null) => {
       if (isTransitioning) return
+
+      if (dir === "down") {
+        const leavingClip = currentClipRef.current
+        if (leavingClip) {
+          const elapsedMs = Date.now() - (clipStartedAtRef.current || Date.now())
+          let watchedSeconds = null
+          const player = playerRef.current
+          if (player && typeof player.getCurrentTime === "function") {
+            try {
+              watchedSeconds = player.getCurrentTime()
+            } catch {
+              watchedSeconds = null
+            }
+          }
+
+          const quickSkip =
+            (typeof watchedSeconds === "number" && watchedSeconds >= 0 && watchedSeconds < 2.25) || elapsedMs < 2200
+
+          if (quickSkip) {
+            applyDiscoverFeedback("quick_skip", leavingClip)
+          }
+        }
+      }
+
       setIsTransitioning(true)
       setDirection(dir)
 
       setTimeout(() => {
-        setCurrentIndex(newIndex)
+        let resolvedIndex = newIndex
+        if (targetKey) {
+          const latest = filteredClipsRef.current || []
+          const nextIndex = latest.findIndex((clip) => clip?.key === targetKey)
+          if (nextIndex >= 0) resolvedIndex = nextIndex
+        }
+
+        setCurrentIndex(resolvedIndex)
         setShowSpoilerContent(false)
         setProgress(0)
         setAddToListOpen(false)
@@ -857,7 +1919,7 @@ export default function DiscoverPage() {
         setIsTransitioning(false)
       }, 300)
     },
-    [isTransitioning],
+    [isTransitioning, applyDiscoverFeedback],
   )
 
   const nextClip = useCallback(() => {
@@ -867,20 +1929,26 @@ export default function DiscoverPage() {
       return
     }
     const newIndex = currentIndex + 1
-    goToClip(newIndex, "down")
-  }, [currentIndex, filteredClips.length, goToClip])
+    goToClip(newIndex, "down", filteredClips[newIndex]?.key || null)
+  }, [currentIndex, filteredClips, goToClip])
+
+  useEffect(() => {
+    nextClipRef.current = nextClip
+  }, [nextClip])
 
   const prevClip = useCallback(() => {
     if (!filteredClips.length) return
     if (currentIndex <= 0) return
     const newIndex = currentIndex - 1
-    goToClip(newIndex, "up")
-  }, [currentIndex, filteredClips.length, goToClip])
+    goToClip(newIndex, "up", filteredClips[newIndex]?.key || null)
+  }, [currentIndex, filteredClips, goToClip])
 
   useEffect(() => {
     if (!ytReady || !playerId || !currentClip?.trailerId) return
     if (typeof window === "undefined" || !window.YT || !window.YT.Player) return
 
+    // Only (re)create the player when the clip changes. Other state (mute/play/blur)
+    // is handled via refs + dedicated effects, otherwise the iframe flashes constantly.
     if (playerRef.current?.destroy) {
       playerRef.current.destroy()
       playerRef.current = null
@@ -888,12 +1956,13 @@ export default function DiscoverPage() {
 
     const player = new window.YT.Player(playerId, {
       videoId: currentClip.trailerId,
-      playerVars: getPlayerVars(isMuted),
+      playerVars: getPlayerVars(isMutedRef.current),
       events: {
         onReady: (event) => {
-          if (isMuted) event.target.mute()
+          if (isMutedRef.current) event.target.mute()
           else event.target.unMute()
-          if (!isPlaying || shouldBlur) {
+
+          if (!isPlayingRef.current || shouldBlurRef.current) {
             event.target.pauseVideo()
           } else {
             event.target.playVideo()
@@ -901,7 +1970,10 @@ export default function DiscoverPage() {
         },
         onStateChange: (event) => {
           if (event.data === window.YT.PlayerState.ENDED) {
-            if (!isTransitioning) nextClip()
+            applyDiscoverFeedback("complete", currentClipRef.current)
+            if (!isTransitioningRef.current && typeof nextClipRef.current === "function") {
+              nextClipRef.current()
+            }
           }
         },
       },
@@ -915,7 +1987,7 @@ export default function DiscoverPage() {
         playerRef.current = null
       }
     }
-  }, [ytReady, playerId, currentClip?.trailerId, isMuted, isPlaying, shouldBlur, isTransitioning, nextClip])
+  }, [ytReady, playerId, currentClip?.trailerId, applyDiscoverFeedback])
 
   useEffect(() => {
     const player = playerRef.current
@@ -961,6 +2033,12 @@ export default function DiscoverPage() {
 
     if (!error) {
       setSelectedList((prev) => ({ ...prev, [clipId]: listId }))
+      if (listId === "plan_to_watch") {
+        const clipSnapshot = currentClipRef.current
+        if (clipSnapshot && Number(clipSnapshot.animeId) === Number(clipId)) {
+          applyDiscoverFeedback("plan_to_watch", clipSnapshot)
+        }
+      }
       if (isNewEntry) {
         awardXp(user, XP_ACTIONS.list_add, "list_add")
       }
@@ -1072,7 +2150,8 @@ export default function DiscoverPage() {
 
   const handleToggleSave = async () => {
     if (!user || !currentClip) return
-    const clipId = currentClip.animeId
+    const clipSnapshot = currentClip
+    const clipId = clipSnapshot.animeId
     setSavePendingId(clipId)
 
     if (saved[clipId]) {
@@ -1096,15 +2175,16 @@ export default function DiscoverPage() {
       {
         user_id: user.id,
         media_id: clipId,
-        trailer_id: currentClip.trailerId,
-        media_title: currentClip.animeTitle,
-        thumbnail_url: currentClip.thumbnail || null,
-        clip_type: currentClip.type,
+        trailer_id: clipSnapshot.trailerId,
+        media_title: clipSnapshot.animeTitle,
+        thumbnail_url: clipSnapshot.thumbnail || null,
+        clip_type: clipSnapshot.type,
       },
       { onConflict: "user_id,media_id" },
     )
     if (!error) {
       setSaved((prev) => ({ ...prev, [clipId]: true }))
+      applyDiscoverFeedback("save", clipSnapshot)
     }
     setSavePendingId(null)
   }
@@ -1127,7 +2207,8 @@ export default function DiscoverPage() {
 
   const handleToggleLike = () => {
     if (!currentClip || !user) return
-    const clipKey = getClipKey(currentClip)
+    const clipSnapshot = currentClip
+    const clipKey = getClipKey(clipSnapshot)
     if (likePendingId === clipKey) return
     const nextLiked = !liked[clipKey]
     setLikePendingId(clipKey)
@@ -1135,7 +2216,7 @@ export default function DiscoverPage() {
     const updateLocal = (value) => {
       setLiked((prev) => ({ ...prev, [clipKey]: value }))
       setLikeCounts((prev) => {
-        const base = typeof prev[clipKey] === "number" ? prev[clipKey] : currentClip.likes || 0
+        const base = typeof prev[clipKey] === "number" ? prev[clipKey] : clipSnapshot.likes || 0
         const nextValue = Math.max(base + (value ? 1 : -1), 0)
         return { ...prev, [clipKey]: nextValue }
       })
@@ -1152,20 +2233,22 @@ export default function DiscoverPage() {
       if (nextLiked) {
         const { error } = await client.from("clip_likes").insert({
           user_id: user.id,
-          media_id: currentClip.animeId,
-          trailer_id: currentClip.trailerId,
+          media_id: clipSnapshot.animeId,
+          trailer_id: clipSnapshot.trailerId,
         })
         if (error) {
           console.error("Failed to like clip:", error)
           updateLocal(false)
+        } else {
+          applyDiscoverFeedback("like", clipSnapshot)
         }
       } else {
         const { error } = await client
           .from("clip_likes")
           .delete()
           .eq("user_id", user.id)
-          .eq("media_id", currentClip.animeId)
-          .eq("trailer_id", currentClip.trailerId)
+          .eq("media_id", clipSnapshot.animeId)
+          .eq("trailer_id", clipSnapshot.trailerId)
         if (error) {
           console.error("Failed to unlike clip:", error)
           updateLocal(true)
@@ -1508,6 +2591,8 @@ export default function DiscoverPage() {
               comments: 0,
               shares: 0,
               description: data.clip_title || "Fandom submission.",
+              genres: [],
+              tagNames: data.tags || submitTags,
               trailerId: data.video_id,
               creator: {
                 username: data.user_handle || handle || "fan",
@@ -1758,8 +2843,8 @@ export default function DiscoverPage() {
     <div className="min-h-screen bg-black overflow-hidden">
       <Navigation />
 
-      <main className="fixed inset-0 pt-32 md:pt-28 flex flex-col overflow-hidden select-none">
-        <div className="relative z-[60] px-4 pb-2 mt-1 pointer-events-auto">
+      <main className="fixed inset-0 pt-24 md:pt-24 flex flex-col overflow-hidden select-none">
+        <div className="relative z-[60] px-4 pb-2 pointer-events-auto">
           <div className="mx-auto flex w-full max-w-7xl items-center justify-center gap-2 flex-wrap">
             {contentModeOptions.map((mode) => {
               const Icon = mode.icon
@@ -1816,7 +2901,7 @@ export default function DiscoverPage() {
               <span className="hidden sm:inline">Shield</span>
             </button>
 
-            {(contentMode === "fandom" || contentMode === "mixed") && (
+            {(contentMode === "fandom" || contentMode === "for-you") && (
               <Dialog
                 open={submitDialogOpen}
                 onOpenChange={(open) => {
@@ -2022,13 +3107,30 @@ export default function DiscoverPage() {
           {!filteredClips.length && (
             <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
               <div className="max-w-sm rounded-2xl border border-white/10 bg-black/60 px-6 py-5 text-white/70">
-                <p className="text-sm font-medium text-white">No clips yet</p>
-                <p className="mt-2 text-xs text-white/50">
-                  {contentMode === "fandom"
-                    ? "Be the first to submit a fandom clip."
-                    : "Try switching filters or content mode."}
-                </p>
-                {(contentMode === "fandom" || contentMode === "mixed") && (
+                {user && !listStatusesReady ? (
+                  <>
+                    <p className="text-sm font-medium text-white">Building your Discover feed...</p>
+                    <p className="mt-2 text-xs text-white/50">
+                      Filtering out titles already on your list so they never show up here.
+                    </p>
+                    <div className="mt-4 flex items-center justify-center">
+                      <div className="h-5 w-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-white">No clips yet</p>
+                    <p className="mt-2 text-xs text-white/50">
+                      {contentMode === "fandom"
+                        ? "Be the first to submit a fandom clip."
+                        : listFilteredOutEverything
+                          ? "You're caught up. Discover only shows new titles not already on your list."
+                          : "Try switching filters or content mode."}
+                    </p>
+                  </>
+                )}
+
+                {(!user || listStatusesReady) && (contentMode === "fandom" || contentMode === "for-you") && (
                   <button
                     onClick={() => setSubmitDialogOpen(true)}
                     className="mt-4 inline-flex items-center gap-2 rounded-full bg-rose-500 px-4 py-2 text-xs font-medium text-white hover:bg-rose-600"
@@ -2055,17 +3157,11 @@ export default function DiscoverPage() {
                   transition: "transform 300ms cubic-bezier(0.22, 1, 0.36, 1), opacity 250ms ease-out",
                 }}
               >
-                <div className="absolute inset-0">
-                  <img
-                    src={clip.thumbnail || "/placeholder.svg"}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover blur-3xl scale-125 opacity-60"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/70" />
-                </div>
+                {/* Keep the background calm/consistent; the blurred poster was creating a big "separator" band. */}
+                <div className="absolute inset-0 bg-gradient-to-b from-black via-zinc-950 to-black" />
 
                 {isActive && (
-                  <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-start justify-center pt-4 md:pt-6">
                     <div className="w-full max-w-[400px] aspect-[9/16] rounded-3xl overflow-hidden bg-black shadow-2xl shadow-black/50 ring-1 ring-white/10">
                       <div id={playerId} className="h-full w-full" />
                     </div>
@@ -2166,6 +3262,23 @@ export default function DiscoverPage() {
                 </h2>
               </Link>
               <p className="text-white/70 text-sm mb-2">{currentClip.clipTitle}</p>
+
+              {contentMode === "for-you" && activeForYouReason && (
+                <button
+                  onClick={() =>
+                    setReasonIndex((prev) => (currentForYouReasons.length ? (prev + 1) % currentForYouReasons.length : 0))
+                  }
+                  className="mb-2 inline-flex items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-3 py-1.5 text-[11px] text-emerald-200 hover:bg-emerald-500/15 transition-colors"
+                >
+                  <Sparkles className="h-3 w-3 text-emerald-300" />
+                  <span className="truncate max-w-[260px]">{activeForYouReason}</span>
+                  {currentForYouReasons.length > 1 && (
+                    <span className="rounded-full bg-emerald-300/15 px-1.5 py-0.5 text-[10px] text-emerald-200">
+                      {reasonIndex % currentForYouReasons.length + 1}/{currentForYouReasons.length}
+                    </span>
+                  )}
+                </button>
+              )}
 
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {(currentClip.tags || []).slice(0, 3).map((tag) => (
@@ -2365,6 +3478,23 @@ export default function DiscoverPage() {
                 </div>
               </button>
 
+              <button
+                onClick={() => {
+                  if (!user || !currentClip) return
+                  applyDiscoverFeedback("not_interested", currentClip)
+                  nextClip()
+                }}
+                disabled={!user}
+                className="flex flex-col items-center gap-1 group disabled:opacity-50"
+                aria-label="Not interested"
+                title="Not interested"
+              >
+                <div className="h-11 w-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center transition-all duration-200 group-hover:bg-white/20">
+                  <X className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-[10px] text-white/50">Hide</span>
+              </button>
+
               <button onClick={handleShare} className="flex flex-col items-center gap-1 group">
                 <div className="h-11 w-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center transition-all duration-200 group-hover:bg-white/20">
                   <Share2 className="h-5 w-5 text-white" />
@@ -2473,3 +3603,4 @@ export default function DiscoverPage() {
     </div>
   )
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      

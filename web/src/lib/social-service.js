@@ -3,6 +3,49 @@ import { reportContent } from "@/lib/reporting"
 
 const normalizeHandle = (value) => (value || "").replace(/^@/, "").trim()
 
+const getErrorText = (error) => {
+  if (!error) return ""
+  const message = typeof error?.message === "string" ? error.message : ""
+  const details = typeof error?.details === "string" ? error.details : ""
+  const hint = typeof error?.hint === "string" ? error.hint : ""
+  return `${message} ${details} ${hint}`.toLowerCase()
+}
+
+const isMissingPublicProfilesSchema = (error) => {
+  const code = String(error?.code || "")
+  const text = getErrorText(error)
+  return (
+    code === "42P01" ||
+    code === "42703" ||
+    code === "PGRST204" ||
+    (text.includes("public_profiles") && (text.includes("does not exist") || text.includes("unknown"))) ||
+    text.includes("public_profiles")
+  )
+}
+
+const loadUserSnapshots = async (userIds) => {
+  const ids = Array.from(new Set((userIds || []).filter(Boolean).map((id) => String(id))))
+  if (!ids.length) return new Map()
+
+  const { data, error } = await client
+    .from("public_profiles")
+    .select("user_id, handle, display_name, avatar_url")
+    .in("user_id", ids)
+
+  if (error) {
+    if (isMissingPublicProfilesSchema(error)) return new Map()
+    // Don't break the feed if profiles can't be loaded; just keep stored snapshots.
+    return new Map()
+  }
+
+  const map = new Map()
+  ;(data || []).forEach((row) => {
+    if (!row?.user_id) return
+    map.set(String(row.user_id), row)
+  })
+  return map
+}
+
 export const buildUserProfile = (user) => {
   if (!user) {
     return {
@@ -27,7 +70,9 @@ const hydratePosts = async (posts, userId) => {
   if (!posts || posts.length === 0) return []
   const postIds = posts.map((post) => post.id)
 
-  const [{ data: reactions }, { data: comments }, { data: pollVotes }] = await Promise.all([
+  const userIds = posts.map((post) => post.user_id).filter(Boolean)
+
+  const [{ data: reactions }, { data: comments }, { data: pollVotes }, profilesByUserId] = await Promise.all([
     client
       .from("social_reactions")
       .select("post_id, user_id, reaction_type")
@@ -40,6 +85,7 @@ const hydratePosts = async (posts, userId) => {
       .from("social_poll_votes")
       .select("post_id, user_id, option_index")
       .in("post_id", postIds),
+    loadUserSnapshots(userIds),
   ])
 
   const reactionMap = new Map()
@@ -85,8 +131,15 @@ const hydratePosts = async (posts, userId) => {
     const pollCounts = pollOptions.map((_, index) => (pollCountsMap.get(post.id) || {})[index] || 0)
     const pollTotal = pollCounts.reduce((sum, value) => sum + value, 0)
     const pollUserVote = pollUserVoteMap.has(post.id) ? pollUserVoteMap.get(post.id) : null
+    const liveProfile = profilesByUserId?.get?.(String(post.user_id))
+
+    // Prefer live public profile for display fields so handle/avatar changes reflect everywhere.
+    const liveHandle = liveProfile?.handle ? `@${normalizeHandle(liveProfile.handle)}` : null
     return {
       ...post,
+      user_display_name: liveProfile?.display_name || post.user_display_name,
+      user_handle: liveHandle || post.user_handle,
+      user_avatar_url: liveProfile?.avatar_url || post.user_avatar_url,
       like_count: counts.like,
       repost_count: counts.repost,
       save_count: counts.save,
@@ -159,7 +212,20 @@ export const fetchSocialComments = async (postId) => {
     throw new Error(error.message || "Failed to load comments.")
   }
 
-  return data || []
+  const comments = data || []
+  if (!comments.length) return []
+
+  const profilesByUserId = await loadUserSnapshots(comments.map((comment) => comment.user_id))
+  return comments.map((comment) => {
+    const liveProfile = profilesByUserId.get(String(comment.user_id))
+    const liveHandle = liveProfile?.handle ? `@${normalizeHandle(liveProfile.handle)}` : null
+    return {
+      ...comment,
+      user_display_name: liveProfile?.display_name || comment.user_display_name,
+      user_handle: liveHandle || comment.user_handle,
+      user_avatar_url: liveProfile?.avatar_url || comment.user_avatar_url,
+    }
+  })
 }
 
 export const createSocialPost = async (payload) => {
