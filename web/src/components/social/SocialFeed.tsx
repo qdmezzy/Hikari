@@ -23,6 +23,7 @@ import { emitSocialPosts, subscribeSocialFollowing, subscribeSocialPosts } from 
 import { parseVideoUrl } from "@/lib/video-utils"
 import { awardXp, XP_ACTIONS } from "@/lib/xp"
 import { reportContent } from "@/lib/reporting"
+import { upsertPublicProfile } from "@/lib/public-profile"
 
 const feedTabs = [
   { id: "for-you", label: "For You", icon: Sparkles },
@@ -175,6 +176,9 @@ export function SocialFeed() {
       (payload.pollOptions?.length ? "poll" : payload.clipUrl ? "clip" : payload.attachedList ? "list" : "text")
 
     try {
+      await upsertPublicProfile(user, {
+        handle: (profile.handle || "").replace(/^@/, ""),
+      })
       const created = await createSocialPost({
         user_id: user.id,
         content: payload.content,

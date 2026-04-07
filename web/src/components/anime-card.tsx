@@ -3,8 +3,8 @@
 import Image from "next/image"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { Plus, Play, Star, Bookmark, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { getMediaHref } from "@/lib/anilist"
+import { Star } from "lucide-react"
 import { useState } from "react"
 
 interface AnimeCardProps {
@@ -32,14 +32,16 @@ export function AnimeCard({
   className,
   index = 0,
 }: AnimeCardProps) {
-  const [isAdded, setIsAdded] = useState(false)
   const [isHovered, setIsHovered] = useState(false)
   const progress = currentEpisode && episodes ? (currentEpisode / episodes) * 100 : 0
 
   return (
     <Link
-      href={`/anime/${id}`}
-      className={cn("group relative flex flex-col overflow-hidden rounded-xl bg-card", className)}
+      href={getMediaHref(id, title)}
+      className={cn(
+        "group relative block overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,16,24,0.98)_0%,rgba(5,9,14,1)_100%)] shadow-[0_18px_44px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_28px_64px_rgba(4,14,24,0.55)]",
+        className,
+      )}
       style={{
         animation: "fade-in-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards",
         animationDelay: `${index * 60}ms`,
@@ -48,7 +50,7 @@ export function AnimeCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="relative aspect-[3/4] overflow-hidden rounded-t-xl">
+      <div className="relative aspect-[3/4] overflow-hidden">
         <Image
           src={image || "/placeholder.svg?height=400&width=300"}
           alt={title}
@@ -57,114 +59,58 @@ export function AnimeCard({
           style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
         />
 
-        {/* Overlay gradient */}
         <div
           className={cn(
-            "absolute inset-0 bg-gradient-to-t from-card via-transparent to-transparent transition-opacity duration-500",
-            isHovered ? "opacity-100" : "opacity-0",
+            "absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_42%),linear-gradient(180deg,rgba(4,10,18,0.08)_0%,rgba(4,10,18,0.34)_40%,rgba(3,6,10,0.95)_100%)] transition-opacity duration-500",
+            isHovered ? "opacity-100" : "opacity-85",
           )}
           style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
         />
 
-        {/* Rating Badge */}
-        {rating && (
-          <div
-            className={cn(
-              "absolute top-2 right-2 flex items-center gap-1 rounded-lg bg-background/80 backdrop-blur-sm px-2 py-1 transition-all duration-500",
-              isHovered ? "translate-x-0 opacity-100" : "translate-x-2 opacity-0",
-            )}
-            style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-          >
-            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-            <span className="text-xs font-semibold text-foreground">{rating.toFixed(1)}</span>
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div
-          className={cn(
-            "absolute bottom-2 left-2 right-2 flex items-center gap-2 transition-all duration-500",
-            isHovered ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
+        <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
+          {episodes ? (
+            <span className="rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white/80 backdrop-blur-md">
+              {currentEpisode ? `${currentEpisode}/${episodes}` : `${episodes}`} {type === "anime" ? "eps" : "ch"}
+            </span>
+          ) : (
+            <span />
           )}
-          style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-        >
-          <Button
-            size="sm"
-            className={cn(
-              "flex-1 gap-1 h-8 text-xs transition-all duration-500 btn-press",
-              isAdded ? "bg-emerald-500 hover:bg-emerald-600 text-white" : "bg-primary/90 hover:bg-primary",
-            )}
-            style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-            onClick={(e) => {
-              e.preventDefault()
-              setIsAdded(!isAdded)
-            }}
-          >
-            {isAdded ? (
-              <>
-                <Check className="h-3 w-3" />
-                Added
-              </>
-            ) : (
-              <>
-                <Plus className="h-3 w-3" />
-                Add
-              </>
-            )}
-          </Button>
-          {showProgress && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="gap-1 h-8 text-xs bg-secondary/90 btn-press transition-all duration-500"
-              style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-              onClick={(e) => e.preventDefault()}
-            >
-              <Play className="h-3 w-3" />
-              +1
-            </Button>
-          )}
+          {rating ? (
+            <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+              <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+              <span>{rating.toFixed(1)}</span>
+            </div>
+          ) : null}
         </div>
 
-        {/* Bookmark indicator */}
-        {isAdded && (
-          <div
-            className="absolute top-0 left-3"
-            style={{ animation: "scale-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
+        <div className="absolute inset-x-0 bottom-0 p-4">
+          <h3
+            className="line-clamp-2 text-sm font-semibold text-white drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)] transition-colors duration-500 group-hover:text-primary"
+            style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
           >
-            <div className="w-6 h-8 bg-primary rounded-b-sm flex items-end justify-center pb-1">
-              <Bookmark className="h-3 w-3 text-primary-foreground fill-current" />
-            </div>
-          </div>
-        )}
+            {title}
+          </h3>
+          <p className="mt-1 text-xs text-white/65 drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]">
+            {type === "anime" ? "Anime" : "Manga"}
+            {episodes ? ` / ${episodes} ${type === "anime" ? "episodes" : "chapters"}` : ""}
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-3">
-        <h3
-          className="line-clamp-2 text-sm font-medium text-foreground group-hover:text-primary transition-colors duration-500"
-          style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-        >
-          {title}
-        </h3>
-        {episodes && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {currentEpisode ? `${currentEpisode}/${episodes}` : `${episodes}`} {type === "anime" ? "eps" : "ch"}
-          </p>
-        )}
-
-        {/* Progress Bar */}
-        {showProgress && progress > 0 && (
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-secondary">
+      {showProgress && progress > 0 ? (
+        <div className="absolute inset-x-4 bottom-0 overflow-hidden rounded-t-full">
+          <div className="h-1.5 w-full rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-1000"
+              className="h-full rounded-full bg-gradient-to-r from-primary via-cyan-300 to-accent transition-all duration-1000"
               style={{
                 width: `${progress}%`,
                 transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
               }}
             />
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
     </Link>
   )
 }
+

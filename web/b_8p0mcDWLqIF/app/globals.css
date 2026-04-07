@@ -1,0 +1,366 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* Ice Glacier Theme - Light Mode */
+:root {
+  /* Primary ice blues */
+  --background: oklch(0.97 0.01 220);
+  --foreground: oklch(0.20 0.02 240);
+  
+  /* Cards with frosted glass effect base */
+  --card: oklch(0.99 0.005 220);
+  --card-foreground: oklch(0.20 0.02 240);
+  
+  --popover: oklch(0.99 0.005 220);
+  --popover-foreground: oklch(0.20 0.02 240);
+  
+  /* Primary - deep glacier blue */
+  --primary: oklch(0.55 0.15 230);
+  --primary-foreground: oklch(0.99 0.005 220);
+  
+  /* Secondary - soft frost */
+  --secondary: oklch(0.92 0.02 220);
+  --secondary-foreground: oklch(0.25 0.02 240);
+  
+  /* Muted - gentle grey-blue */
+  --muted: oklch(0.94 0.015 220);
+  --muted-foreground: oklch(0.45 0.02 240);
+  
+  /* Accent - aurora cyan */
+  --accent: oklch(0.75 0.12 200);
+  --accent-foreground: oklch(0.15 0.02 240);
+  
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(0.98 0.01 25);
+  
+  /* Borders - subtle ice */
+  --border: oklch(0.88 0.02 220);
+  --input: oklch(0.92 0.015 220);
+  --ring: oklch(0.60 0.12 230);
+  
+  /* Chart colors */
+  --chart-1: oklch(0.55 0.15 230);
+  --chart-2: oklch(0.65 0.12 200);
+  --chart-3: oklch(0.70 0.10 180);
+  --chart-4: oklch(0.75 0.08 260);
+  --chart-5: oklch(0.60 0.14 280);
+  
+  --radius: 0.75rem;
+  
+  /* Sidebar */
+  --sidebar: oklch(0.98 0.01 220);
+  --sidebar-foreground: oklch(0.20 0.02 240);
+  --sidebar-primary: oklch(0.55 0.15 230);
+  --sidebar-primary-foreground: oklch(0.99 0.005 220);
+  --sidebar-accent: oklch(0.92 0.02 220);
+  --sidebar-accent-foreground: oklch(0.25 0.02 240);
+  --sidebar-border: oklch(0.88 0.02 220);
+  --sidebar-ring: oklch(0.60 0.12 230);
+  
+  /* Custom anime tracker tokens */
+  --glacier: oklch(0.85 0.08 220);
+  --glacier-deep: oklch(0.45 0.12 230);
+  --frost: oklch(0.95 0.015 220);
+  --aurora: oklch(0.70 0.15 200);
+  --crystal: oklch(0.90 0.04 260);
+  --sparkle: oklch(0.80 0.10 280);
+}
+
+/* Ice Glacier Theme - Dark Mode */
+.dark {
+  /* Deep night sky with subtle blue */
+  --background: oklch(0.14 0.02 240);
+  --foreground: oklch(0.92 0.015 220);
+  
+  /* Cards - frosted dark glass */
+  --card: oklch(0.18 0.025 240);
+  --card-foreground: oklch(0.92 0.015 220);
+  
+  --popover: oklch(0.18 0.025 240);
+  --popover-foreground: oklch(0.92 0.015 220);
+  
+  /* Primary - bright glacier blue */
+  --primary: oklch(0.70 0.14 220);
+  --primary-foreground: oklch(0.12 0.02 240);
+  
+  /* Secondary - muted frost */
+  --secondary: oklch(0.25 0.03 240);
+  --secondary-foreground: oklch(0.90 0.015 220);
+  
+  /* Muted */
+  --muted: oklch(0.22 0.025 240);
+  --muted-foreground: oklch(0.65 0.02 220);
+  
+  /* Accent - aurora glow */
+  --accent: oklch(0.60 0.14 200);
+  --accent-foreground: oklch(0.95 0.01 220);
+  
+  --destructive: oklch(0.45 0.18 25);
+  --destructive-foreground: oklch(0.95 0.02 25);
+  
+  /* Borders */
+  --border: oklch(0.28 0.03 240);
+  --input: oklch(0.25 0.025 240);
+  --ring: oklch(0.55 0.12 220);
+  
+  /* Chart colors - brighter for dark mode */
+  --chart-1: oklch(0.70 0.14 220);
+  --chart-2: oklch(0.65 0.14 200);
+  --chart-3: oklch(0.72 0.12 180);
+  --chart-4: oklch(0.68 0.10 260);
+  --chart-5: oklch(0.65 0.15 280);
+  
+  /* Sidebar */
+  --sidebar: oklch(0.16 0.02 240);
+  --sidebar-foreground: oklch(0.92 0.015 220);
+  --sidebar-primary: oklch(0.70 0.14 220);
+  --sidebar-primary-foreground: oklch(0.12 0.02 240);
+  --sidebar-accent: oklch(0.25 0.03 240);
+  --sidebar-accent-foreground: oklch(0.90 0.015 220);
+  --sidebar-border: oklch(0.28 0.03 240);
+  --sidebar-ring: oklch(0.55 0.12 220);
+  
+  /* Custom anime tracker tokens */
+  --glacier: oklch(0.35 0.08 230);
+  --glacier-deep: oklch(0.60 0.14 220);
+  --frost: oklch(0.20 0.025 240);
+  --aurora: oklch(0.55 0.16 200);
+  --crystal: oklch(0.40 0.06 260);
+  --sparkle: oklch(0.65 0.12 280);
+}
+
+@theme inline {
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  
+  /* Custom tokens */
+  --color-glacier: var(--glacier);
+  --color-glacier-deep: var(--glacier-deep);
+  --color-frost: var(--frost);
+  --color-aurora: var(--aurora);
+  --color-crystal: var(--crystal);
+  --color-sparkle: var(--sparkle);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Glass morphism utilities */
+@layer utilities {
+  .glass {
+    @apply bg-card/80 backdrop-blur-md border border-border/50;
+  }
+  
+  .glass-strong {
+    @apply bg-card/90 backdrop-blur-xl border border-border/60;
+  }
+  
+  .glass-subtle {
+    @apply bg-card/60 backdrop-blur-sm border border-border/30;
+  }
+}
+
+/* Custom animations for anime tracker */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(2deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px oklch(0.70 0.14 220 / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.70 0.14 220 / 0.5);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+  
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      oklch(0.90 0.04 220 / 0.4) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s ease-in-out infinite;
+  }
+  
+  .animate-sparkle {
+    animation: sparkle 2s ease-in-out infinite;
+  }
+  
+  .animate-pulse-glow {
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+  
+  .animate-slide-up {
+    animation: slide-up 0.5s ease-out forwards;
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out forwards;
+  }
+  
+  /* Stagger children animations */
+  .stagger-children > * {
+    opacity: 0;
+    animation: slide-up 0.5s ease-out forwards;
+  }
+  
+  .stagger-children > *:nth-child(1) { animation-delay: 0.1s; }
+  .stagger-children > *:nth-child(2) { animation-delay: 0.2s; }
+  .stagger-children > *:nth-child(3) { animation-delay: 0.3s; }
+  .stagger-children > *:nth-child(4) { animation-delay: 0.4s; }
+  .stagger-children > *:nth-child(5) { animation-delay: 0.5s; }
+  .stagger-children > *:nth-child(6) { animation-delay: 0.6s; }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-shimmer,
+  .animate-sparkle,
+  .animate-pulse-glow {
+    animation: none;
+  }
+  
+  .animate-slide-up,
+  .animate-fade-in {
+    animation-duration: 0.01ms;
+  }
+  
+  .stagger-children > * {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Anime card hover effects */
+@layer utilities {
+  .anime-card {
+    @apply relative overflow-hidden rounded-xl transition-all duration-300;
+  }
+  
+  .anime-card::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-t from-foreground/80 via-foreground/20 to-transparent opacity-0 transition-opacity duration-300 z-10;
+  }
+  
+  .anime-card:hover::before {
+    @apply opacity-100;
+  }
+  
+  .anime-card:hover {
+    @apply scale-[1.02] shadow-xl;
+  }
+}
+
+/* Scrollbar styling */
+@layer base {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/50 rounded-full;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full hover:bg-muted-foreground/30 transition-colors;
+  }
+}

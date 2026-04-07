@@ -1,155 +1,146 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Navigation } from "@/components/Navigation"
-import RequireAuth from "@/components/RequireAuth"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Switch } from "@/components/ui/switch"
-import {
-  BookMarked,
-  Search,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  Share2,
-  ChevronRight,
-  Play,
-  Star,
-  Sparkles,
-  Clock,
-  PauseCircle,
-  RotateCcw,
-  Ban,
-  Plus,
-  Globe,
-  Lock,
-} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
+import { useSearchParams } from "next/navigation"
+import { motion } from "framer-motion"
+import { Navigation } from "@/components/Navigation"
+import { AnimeDecorations } from "@/components/anime-decorations"
+import RequireAuth from "@/components/RequireAuth"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+  Play,
+  Pause,
+  CheckCircle2,
+  Clock,
+  Star,
+  Trash2,
+  MoreHorizontal,
+  Eye,
+  Calendar,
+  Plus,
+  Loader2,
+  ListPlus,
+  XCircle,
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Suspense } from "react"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { fetchAniListMediaByIds, formatRelativeTime, getEpisodeCount, getMediaTitle } from "@/lib/anilist"
 
-const MEDIA_BY_IDS = `
-query ($ids: [Int], $perPage: Int) {
-  Page(perPage: $perPage) {
-    media(id_in: $ids, sort: POPULARITY_DESC) {
-      id
-      type
-      title { romaji english }
-      coverImage { large }
-      episodes
-      chapters
-      averageScore
-      genres
-    }
-  }
-}
-`
-
-const chunkIds = (ids, size) => {
-  const batches = []
-  for (let i = 0; i < ids.length; i += size) {
-    batches.push(ids.slice(i, i + size))
-  }
-  return batches
+const statusToTab = {
+  watching: "watching",
+  rewatching: "watching",
+  completed: "completed",
+  plan_to_watch: "planned",
+  "plan-to-watch": "planned",
+  planned: "planned",
+  on_hold: "paused",
+  "on-hold": "paused",
+  dropped: "dropped",
 }
 
-const STATUS_LISTS = [
-  {
-    id: "watching",
-    name: "Watching",
-    description: "Currently watching and tracking progress.",
+const tabMeta = {
+  watching: {
+    label: "Watching / Reading",
     icon: Play,
+    badge: "text-green-500 bg-green-500/10",
+    statuses: ["watching", "rewatching"],
   },
-  {
-    id: "completed",
-    name: "Completed",
-    description: "All the shows and manga you finished.",
-    icon: Star,
+  completed: {
+    label: "Completed / Read",
+    icon: CheckCircle2,
+    badge: "text-accent bg-accent/10",
+    statuses: ["completed"],
   },
-  {
-    id: "plan_to_watch",
-    name: "Plan to Watch",
-    description: "Titles queued up for later.",
+  planned: {
+    label: "Plan to Watch / Read",
     icon: Clock,
+    badge: "text-blue-500 bg-blue-500/10",
+    statuses: ["plan_to_watch"],
   },
-  {
-    id: "rewatching",
-    name: "Rewatching",
-    description: "Second runs and revisits.",
-    icon: RotateCcw,
+  paused: {
+    label: "On Hold",
+    icon: Pause,
+    badge: "text-yellow-500 bg-yellow-500/10",
+    statuses: ["on_hold"],
   },
-  {
-    id: "on_hold",
-    name: "On Hold",
-    description: "Paused for now, but not dropped.",
-    icon: PauseCircle,
+  dropped: {
+    label: "Dropped",
+    icon: Trash2,
+    badge: "text-red-500 bg-red-500/10",
+    statuses: ["dropped"],
   },
-  {
-    id: "dropped",
-    name: "Dropped",
-    description: "Stopped watching or reading.",
-    icon: Ban,
-  },
-]
-
-const formatRelativeTime = (dateValue) => {
-  if (!dateValue) return "No activity yet"
-  const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return "No activity yet"
-
-  const diffMs = date.getTime() - Date.now()
-  const diffSec = Math.round(diffMs / 1000)
-  const absSec = Math.abs(diffSec)
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
-
-  if (absSec < 60) return rtf.format(diffSec, "second")
-  if (absSec < 3600) return rtf.format(Math.round(diffSec / 60), "minute")
-  if (absSec < 86400) return rtf.format(Math.round(diffSec / 3600), "hour")
-  if (absSec < 604800) return rtf.format(Math.round(diffSec / 86400), "day")
-
-  return date.toLocaleDateString()
 }
 
-const Loading = () => null
+const getTabIdForStatus = (status) => statusToTab[status] || "watching"
 
-export default function MyListsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
+const isMangaEntry = (entry) => entry?.media_type === "MANGA" || entry?.media?.type === "MANGA"
+
+const getEntryUnitLabel = (entry, short = false) => {
+  const manga = isMangaEntry(entry)
+  if (short) return manga ? "Ch" : "Ep"
+  return manga ? "chapter" : "episode"
+}
+
+const getEntryTotalUnits = (entry) => {
+  if (isMangaEntry(entry)) {
+    return Number(entry?.media?.chapters || 0) || Number(entry?.media?.episodes || 0) || null
+  }
+  return getEpisodeCount(entry?.media)
+}
+
+const getEntryStatusLabel = (entry, tabId) => {
+  const manga = isMangaEntry(entry)
+  if (tabId === "watching") return manga ? "Reading" : "Watching"
+  if (tabId === "completed") return manga ? "Read" : "Completed"
+  if (tabId === "planned") return manga ? "Plan to Read" : "Plan to Watch"
+  if (tabId === "paused") return "On Hold"
+  if (tabId === "dropped") return "Dropped"
+  return tabMeta[tabId]?.label || "Updated"
+}
+
+const getMediaStatusLabel = (entry) => {
+  const status = entry?.media?.status
+  if (!status || status === "FINISHED") return null
+  if (status === "RELEASING") return isMangaEntry(entry) ? "Publishing" : "Airing"
+  if (status === "NOT_YET_RELEASED") return "Coming Soon"
+  return status.replaceAll("_", " ")
+}
+
+function ListPageContent() {
+  const searchParams = useSearchParams()
+  const { user } = useAuth()
+  const statusParam = searchParams.get("status")
+
+  const initialTab = statusParam ? statusToTab[statusParam] || "watching" : "watching"
+
+  const [activeTab, setActiveTab] = useState(initialTab)
   const [entries, setEntries] = useState([])
+  const [isLoaded, setIsLoaded] = useState(false)
   const [loadingEntries, setLoadingEntries] = useState(true)
   const [entriesError, setEntriesError] = useState("")
-  const [activeListId, setActiveListId] = useState(null)
-  const [customLists, setCustomLists] = useState([])
-  const [customListItems, setCustomListItems] = useState({})
-  const [loadingCustomLists, setLoadingCustomLists] = useState(true)
-  const [customListsError, setCustomListsError] = useState("")
-  const [activeCustomListId, setActiveCustomListId] = useState(null)
-  const [createListOpen, setCreateListOpen] = useState(false)
-  const [newListName, setNewListName] = useState("")
-  const [newListDescription, setNewListDescription] = useState("")
-  const [newListPublic, setNewListPublic] = useState(false)
-  const [listSaving, setListSaving] = useState(false)
-  const [customListItemPending, setCustomListItemPending] = useState({})
-  const [selectedEntryId, setSelectedEntryId] = useState("")
-  const { user } = useAuth()
+  const [pendingId, setPendingId] = useState(null)
+
+  useEffect(() => {
+    setIsLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (statusParam && statusToTab[statusParam]) {
+      setActiveTab(statusToTab[statusParam])
+    }
+  }, [statusParam])
 
   useEffect(() => {
     let isActive = true
@@ -168,65 +159,42 @@ export default function MyListsPage() {
         .from("list_entries")
         .select("id, media_id, status, progress, media_type, updated_at")
         .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
 
       if (!isActive) return
 
       if (error) {
         console.error("Failed to load list entries:", error)
         setEntries([])
-        setEntriesError("Could not load your lists yet.")
+        setEntriesError("Could not load your list yet.")
         setLoadingEntries(false)
         return
       }
 
-      if (!data || data.length === 0) {
+      if (!data?.length) {
         setEntries([])
         setLoadingEntries(false)
         return
       }
 
-      const mediaIds = Array.from(new Set(data.map((entry) => entry.media_id).filter(Boolean)))
-
       try {
-        const mediaById = new Map()
-        const batches = chunkIds(mediaIds, 50)
+        const mediaById = await fetchAniListMediaByIds(data.map((entry) => entry.media_id))
+        if (!isActive) return
 
-        for (const batch of batches) {
-          const res = await fetch("/api/anilist", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              query: MEDIA_BY_IDS,
-              variables: { ids: batch, perPage: batch.length },
-            }),
-          })
+        setEntries(
+          data.map((entry) => ({
+            ...entry,
+            media: mediaById.get(entry.media_id) || null,
+          })),
+        )
+      } catch (loadError) {
+        console.error("Failed to hydrate list media:", loadError)
+        if (!isActive) return
 
-          const json = await res.json()
-
-          if (!res.ok || json?.errors) {
-            throw new Error(json?.errors?.[0]?.message || "Failed to load AniList data")
-          }
-
-          const mediaList = json?.data?.Page?.media ?? []
-          mediaList.forEach((media) => {
-            mediaById.set(media.id, media)
-          })
-        }
-
-        const enriched = data.map((entry) => ({
-          ...entry,
-          media: mediaById.get(entry.media_id),
-        }))
-
+        setEntries(data.map((entry) => ({ ...entry, media: null })))
+        setEntriesError("Some covers and titles could not load.")
+      } finally {
         if (isActive) {
-          setEntries(enriched)
-          setLoadingEntries(false)
-        }
-      } catch (err) {
-        console.error("Failed to hydrate list media:", err)
-        if (isActive) {
-          setEntries(data.map((entry) => ({ ...entry, media: null })))
-          setEntriesError("Some details could not load.")
           setLoadingEntries(false)
         }
       }
@@ -239,951 +207,362 @@ export default function MyListsPage() {
     }
   }, [user])
 
-  const loadCustomLists = useCallback(async () => {
-    if (!user) {
-      setCustomLists([])
-      setCustomListItems({})
-      setLoadingCustomLists(false)
-      return
+  const groupedEntries = useMemo(() => {
+    const groups = {
+      watching: [],
+      completed: [],
+      planned: [],
+      paused: [],
+      dropped: [],
     }
 
-    setLoadingCustomLists(true)
-    setCustomListsError("")
-
-    const { data, error } = await client
-      .from("custom_lists")
-      .select("id, name, description, is_public, created_at, updated_at")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false })
-
-    if (error) {
-      console.error("Failed to load custom lists:", error)
-      setCustomLists([])
-      setCustomListItems({})
-      setCustomListsError("Could not load your custom lists yet.")
-      setLoadingCustomLists(false)
-      return
-    }
-
-    const lists = data || []
-    if (lists.length === 0) {
-      setCustomLists([])
-      setCustomListItems({})
-      setLoadingCustomLists(false)
-      return
-    }
-
-    const listIds = lists.map((list) => list.id)
-    const { data: listItems, error: listItemsError } = await client
-      .from("custom_list_items")
-      .select("id, list_id, media_id, media_type, added_at")
-      .in("list_id", listIds)
-
-    if (listItemsError) {
-      console.error("Failed to load custom list items:", listItemsError)
-      setCustomLists(lists)
-      setCustomListItems({})
-      setLoadingCustomLists(false)
-      return
-    }
-
-    const items = listItems || []
-    const mediaIds = Array.from(new Set(items.map((item) => item.media_id).filter(Boolean)))
-    const mediaById = new Map()
-
-    try {
-      const batches = chunkIds(mediaIds, 50)
-      for (const batch of batches) {
-        const res = await fetch("/api/anilist", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: MEDIA_BY_IDS,
-            variables: { ids: batch, perPage: batch.length },
-          }),
-        })
-        const json = await res.json()
-        if (!res.ok || json?.errors) {
-          throw new Error(json?.errors?.[0]?.message || "Failed to load AniList data")
-        }
-        const mediaList = json?.data?.Page?.media ?? []
-        mediaList.forEach((media) => {
-          mediaById.set(media.id, media)
-        })
-      }
-    } catch (err) {
-      console.error("Failed to hydrate custom list items:", err)
-    }
-
-    const itemsWithMedia = items.map((item) => ({
-      ...item,
-      media: mediaById.get(item.media_id) || null,
-    }))
-
-    const grouped = itemsWithMedia.reduce((acc, item) => {
-      if (!acc[item.list_id]) acc[item.list_id] = []
-      acc[item.list_id].push(item)
-      return acc
-    }, {})
-
-    setCustomLists(lists)
-    setCustomListItems(grouped)
-    setLoadingCustomLists(false)
-  }, [user])
-
-  useEffect(() => {
-    loadCustomLists()
-  }, [loadCustomLists])
-
-  useEffect(() => {
-    setSelectedEntryId("")
-  }, [activeCustomListId])
-
-  const statusLists = useMemo(() => {
-    return STATUS_LISTS.map((status) => {
-      const listEntries = entries.filter((entry) => entry.status === status.id)
-      const coverImages = listEntries
-        .map((entry) => entry?.media?.coverImage?.large)
-        .filter(Boolean)
-        .slice(0, 4)
-      const mostRecent = listEntries.reduce((latest, entry) => {
-        if (!entry.updated_at) return latest
-        if (!latest) return entry.updated_at
-        return new Date(entry.updated_at) > new Date(latest) ? entry.updated_at : latest
-      }, null)
-      const animeCount = listEntries.filter((entry) => entry.media_type === "ANIME").length
-      const mangaCount = listEntries.filter((entry) => entry.media_type === "MANGA").length
-
-      return {
-        ...status,
-        entries: listEntries,
-        coverImages,
-        updatedAt: formatRelativeTime(mostRecent),
-        animeCount,
-        mangaCount,
-        itemCount: listEntries.length,
-      }
-    })
-  }, [entries])
-
-  const customListsData = useMemo(() => {
-    return customLists.map((list) => {
-      const items = customListItems[list.id] || []
-      const coverImages = items
-        .map((item) => item?.media?.coverImage?.large)
-        .filter(Boolean)
-        .slice(0, 4)
-      const mostRecent = items.reduce((latest, item) => {
-        if (!item.added_at) return latest
-        if (!latest) return item.added_at
-        return new Date(item.added_at) > new Date(latest) ? item.added_at : latest
-      }, null)
-      return {
-        ...list,
-        entries: items,
-        coverImages,
-        updatedAt: formatRelativeTime(mostRecent),
-        itemCount: items.length,
-      }
-    })
-  }, [customLists, customListItems])
-
-  const filteredStatusLists = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    if (!query) return statusLists
-    return statusLists.filter((list) => {
-      return list.name.toLowerCase().includes(query) || list.description.toLowerCase().includes(query)
-    })
-  }, [statusLists, searchQuery])
-
-  const filteredCustomLists = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    if (!query) return customListsData
-    return customListsData.filter((list) => {
-      return (
-        list.name.toLowerCase().includes(query) ||
-        (list.description || "").toLowerCase().includes(query)
-      )
-    })
-  }, [customListsData, searchQuery])
-
-  const topGenres = useMemo(() => {
-    const counts = new Map()
     entries.forEach((entry) => {
-      const genres = entry?.media?.genres || []
-      genres.forEach((genre) => {
-        counts.set(genre, (counts.get(genre) || 0) + 1)
-      })
+      groups[getTabIdForStatus(entry.status)].push(entry)
     })
-    return Array.from(counts.entries())
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 2)
+
+    return groups
   }, [entries])
 
-  const topRated = useMemo(() => {
-    const ranked = entries
-      .filter((entry) => entry?.media?.averageScore)
-      .sort((a, b) => (b.media?.averageScore || 0) - (a.media?.averageScore || 0))
-    return ranked[0]
-  }, [entries])
-
-  const aiSuggestedLists = useMemo(() => {
-    const suggestions = []
-    if (topGenres[0]) {
-      suggestions.push({
-        name: `${topGenres[0].name} Gems`,
-        reason: "Based on your top genre",
-        count: topGenres[0].count,
-        href: `/search?genres=${encodeURIComponent(topGenres[0].name)}`,
-      })
-    }
-    if (topRated?.media?.title) {
-      const title = topRated.media.title.english || topRated.media.title.romaji
-      if (title) {
-        suggestions.push({
-          name: `Similar to ${title}`,
-          reason: "Based on your ratings",
-          count: "",
-          href: `/search?query=${encodeURIComponent(title)}`,
-        })
-      }
-    }
-    return suggestions
-  }, [topGenres, topRated])
-
-  const handleCreateList = async () => {
-    if (!user || !newListName.trim()) return
-    setListSaving(true)
-    const { data, error } = await client
-      .from("custom_lists")
-      .insert({
-        user_id: user.id,
-        name: newListName.trim(),
-        description: newListDescription.trim() || null,
-        is_public: newListPublic,
-      })
-      .select("id, name, description, is_public, created_at, updated_at")
-      .single()
-
-    if (error) {
-      console.error("Failed to create custom list:", error)
-      setListSaving(false)
-      return
-    }
-
-    setCustomLists((prev) => [data, ...prev])
-    setCustomListItems((prev) => ({ ...prev, [data.id]: [] }))
-    setNewListName("")
-    setNewListDescription("")
-    setNewListPublic(false)
-    setCreateListOpen(false)
-    setListSaving(false)
-  }
-
-  const handleDeleteCustomList = async (listId) => {
-    if (!user) return
-    const { error } = await client
-      .from("custom_lists")
-      .delete()
-      .eq("id", listId)
-      .eq("user_id", user.id)
-    if (error) {
-      console.error("Failed to delete custom list:", error)
-      return
-    }
-    setCustomLists((prev) => prev.filter((list) => list.id !== listId))
-    setCustomListItems((prev) => {
-      const next = { ...prev }
-      delete next[listId]
-      return next
-    })
-    if (activeCustomListId === listId) {
-      setActiveCustomListId(null)
-    }
-  }
-
-  const handleAddCustomListItem = async () => {
-    if (!user || !activeCustomListId || !selectedEntryId) return
-    const entryId = selectedEntryId
-    const entry = entries.find((item) => String(item.media_id) === entryId)
-    if (!entry) return
-
-    setCustomListItemPending((prev) => ({ ...prev, [entryId]: true }))
-    const { data, error } = await client
-      .from("custom_list_items")
-      .insert({
-        list_id: activeCustomListId,
-        media_id: entry.media_id,
-        media_type: entry.media_type || "ANIME",
-      })
-      .select("id, list_id, media_id, media_type, added_at")
-      .single()
-
-    if (error) {
-      console.error("Failed to add to custom list:", error)
-      setCustomListItemPending((prev) => ({ ...prev, [entryId]: false }))
-      return
-    }
-
-    const itemWithMedia = { ...data, media: entry.media || null }
-    setCustomListItems((prev) => {
-      const next = { ...prev }
-      next[activeCustomListId] = [itemWithMedia, ...(next[activeCustomListId] || [])]
-      return next
-    })
-    setSelectedEntryId("")
-    setCustomListItemPending((prev) => ({ ...prev, [entryId]: false }))
-  }
-
-  const handleRemoveCustomListItem = async (itemId, listId) => {
-    if (!user) return
-    setCustomListItemPending((prev) => ({ ...prev, [itemId]: true }))
-    const { error } = await client
-      .from("custom_list_items")
-      .delete()
-      .eq("id", itemId)
-    if (error) {
-      console.error("Failed to remove custom list item:", error)
-      setCustomListItemPending((prev) => ({ ...prev, [itemId]: false }))
-      return
-    }
-    setCustomListItems((prev) => {
-      const next = { ...prev }
-      next[listId] = (next[listId] || []).filter((item) => item.id !== itemId)
-      return next
-    })
-    setCustomListItemPending((prev) => ({ ...prev, [itemId]: false }))
-  }
-
-  const handleShareCustomList = async (list) => {
-    if (typeof window === "undefined") return
-    const shareUrl = `${window.location.origin}/lists/${list.id}`
-    try {
-      await navigator.clipboard.writeText(shareUrl)
-    } catch (error) {
-      console.error("Failed to copy share link:", error)
-    }
-  }
-
-  const activeList = useMemo(
-    () => statusLists.find((list) => list.id === activeListId),
-    [activeListId, statusLists],
+  const tabs = useMemo(
+    () =>
+      Object.entries(tabMeta).map(([id, meta]) => ({
+        id,
+        label: meta.label,
+        count: groupedEntries[id]?.length || 0,
+        list: groupedEntries[id] || [],
+      })),
+    [groupedEntries],
   )
 
-  const activeCustomList = useMemo(
-    () => customListsData.find((list) => list.id === activeCustomListId),
-    [activeCustomListId, customListsData],
-  )
+  const updateEntry = async (entry, updates) => {
+    if (!entry?.id) return
 
-  const totalListCount = statusLists.length + customLists.length
+    setPendingId(entry.id)
+    const optimisticUpdatedAt = new Date().toISOString()
+    const previousEntry = entry
+
+    setEntries((current) =>
+      current.map((item) =>
+        item.id === entry.id ? { ...item, ...updates, updated_at: optimisticUpdatedAt } : item,
+      ),
+    )
+
+    const { error } = await client.from("list_entries").update(updates).eq("id", entry.id)
+
+    if (error) {
+      console.error("Failed to update list entry:", error)
+      setEntries((current) => current.map((item) => (item.id === entry.id ? previousEntry : item)))
+    }
+
+    setPendingId(null)
+  }
+
+  const handleIncrement = async (entry) => {
+    const episodeCount = getEntryTotalUnits(entry)
+    const currentProgress = Number(entry?.progress || 0)
+    const nextProgress = episodeCount ? Math.min(currentProgress + 1, episodeCount) : currentProgress + 1
+    const nextStatus = episodeCount && nextProgress >= episodeCount ? "completed" : "watching"
+    await updateEntry(entry, { progress: nextProgress, status: nextStatus })
+  }
+
+  const handleRemove = async (entry) => {
+    if (!entry?.id) return
+
+    setPendingId(entry.id)
+    const { error } = await client.from("list_entries").delete().eq("id", entry.id)
+
+    if (error) {
+      console.error("Failed to remove list entry:", error)
+      setPendingId(null)
+      return
+    }
+
+    setEntries((current) => current.filter((item) => item.id !== entry.id))
+    setPendingId(null)
+  }
+
+  const AnimeCard = ({ entry, tabId }) => {
+    const title = getMediaTitle(entry?.media)
+    const cover = entry?.media?.coverImage?.extraLarge || entry?.media?.coverImage?.large || "/placeholder.svg"
+    const score = entry?.media?.averageScore ? Number((entry.media.averageScore / 10).toFixed(1)) : null
+    const episodeCount = getEntryTotalUnits(entry)
+    const progress = Number(entry?.progress || 0)
+    const progressValue = episodeCount ? Math.min((progress / episodeCount) * 100, 100) : 0
+    const updatedLabel = formatRelativeTime(entry?.updated_at)
+    const meta = tabMeta[tabId]
+    const Icon = meta.icon
+    const isPending = pendingId === entry.id
+    const unitLabel = getEntryUnitLabel(entry)
+    const shortUnitLabel = getEntryUnitLabel(entry, true)
+    const statusLabel = getEntryStatusLabel(entry, tabId)
+    const mediaStatusLabel = getMediaStatusLabel(entry)
+
+    const detailText =
+      tabId === "completed"
+        ? `${isMangaEntry(entry) ? "Read" : "Finished"} ${updatedLabel || "recently"}`
+        : tabId === "planned"
+          ? `Added ${updatedLabel || "recently"}`
+          : tabId === "paused"
+            ? `Paused ${updatedLabel || "recently"}`
+            : tabId === "dropped"
+              ? `Dropped ${updatedLabel || "recently"}`
+              : `Updated ${updatedLabel || "recently"}`
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className="glass-card p-4 flex gap-4 group hover:border-accent/50 transition-all"
+      >
+        <Link href={`/media/${entry.media_id}`} className="relative w-20 h-28 md:w-24 md:h-32 rounded-lg overflow-hidden flex-shrink-0">
+          <Image
+            src={cover}
+            alt={title}
+            fill
+            className="object-cover group-hover:scale-110 transition-transform duration-500"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
+            <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white">Open</span>
+          </div>
+        </Link>
+
+        <div className="flex-1 flex flex-col justify-between py-1 min-w-0">
+          <div>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <Link href={`/media/${entry.media_id}`}>
+                  <h3 className="font-semibold text-foreground text-lg group-hover:text-accent transition-colors line-clamp-1">
+                    {title}
+                  </h3>
+                </Link>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <Badge className={meta.badge}>
+                    <Icon className="w-3 h-3 mr-1" />
+                    {statusLabel}
+                  </Badge>
+                  {mediaStatusLabel ? (
+                    <Badge variant="outline" className="text-xs">
+                      {mediaStatusLabel}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="ghost" className="flex-shrink-0 h-8 w-8 p-0" disabled={isPending}>
+                    {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreHorizontal className="w-4 h-4" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/media/${entry.media_id}`}>
+                      <Eye className="w-4 h-4 mr-2" />
+                      Open details
+                    </Link>
+                  </DropdownMenuItem>
+                  {(tabId === "watching" || tabId === "paused") && (
+                    <DropdownMenuItem onClick={() => handleIncrement(entry)}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add 1 {unitLabel}
+                    </DropdownMenuItem>
+                  )}
+                  {entry.status !== "watching" && (
+                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "watching" })}>
+                      <Play className="w-4 h-4 mr-2" />
+                      Move to {isMangaEntry(entry) ? "reading" : "watching"}
+                    </DropdownMenuItem>
+                  )}
+                  {entry.status !== "completed" && (
+                    <DropdownMenuItem
+                      onClick={() =>
+                        updateEntry(entry, {
+                          status: "completed",
+                          progress: episodeCount || entry?.progress || 0,
+                        })
+                      }
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-2" />
+                      Mark {isMangaEntry(entry) ? "read" : "completed"}
+                    </DropdownMenuItem>
+                  )}
+                  {entry.status !== "plan_to_watch" && (
+                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "plan_to_watch" })}>
+                      <ListPlus className="w-4 h-4 mr-2" />
+                      Move to plan to {isMangaEntry(entry) ? "read" : "watch"}
+                    </DropdownMenuItem>
+                  )}
+                  {entry.status !== "on_hold" && (
+                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "on_hold" })}>
+                      <Pause className="w-4 h-4 mr-2" />
+                      Put on hold
+                    </DropdownMenuItem>
+                  )}
+                  {entry.status !== "dropped" && (
+                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "dropped" })}>
+                      <XCircle className="w-4 h-4 mr-2" />
+                      Mark dropped
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive" onClick={() => handleRemove(entry)}>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remove from list
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground flex-wrap">
+              {episodeCount ? (
+                <span>
+                  {shortUnitLabel} {progress}/{episodeCount}
+                </span>
+              ) : progress ? (
+                <span>
+                  Progress {progress} {progress === 1 ? unitLabel : `${unitLabel}s`}
+                </span>
+              ) : null}
+              {score ? (
+                <div className="flex items-center gap-1">
+                  <Star className="w-3.5 h-3.5 text-yellow-400" fill="currentColor" />
+                  <span>{score}</span>
+                </div>
+              ) : null}
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-1">
+              {tabId === "planned" ? <Calendar className="w-3 h-3 inline mr-1" /> : <Clock className="w-3 h-3 inline mr-1" />}
+              {detailText}
+            </p>
+          </div>
+
+          {(tabId === "watching" || tabId === "paused") && episodeCount ? (
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span>Progress</span>
+                <span>{Math.round(progressValue)}%</span>
+              </div>
+              <Progress value={progressValue} className="h-1.5" />
+            </div>
+          ) : null}
+        </div>
+      </motion.div>
+    )
+  }
 
   return (
-    <Suspense fallback={<Loading />}>
-      <RequireAuth>
-        <div className="min-h-screen bg-background noise-overlay">
-          <Navigation />
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      <AnimeDecorations variant="sparse" />
+      <Navigation />
 
-        <main className="pb-24 pt-24 md:pb-8">
-          <div className="px-4 py-8 md:px-8">
-            <div className="mx-auto max-w-5xl">
-              {/* Header */}
-              <div
-                className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-                style={{
-                  animation: "fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-500 flex items-center justify-center shadow-lg shadow-violet-500/25">
-                    <BookMarked className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-foreground md:text-3xl">My Lists</h1>
-                    <p className="text-muted-foreground">{totalListCount} lists tracked</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setCreateListOpen(true)}
-                  className="gap-2 rounded-full px-4"
+      <main className="relative z-10 pt-24 pb-12 px-4">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
+            transition={{ duration: 0.5 }}
+            className="mb-8"
+          >
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">My List</h1>
+            <p className="text-muted-foreground">Your real anime and manga tracking is back in the redesign.</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8"
+          >
+            {tabs.map((tab) => {
+              const meta = tabMeta[tab.id]
+              const Icon = meta.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`glass-card p-4 text-center transition-all duration-300 hover:scale-105 ${
+                    activeTab === tab.id ? "border-accent ring-2 ring-accent/20" : ""
+                  }`}
                 >
-                  <Plus className="h-4 w-4" />
-                  Create List
-                </Button>
-              </div>
-
-              {/* Search */}
-              <Card
-                className="mb-6 bg-card/50 border-border/50"
-                style={{
-                  animation: "fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                  animationDelay: "100ms",
-                  opacity: 0,
-                }}
-              >
-                <CardContent className="p-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Search your lists..."
-                      className="pl-9 bg-background/50 border-border/50"
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                    />
+                  <div className={`w-8 h-8 rounded-full ${meta.badge} flex items-center justify-center mx-auto mb-2`}>
+                    <Icon className="w-4 h-4" />
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="text-2xl font-bold text-foreground">{tab.count}</div>
+                  <div className="text-xs text-muted-foreground">{tab.label}</div>
+                </button>
+              )
+            })}
+          </motion.div>
 
-              {/* AI Suggested Lists */}
-              <Card
-                className="mb-8 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-violet-500/10 border-violet-500/20"
-                style={{
-                  animation: "fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                  animationDelay: "150ms",
-                  opacity: 0,
-                }}
-              >
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Sparkles className="h-5 w-5 text-violet-400" />
-                    AI Suggested Lists
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-3 sm:grid-cols-2">
-                  {aiSuggestedLists.length === 0 ? (
-                    <div className="text-sm text-muted-foreground">
-                      Suggestions will appear after you track more titles.
-                    </div>
-                  ) : (
-                    aiSuggestedLists.map((list) => (
-                      <Link
-                        key={list.name}
-                        href={list.href}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-background/50 hover:bg-background/80 border border-border/50 hover:border-violet-500/30 transition-all text-left group"
-                      >
-                        <div className="h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <Sparkles className="h-5 w-5 text-violet-400" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground group-hover:text-violet-400 transition-colors">
-                            {list.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {list.reason} {list.count ? `- ${list.count} titles` : ""}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-violet-400 group-hover:translate-x-1 transition-all" />
-                      </Link>
+          {entriesError ? <p className="mb-4 text-sm text-rose-400">{entriesError}</p> : null}
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="w-full justify-start bg-transparent border-b border-border/50 p-0 mb-6 overflow-x-auto rounded-none h-auto">
+              {tabs.map((tab) => {
+                const Icon = tabMeta[tab.id].icon
+                return (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
+                      {tab.count}
+                    </span>
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
+
+            {tabs.map((tab) => (
+              <TabsContent key={tab.id} value={tab.id} className="mt-0">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="space-y-3"
+                >
+                  {loadingEntries ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div key={index} className="glass-card p-4 h-40 animate-pulse border border-white/5" />
                     ))
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Custom Lists */}
-              <div
-                className="mb-8"
-                style={{
-                  animation: "fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                  animationDelay: "180ms",
-                  opacity: 0,
-                }}
-              >
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold text-foreground">Custom Lists</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Curate playlists like "Beginner Anime" or "Cozy Nights".
-                    </p>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {customLists.length} created
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {loadingCustomLists ? (
-                    <Card className="bg-card/50 border-border/50">
-                      <CardContent className="py-10 text-center text-muted-foreground">
-                        <BookMarked className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-                        <p>Loading custom lists...</p>
-                      </CardContent>
-                    </Card>
-                  ) : customListsError ? (
-                    <Card className="bg-card/50 border-border/50">
-                      <CardContent className="py-10 text-center text-muted-foreground">
-                        <BookMarked className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-                        <p>{customListsError}</p>
-                      </CardContent>
-                    </Card>
-                  ) : filteredCustomLists.length === 0 ? (
-                    <Card className="bg-card/50 border-border/50">
-                      <CardContent className="py-10 text-center text-muted-foreground">
-                        <BookMarked className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-                        <p>No custom lists yet.</p>
-                        <Button
-                          size="sm"
-                          className="mt-3"
-                          onClick={() => setCreateListOpen(true)}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Create your first list
-                        </Button>
-                      </CardContent>
-                    </Card>
+                  ) : tab.list.length > 0 ? (
+                    tab.list.map((entry) => <AnimeCard key={entry.id} entry={entry} tabId={tab.id} />)
                   ) : (
-                    filteredCustomLists.map((list) => (
-                      <Card
-                        key={list.id}
-                        className="bg-card/50 border-border/50 overflow-hidden group hover:border-primary/30 transition-all duration-300"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setActiveCustomListId(list.id)}
-                          className="block w-full text-left"
-                        >
-                          <div className="relative h-28 overflow-hidden">
-                            <div className="absolute inset-0 grid grid-cols-4 gap-0.5">
-                              {list.coverImages.slice(0, 4).map((img, i) => (
-                                <div key={i} className="relative overflow-hidden">
-                                  <img
-                                    src={img || "/placeholder.svg"}
-                                    alt=""
-                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                  />
-                                </div>
-                              ))}
-                              {list.coverImages.length < 4 &&
-                                Array.from({ length: 4 - list.coverImages.length }).map((_, i) => (
-                                  <div key={`custom-empty-${i}`} className="bg-secondary" />
-                                ))}
-                            </div>
-                            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
-                            <div className="absolute top-2 right-2">
-                              <Badge variant="secondary" className="gap-1">
-                                {list.is_public ? (
-                                  <Globe className="h-3 w-3" />
-                                ) : (
-                                  <Lock className="h-3 w-3" />
-                                )}
-                                {list.is_public ? "Public" : "Private"}
-                              </Badge>
-                            </div>
-                          </div>
-                        </button>
-
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setActiveCustomListId(list.id)}
-                              className="flex-1 text-left"
-                            >
-                              <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                                {list.name}
-                              </h3>
-                              <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
-                                {list.description || "Custom playlist."}
-                              </p>
-                            </button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleShareCustomList(list)}>
-                                  <Share2 className="h-4 w-4 mr-2" />
-                                  Copy Share Link
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onClick={() => handleDeleteCustomList(list.id)}
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-muted-foreground">
-                            <span>{list.itemCount} titles</span>
-                            <span>Updated {list.updatedAt}</span>
-                          </div>
-
-                          <div className="mt-4">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="w-full"
-                              onClick={() => setActiveCustomListId(list.id)}
-                            >
-                              View List
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Lists Grid */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                {loadingEntries ? (
-                  <Card className="bg-card/50 border-border/50">
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                      <BookMarked className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p>Loading your lists...</p>
-                    </CardContent>
-                  </Card>
-                ) : entriesError ? (
-                  <Card className="bg-card/50 border-border/50">
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                      <BookMarked className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p>{entriesError}</p>
-                    </CardContent>
-                  </Card>
-                ) : filteredStatusLists.length === 0 ? (
-                  <Card className="bg-card/50 border-border/50">
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                      <BookMarked className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p>No lists match your search.</p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  filteredStatusLists.map((list, index) => {
-                    const Icon = list.icon
-
-                    return (
-                      <Card
-                        key={list.id}
-                        className="bg-card/50 border-border/50 overflow-hidden group hover:border-primary/30 transition-all duration-300"
-                        style={{
-                          animation: "fade-in-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                          animationDelay: `${200 + index * 80}ms`,
-                          opacity: 0,
-                        }}
-                      >
-                        {/* Cover Images Grid */}
-                        <button
-                          type="button"
-                          onClick={() => setActiveListId(list.id)}
-                          className="block w-full text-left"
-                        >
-                          <div className="relative h-32 overflow-hidden">
-                            <div className="absolute inset-0 grid grid-cols-4 gap-0.5">
-                              {list.coverImages.slice(0, 4).map((img, i) => (
-                                <div key={i} className="relative overflow-hidden">
-                                  <img
-                                    src={img || "/placeholder.svg"}
-                                    alt=""
-                                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                    style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
-                                  />
-                                </div>
-                              ))}
-                              {list.coverImages.length < 4 &&
-                                Array.from({ length: 4 - list.coverImages.length }).map((_, i) => (
-                                  <div key={`empty-${i}`} className="bg-secondary" />
-                                ))}
-                            </div>
-                            <div className="absolute inset-0 bg-gradient-to-t from-card via-card/50 to-transparent" />
-
-                            <div className="absolute top-2 right-2">
-                              <Badge variant="secondary" className="gap-1">
-                                <Icon className="h-3 w-3" />
-                                {list.name}
-                              </Badge>
-                            </div>
-                          </div>
-                        </button>
-
-                        <CardContent className="p-4">
-                          <div className="flex items-start justify-between">
-                            <button
-                              type="button"
-                              onClick={() => setActiveListId(list.id)}
-                              className="flex-1 text-left"
-                            >
-                              <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                                {list.name}
-                              </h3>
-                              <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
-                                {list.description}
-                              </p>
-                            </button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit List
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Share2 className="h-4 w-4 mr-2" />
-                                  Share
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-destructive">
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-3 mt-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Play className="h-3 w-3" />
-                              {list.animeCount} anime
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Star className="h-3 w-3" />
-                              {list.mangaCount} manga
-                            </span>
-                            <span>Updated {list.updatedAt}</span>
-                          </div>
-
-                          <div className="mt-4">
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              className="w-full"
-                              onClick={() => setActiveListId(list.id)}
-                            >
-                              View List
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        </main>
-
-        <Dialog
-          open={Boolean(activeList || activeCustomList)}
-          onOpenChange={() => {
-            setActiveListId(null)
-            setActiveCustomListId(null)
-            setSelectedEntryId("")
-          }}
-        >
-          <DialogContent className="sm:max-w-2xl">
-            {activeCustomList ? (
-              <>
-                <DialogHeader>
-                  <DialogTitle>{activeCustomList.name}</DialogTitle>
-                  <DialogDescription>{activeCustomList.description}</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 py-2">
-                  {activeCustomList.entries.length ? (
-                    activeCustomList.entries.map((entry) => {
-                      const title =
-                        entry?.media?.title?.english ||
-                        entry?.media?.title?.romaji ||
-                        "Unknown title"
-                      const coverImage = entry?.media?.coverImage?.large || "/placeholder.svg"
-
-                      return (
-                        <div
-                          key={entry.id}
-                          className="flex items-center gap-4 rounded-xl border border-border/50 bg-card/60 p-3"
-                        >
-                          <img
-                            src={coverImage}
-                            alt={title}
-                            className="h-16 w-12 rounded-lg object-cover"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground truncate">{title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {entry.media_type || "ANIME"}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Link href={`/media/${entry.media_id}`}>
-                              <Button size="sm" variant="secondary">
-                                Open
-                              </Button>
-                            </Link>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleRemoveCustomListItem(entry.id, activeCustomList.id)}
-                              disabled={customListItemPending[entry.id]}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="text-sm text-muted-foreground">No titles in this list yet.</div>
-                  )}
-
-                  <div className="rounded-xl border border-border/50 bg-card/40 p-4">
-                    <p className="text-sm font-medium text-foreground mb-2">Add from your library</p>
-                    <div className="flex flex-col gap-2 md:flex-row md:items-center">
-                      <select
-                        value={selectedEntryId}
-                        onChange={(event) => setSelectedEntryId(event.target.value)}
-                        className="h-9 w-full rounded-md border border-border/50 bg-background/50 px-3 text-sm text-foreground"
-                      >
-                        <option value="">Select a title</option>
-                        {entries
-                          .filter((entry) =>
-                            !(activeCustomList.entries || []).some(
-                              (item) => item.media_id === entry.media_id,
-                            ),
-                          )
-                          .map((entry) => {
-                            const title =
-                              entry?.media?.title?.english ||
-                              entry?.media?.title?.romaji ||
-                              "Unknown title"
-                            return (
-                              <option key={entry.media_id} value={entry.media_id}>
-                                {title}
-                              </option>
-                            )
-                          })}
-                      </select>
-                      <Button
-                        size="sm"
-                        onClick={handleAddCustomListItem}
-                        disabled={!selectedEntryId || customListItemPending[selectedEntryId]}
-                      >
-                        Add
+                    <div className="glass-card p-12 text-center">
+                      <div className={`w-16 h-16 rounded-full ${tabMeta[tab.id].badge} flex items-center justify-center mx-auto mb-4`}>
+                        {(() => {
+                          const Icon = tabMeta[tab.id].icon
+                          return <Icon className="w-6 h-6" />
+                        })()}
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground mb-2">Nothing here yet</h3>
+                      <p className="text-muted-foreground mb-4">
+                        This tab no longer shows demo rows. Add titles and it will fill with your real entries.
+                      </p>
+                      <Button asChild className="bg-accent hover:bg-accent/90">
+                        <Link href="/search">Browse Titles</Link>
                       </Button>
                     </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <DialogHeader>
-                  <DialogTitle>{activeList?.name || "List"}</DialogTitle>
-                  <DialogDescription>{activeList?.description}</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3 py-2">
-                  {activeList?.entries?.length ? (
-                    activeList.entries.map((entry) => {
-                      const title =
-                        entry?.media?.title?.english ||
-                        entry?.media?.title?.romaji ||
-                        "Unknown title"
-                      const coverImage = entry?.media?.coverImage?.large || "/placeholder.svg"
-                      const isManga = entry?.media_type === "MANGA"
-                      const totalUnits = isManga
-                        ? entry?.media?.chapters ?? null
-                        : entry?.media?.episodes ?? null
-                      const progress = entry?.progress ?? 0
-
-                      return (
-                        <div
-                          key={entry.id}
-                          className="flex items-center gap-4 rounded-xl border border-border/50 bg-card/60 p-3"
-                        >
-                          <img
-                            src={coverImage}
-                            alt={title}
-                            className="h-16 w-12 rounded-lg object-cover"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground truncate">{title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {isManga ? "Chapter" : "Episode"} {progress}
-                              {totalUnits ? ` / ${totalUnits}` : ""}
-                            </p>
-                          </div>
-                          <Link href={`/media/${entry.media_id}`}>
-                            <Button size="sm" variant="secondary">
-                              Open
-                            </Button>
-                          </Link>
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <div className="text-sm text-muted-foreground">No titles in this list yet.</div>
                   )}
-                </div>
-              </>
-            )}
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setActiveListId(null)
-                  setActiveCustomListId(null)
-                  setSelectedEntryId("")
-                }}
-                className="bg-transparent"
-              >
-                Close
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={createListOpen} onOpenChange={setCreateListOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create a custom list</DialogTitle>
-              <DialogDescription>Group titles into shareable playlists.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">List name</label>
-                <Input
-                  value={newListName}
-                  onChange={(event) => setNewListName(event.target.value)}
-                  placeholder="Beginner Anime"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Description</label>
-                <textarea
-                  value={newListDescription}
-                  onChange={(event) => setNewListDescription(event.target.value)}
-                  placeholder="Perfect starter shows for new anime fans."
-                  className="h-24 w-full rounded-md border border-border/50 bg-background/50 px-3 py-2 text-sm text-foreground"
-                />
-              </div>
-              <div className="flex items-center justify-between rounded-lg border border-border/50 bg-card/40 px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Public list</p>
-                  <p className="text-xs text-muted-foreground">
-                    Enable sharing to friends later.
-                  </p>
-                </div>
-                <Switch checked={newListPublic} onCheckedChange={setNewListPublic} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateListOpen(false)} className="bg-transparent">
-                Cancel
-              </Button>
-              <Button onClick={handleCreateList} disabled={!newListName.trim() || listSaving}>
-                {listSaving ? "Creating..." : "Create List"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                </motion.div>
+              </TabsContent>
+            ))}
+          </Tabs>
         </div>
-      </RequireAuth>
-    </Suspense>
+      </main>
+    </div>
+  )
+}
+
+export default function ListPage() {
+  return (
+    <RequireAuth>
+      <ListPageContent />
+    </RequireAuth>
   )
 }

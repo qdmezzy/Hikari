@@ -108,6 +108,8 @@ export function SocialPost({
   const shareUrl = post.postUrl
   const pollTotal = Number.isFinite(post.pollTotal) ? post.pollTotal : 0
   const fandomSlug = post.fandom ? encodeURIComponent(post.fandom.trim().replace(/\s+/g, "-")) : ""
+  const normalizedHandle = String(post.user.handle || "").replace(/^@/, "").trim()
+  const profileHref = normalizedHandle ? `/u/${encodeURIComponent(normalizedHandle)}` : null
 
   const handleShare = async () => {
     if (onShare) {
@@ -141,8 +143,20 @@ export function SocialPost({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="flex flex-wrap items-center gap-1 text-sm">
-                <span className="font-semibold">{post.user.name}</span>
-                <span className="text-muted-foreground">{post.user.handle}</span>
+                {profileHref ? (
+                  <Link href={profileHref} className="font-semibold hover:underline">
+                    {post.user.name}
+                  </Link>
+                ) : (
+                  <span className="font-semibold">{post.user.name}</span>
+                )}
+                {profileHref ? (
+                  <Link href={profileHref} className="text-muted-foreground hover:underline">
+                    {post.user.handle}
+                  </Link>
+                ) : (
+                  <span className="text-muted-foreground">{post.user.handle}</span>
+                )}
                 <span className="text-muted-foreground">-</span>
                 <span className="text-muted-foreground">{post.timestamp}</span>
               </div>

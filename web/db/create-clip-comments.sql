@@ -63,7 +63,7 @@ USING (true);
 -- Policy: Authenticated users can insert their own comments
 DROP POLICY IF EXISTS "Users can insert clip comments" ON public.clip_comments;
 CREATE POLICY "Users can insert clip comments"
-ON public.clip_comments. the s
+ON public.clip_comments
 FOR INSERT
 TO authenticated
 WITH CHECK (auth.uid() = user_id);

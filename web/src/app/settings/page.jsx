@@ -1,624 +1,1910 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import * as React from "react"
+import Link from "next/link"
+import { motion } from "framer-motion"
+import {
+  AlertTriangle,
+  Bell,
+  Calendar,
+  Camera,
+  ChevronRight,
+  Crown,
+  Download,
+  Eye,
+  Globe,
+  Heart,
+  Link2,
+  Lock,
+  Mail,
+  MessageSquare,
+  Palette,
+  Play,
+  Save,
+  Shield,
+  Smartphone,
+  Star,
+  Trash2,
+  Upload,
+  User,
+  Volume2,
+} from "lucide-react"
 import { Navigation } from "@/components/Navigation"
 import RequireAuth from "@/components/RequireAuth"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { User, Bell, Shield, Palette, Link2, Eye, EyeOff, Save } from "lucide-react"
+import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
 import { useTheme } from "next-themes"
 import client from "@/lib/client"
+import { checkHandleAvailability, isHandleTakenError, normalizeHandle, upsertPublicProfile } from "@/lib/public-profile"
+
+const sections = [
+  { id: "profile", label: "Profile", icon: User },
+  { id: "privacy", label: "Privacy", icon: Shield },
+  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "display", label: "Appearance", icon: Palette },
+  { id: "lists", label: "Lists", icon: Play },
+  { id: "content", label: "Content", icon: Eye },
+  { id: "import-export", label: "Import / Export", icon: Download },
+  { id: "account", label: "Account", icon: Lock },
+]
+
+const defaultPublicListVisibility = {
+  watching: true,
+  rewatching: true,
+  completed: true,
+  plan_to_watch: true,
+  on_hold: true,
+  dropped: true,
+}
+
+const normalizePublicListVisibility = (value) => {
+  const next = { ...defaultPublicListVisibility }
+  if (!value || typeof value !== "object") return next
+  Object.keys(next).forEach((key) => {
+    if (typeof value[key] === "boolean") next[key] = value[key]
+  })
+  return next
+}
+
+const buildVisibilityFromPrivacy = (privacy) => ({
+  watching: privacy.showWatching,
+  rewatching: privacy.showWatching,
+  completed: privacy.showCompleted,
+  plan_to_watch: privacy.showPlanned,
+  on_hold: privacy.showOnHold,
+  dropped: privacy.showDropped,
+})
+
+const isHideFromProfileSchemaError = (error) => {
+  const code = String(error?.code || "")
+  const text = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase()
+  return code === "42703" || code === "PGRST204" || text.includes("hide_from_profile")
+}
+
+const defaultProfile = {
+  displayName: "",
+  username: "",
+  email: "",
+  bio: "",
+  location: "",
+  website: "",
+  birthday: "",
+  gender: "prefer-not-to-say",
+  bannerImage: "",
+}
+
+const defaultPrivacy = {
+  publicProfile: true,
+  showActivity: true,
+  showStats: true,
+  showFavorites: true,
+  showWatching: true,
+  showCompleted: true,
+  showPlanned: true,
+  showOnHold: true,
+  showDropped: true,
+  showScores: true,
+  showProgressDates: true,
+  allowMessages: "everyone",
+  allowComments: "everyone",
+  showOnline: true,
+  showLastSeen: true,
+  hideFromSearch: false,
+}
+
+const defaultNotifications = {
+  emailEnabled: true,
+  pushEnabled: true,
+  emailNewEpisode: true,
+  emailWeeklyDigest: false,
+  emailRecommendations: false,
+  emailFriendActivity: true,
+  emailComments: true,
+  emailMessages: true,
+  emailAnnouncements: true,
+  pushNewEpisode: true,
+  pushAiring: true,
+  pushFriendActivity: false,
+  pushComments: true,
+  pushMessages: true,
+  quietHoursEnabled: false,
+  quietHoursStart: "22:00",
+  quietHoursEnd: "08:00",
+}
+
+const defaultDisplay = {
+  theme: "system",
+  accentColor: "teal",
+  language: "en",
+  timezone: "auto",
+  dateFormat: "relative",
+  titleLanguage: "romaji",
+  scoreFormat: "10point",
+  defaultListView: "grid",
+  cardsPerRow: 5,
+  showTrailers: true,
+  autoplayTrailers: false,
+  reduceMotion: false,
+  highContrast: false,
+}
+
+const defaultListSettings = {
+  defaultStatus: "watching",
+  confirmStatusChange: true,
+  autoAddToList: true,
+  showProgressBar: true,
+  showAiringCountdown: true,
+  enableRewatchTracking: true,
+  splitSeasons: true,
+  mergeSequels: false,
+  sortBy: "last-updated",
+  sortDirection: "desc",
+}
+
+const defaultContent = {
+  adultContent: false,
+  showSpoilers: "hide",
+  blurNSFW: true,
+  autoSkipIntro: false,
+  autoSkipOutro: false,
+  autoNextEpisode: true,
+  videoQuality: "auto",
+  subtitleLanguage: "en",
+  dubLanguage: "none",
+}
+
+const defaultAccount = {
+  twoFactorEnabled: false,
+}
+
+function SettingsPanel({ title, description, children, className = "" }) {
+  return (
+    <div className={cn("rounded-2xl border border-border/50 bg-card/60 p-6 backdrop-blur-sm", className)}>
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+        {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function ToggleRow({ id, label, desc, checked, onChange, icon: Icon }) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <div className="flex items-start gap-3">
+        {Icon ? <Icon className="mt-0.5 h-5 w-5 text-muted-foreground" /> : null}
+        <div>
+          <Label htmlFor={id} className="font-medium">
+            {label}
+          </Label>
+          <p className="text-sm text-muted-foreground">{desc}</p>
+        </div>
+      </div>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} />
+    </div>
+  )
+}
 
 export default function SettingsPage() {
-  const { user } = useAuth()
-  const [spoilersOff, setSpoilersOff] = useState(true)
+  const { user, logout } = useAuth()
   const { theme, setTheme } = useTheme()
-  const [displayName, setDisplayName] = useState("")
-  const [handle, setHandle] = useState("")
-  const [bio, setBio] = useState("")
-  const [location, setLocation] = useState("")
-  const [website, setWebsite] = useState("")
-  const [avatarUrl, setAvatarUrl] = useState("")
-  const [avatarPath, setAvatarPath] = useState("")
-  const [avatarUploading, setAvatarUploading] = useState(false)
-  const [avatarError, setAvatarError] = useState("")
-  const [savingProfile, setSavingProfile] = useState(false)
-  const [profileError, setProfileError] = useState("")
-  const [profileSaved, setProfileSaved] = useState(false)
-  const [mutedIds, setMutedIds] = useState([])
-  const [mutedUsers, setMutedUsers] = useState([])
-  const [mutedLoading, setMutedLoading] = useState(false)
-  const [mutedError, setMutedError] = useState("")
-  const [notifyEpisodes, setNotifyEpisodes] = useState(true)
-  const [notifyPreAir, setNotifyPreAir] = useState(true)
-  const [notifyDigest, setNotifyDigest] = useState(false)
-  const [savingNotifications, setSavingNotifications] = useState(false)
-  const fileInputRef = useRef(null)
+  const [activeSection, setActiveSection] = React.useState("profile")
+  const [hasChanges, setHasChanges] = React.useState(false)
+  const [saving, setSaving] = React.useState(false)
+  const [saveError, setSaveError] = React.useState("")
+  const [saveMessage, setSaveMessage] = React.useState("")
+
+  const [profile, setProfile] = React.useState(defaultProfile)
+  const [privacy, setPrivacy] = React.useState(defaultPrivacy)
+  const [notifications, setNotifications] = React.useState(defaultNotifications)
+  const [display, setDisplay] = React.useState(defaultDisplay)
+  const [listSettings, setListSettings] = React.useState(defaultListSettings)
+  const [content, setContent] = React.useState(defaultContent)
+  const [account, setAccount] = React.useState(defaultAccount)
+
+  const [avatarUrl, setAvatarUrl] = React.useState("")
+  const [avatarPath, setAvatarPath] = React.useState("")
+  const [avatarUploading, setAvatarUploading] = React.useState(false)
+  const [avatarError, setAvatarError] = React.useState("")
+  const [mutedIds, setMutedIds] = React.useState([])
+  const [mutedUsers, setMutedUsers] = React.useState([])
+  const [mutedLoading, setMutedLoading] = React.useState(false)
+  const [mutedError, setMutedError] = React.useState("")
+  const [customLists, setCustomLists] = React.useState([])
+  const [connectedIdentities, setConnectedIdentities] = React.useState([])
+  const [connectionPending, setConnectionPending] = React.useState("")
+  const [connectionMessage, setConnectionMessage] = React.useState("")
+  const [connectionError, setConnectionError] = React.useState("")
+
+  const fileInputRef = React.useRef(null)
   const avatarBucket = process.env.NEXT_PUBLIC_SUPABASE_AVATAR_BUCKET || "avatars"
 
-  useEffect(() => {
-    setDisplayName(user?.user_metadata?.display_name || "")
-    setHandle(user?.user_metadata?.username || user?.user_metadata?.handle || "")
-    setBio(user?.user_metadata?.bio || "")
-    setLocation(user?.user_metadata?.location || "")
-    setWebsite(user?.user_metadata?.website || "")
-    setAvatarUrl(user?.user_metadata?.avatar_url || user?.user_metadata?.avatar || "")
-    setAvatarPath(user?.user_metadata?.avatar_path || "")
-    setSpoilersOff(user?.user_metadata?.spoilers_off ?? true)
-    setNotifyEpisodes(user?.user_metadata?.notify_episode ?? true)
-    setNotifyPreAir(user?.user_metadata?.notify_pre_air ?? true)
-    setNotifyDigest(user?.user_metadata?.notify_digest ?? false)
-    const nextMuted = Array.isArray(user?.user_metadata?.muted_user_ids)
-      ? user.user_metadata.muted_user_ids.map((id) => String(id))
-      : []
-    setMutedIds(nextMuted)
-  }, [user])
+  const resetFromUser = React.useCallback(
+    (sourceUser) => {
+      const metadata = sourceUser?.user_metadata || {}
+      const handle = metadata.username || metadata.handle || sourceUser?.email?.split("@")[0] || ""
+      const visibility = normalizePublicListVisibility(metadata.public_list_visibility)
 
-  const normalizeHandle = (value) => {
-    return value.replace(/^@/, "").replace(/\s+/g, "")
-  }
-
-  const shortId = (value) => {
-    if (!value) return ""
-    return `${value.slice(0, 6)}...${value.slice(-4)}`
-  }
-
-  const loadMutedUsers = async (ids) => {
-    if (!user || typeof window === "undefined") return
-    if (!ids.length) {
-      setMutedUsers([])
-      setMutedLoading(false)
-      return
-    }
-
-    setMutedLoading(true)
-    setMutedError("")
-
-    const { data, error } = await client
-      .from("social_posts")
-      .select("user_id, user_display_name, user_handle, user_avatar_url, created_at")
-      .in("user_id", ids)
-      .order("created_at", { ascending: false })
-
-    if (error) {
-      console.error("Failed to load muted users:", error)
-      setMutedError(error.message || "Could not load muted users.")
-      setMutedLoading(false)
-      return
-    }
-
-    const byId = new Map()
-    ;(data || []).forEach((row) => {
-      if (!row.user_id || byId.has(row.user_id)) return
-      byId.set(row.user_id, {
-        userId: row.user_id,
-        displayName: row.user_display_name || "Unknown user",
-        handle: row.user_handle ? `@${row.user_handle}` : shortId(row.user_id),
-        avatarUrl: row.user_avatar_url || "",
+      setProfile({
+        displayName: metadata.display_name || metadata.full_name || sourceUser?.email?.split("@")[0] || "",
+        username: handle,
+        email: sourceUser?.email || "",
+        bio: metadata.bio || "",
+        location: metadata.location || "",
+        website: metadata.website || "",
+        birthday: metadata.birthday || "",
+        gender: metadata.gender || "prefer-not-to-say",
+        bannerImage: metadata.banner_url || "",
       })
-    })
 
-    const nextUsers = ids.map((id) => {
-      return (
-        byId.get(id) || {
-          userId: id,
-          displayName: "Unknown user",
-          handle: shortId(id),
-          avatarUrl: "",
-        }
+      setPrivacy({
+        publicProfile: metadata.public_profile ?? true,
+        showActivity: metadata.show_watch_activity ?? true,
+        showStats: metadata.show_stats ?? true,
+        showFavorites: metadata.show_favorites ?? true,
+        showWatching: visibility.watching || visibility.rewatching,
+        showCompleted: visibility.completed,
+        showPlanned: visibility.plan_to_watch,
+        showOnHold: visibility.on_hold,
+        showDropped: visibility.dropped,
+        showScores: metadata.show_scores ?? true,
+        showProgressDates: metadata.show_progress_dates ?? true,
+        allowMessages: metadata.allow_messages || "everyone",
+        allowComments: metadata.allow_comments || "everyone",
+        showOnline: metadata.show_online_status ?? true,
+        showLastSeen: metadata.show_last_seen ?? true,
+        hideFromSearch: metadata.hide_from_search ?? false,
+      })
+
+      setNotifications({
+        ...defaultNotifications,
+        ...(metadata.notification_preferences || {}),
+        emailEnabled: metadata.email_notifications ?? true,
+        pushEnabled: metadata.push_notifications ?? true,
+        emailNewEpisode: metadata.notify_episode ?? true,
+        pushNewEpisode: metadata.notify_episode ?? true,
+        pushAiring: metadata.notify_pre_air ?? true,
+        emailWeeklyDigest: metadata.notify_digest ?? false,
+      })
+
+      setDisplay({
+        ...defaultDisplay,
+        ...(metadata.display_settings || {}),
+        theme: metadata.theme || theme || "system",
+        language: metadata.language || "en",
+        scoreFormat: metadata.score_format || defaultDisplay.scoreFormat,
+      })
+
+      setListSettings({
+        ...defaultListSettings,
+        ...(metadata.list_settings || {}),
+      })
+
+      setContent({
+        ...defaultContent,
+        ...(metadata.content_settings || {}),
+        adultContent: metadata.adult_content ?? defaultContent.adultContent,
+        showSpoilers: metadata.spoilers_off === false ? metadata.content_settings?.showSpoilers || "blur" : "hide",
+      })
+
+      setAccount({
+        ...defaultAccount,
+        ...(metadata.account_settings || {}),
+        twoFactorEnabled: metadata.two_factor_enabled ?? false,
+      })
+
+      setAvatarUrl(metadata.avatar_url || metadata.avatar || "")
+      setAvatarPath(metadata.avatar_path || "")
+      setMutedIds(
+        Array.isArray(metadata.muted_user_ids) ? metadata.muted_user_ids.map((id) => String(id)) : [],
       )
-    })
+      setHasChanges(false)
+      setSaveError("")
+    },
+    [theme],
+  )
 
-    setMutedUsers(nextUsers)
-    setMutedLoading(false)
-  }
+  React.useEffect(() => {
+    resetFromUser(user)
+  }, [user, resetFromUser])
 
-  useEffect(() => {
+  React.useEffect(() => {
+    const next = Array.isArray(user?.identities) ? user.identities : []
+    setConnectedIdentities(next)
+  }, [user?.identities])
+
+  React.useEffect(() => {
+    if (!user) return
+    let active = true
+
+    const loadUserIdentities = async () => {
+      const { data, error } = await client.auth.getUserIdentities()
+      if (!active || error) return
+      setConnectedIdentities(data?.identities || [])
+    }
+
+    loadUserIdentities()
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  React.useEffect(() => {
+    if (!user) return
+    let active = true
+
+    const loadLists = async () => {
+      const { data, error } = await client
+        .from("custom_lists")
+        .select("id, name, updated_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+
+      if (!active || error) return
+      setCustomLists(data || [])
+    }
+
+    loadLists()
+    return () => {
+      active = false
+    }
+  }, [user?.id])
+
+  const shortId = (value) => (value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "")
+
+  const loadMutedUsers = React.useCallback(
+    async (ids) => {
+      if (!user || !ids.length) {
+        setMutedUsers([])
+        setMutedLoading(false)
+        return
+      }
+
+      setMutedLoading(true)
+      setMutedError("")
+
+      const { data, error } = await client
+        .from("social_posts")
+        .select("user_id, user_display_name, user_handle, user_avatar_url, created_at")
+        .in("user_id", ids)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        setMutedError(error.message || "Could not load muted users.")
+        setMutedLoading(false)
+        return
+      }
+
+      const byId = new Map()
+      ;(data || []).forEach((row) => {
+        if (!row.user_id || byId.has(row.user_id)) return
+        byId.set(row.user_id, {
+          userId: row.user_id,
+          displayName: row.user_display_name || "Unknown user",
+          handle: row.user_handle ? `@${row.user_handle}` : shortId(row.user_id),
+          avatarUrl: row.user_avatar_url || "",
+        })
+      })
+
+      setMutedUsers(
+        ids.map((id) => byId.get(id) || { userId: id, displayName: "Unknown user", handle: shortId(id), avatarUrl: "" }),
+      )
+      setMutedLoading(false)
+    },
+    [user],
+  )
+
+  React.useEffect(() => {
     if (!user) return
     loadMutedUsers(mutedIds)
-  }, [user, mutedIds])
+  }, [user, mutedIds, loadMutedUsers])
 
-  const handleSaveProfile = async () => {
-    if (!user) return
-    setSavingProfile(true)
-    setProfileError("")
-    setProfileSaved(false)
+  const markChanged = React.useCallback(() => {
+    setHasChanges(true)
+    setSaveMessage("")
+    setSaveError("")
+  }, [])
 
-    const nextHandle = normalizeHandle(handle.trim())
-    const { error } = await client.auth.updateUser({
-      data: {
-        display_name: displayName.trim() || null,
-        username: nextHandle || null,
-        bio: bio.trim() || null,
-        location: location.trim() || null,
-        website: website.trim() || null,
-      },
-    })
+  const applyPublicListVisibility = React.useCallback(
+    async (visibility) => {
+      if (!user?.id) return
+      for (const [status, isVisible] of Object.entries(visibility)) {
+        const { error } = await client
+          .from("list_entries")
+          .update({ hide_from_profile: !isVisible })
+          .eq("user_id", user.id)
+          .eq("status", status)
 
-    if (error) {
-      setProfileError(error.message || "Could not save profile.")
-      setSavingProfile(false)
-      return
-    }
+        if (error && !isHideFromProfileSchemaError(error)) {
+          throw error
+        }
+      }
+    },
+    [user?.id],
+  )
 
-    setProfileSaved(true)
-    setSavingProfile(false)
-    setTimeout(() => setProfileSaved(false), 2000)
+  const updateProfileState = (patch) => {
+    setProfile((current) => ({ ...current, ...patch }))
+    markChanged()
   }
 
-  const handleAvatarSelect = async (event) => {
-    if (!user) return
-    const file = event.target.files?.[0]
-    if (!file) return
+  const updatePrivacyState = (patch) => {
+    setPrivacy((current) => ({ ...current, ...patch }))
+    markChanged()
+  }
 
-    setAvatarError("")
+  const updateNotificationState = (patch) => {
+    setNotifications((current) => ({ ...current, ...patch }))
+    markChanged()
+  }
 
-    const maxSize = 2 * 1024 * 1024
-    if (file.size > maxSize) {
-      setAvatarError("Avatar must be smaller than 2MB.")
-      return
+  const updateDisplayState = (patch) => {
+    setDisplay((current) => ({ ...current, ...patch }))
+    markChanged()
+  }
+
+  const updateListSettingsState = (patch) => {
+    setListSettings((current) => ({ ...current, ...patch }))
+    markChanged()
+  }
+
+  const updateContentState = (patch) => {
+    setContent((current) => ({ ...current, ...patch }))
+    markChanged()
+  }
+
+  const updateAccountState = (patch) => {
+    setAccount((current) => ({ ...current, ...patch }))
+    markChanged()
+  }
+
+  const headerUser = React.useMemo(
+    () => ({
+      name: profile.displayName || user?.email?.split("@")[0] || "Hikari User",
+      avatar: avatarUrl || undefined,
+      username: normalizeHandle(profile.username || user?.user_metadata?.username || user?.email?.split("@")[0] || "user"),
+      isPremium: Boolean(user?.user_metadata?.is_premium || user?.user_metadata?.premium),
+    }),
+    [avatarUrl, profile.displayName, profile.username, user],
+  )
+
+  const publicListVisibility = React.useMemo(() => buildVisibilityFromPrivacy(privacy), [privacy])
+
+  const providerOptions = React.useMemo(
+    () => [
+      { id: "google", label: "Google", description: "Link Google sign in", icon: Mail },
+      { id: "discord", label: "Discord", description: "Link Discord sign in", icon: MessageSquare },
+    ],
+    [],
+  )
+
+  const linkedProviders = React.useMemo(() => {
+    const map = new Map()
+    ;(connectedIdentities || []).forEach((identity) => {
+      const key = String(identity?.provider || "").toLowerCase()
+      if (key) map.set(key, identity)
+    })
+    return map
+  }, [connectedIdentities])
+
+  const accentColors = [
+    { id: "teal", className: "bg-cyan-400" },
+    { id: "blue", className: "bg-sky-500" },
+    { id: "purple", className: "bg-violet-500" },
+    { id: "pink", className: "bg-fuchsia-500" },
+    { id: "orange", className: "bg-orange-500" },
+    { id: "green", className: "bg-emerald-500" },
+  ]
+
+  const refreshConnectedIdentities = React.useCallback(async () => {
+    const { data, error } = await client.auth.getUserIdentities()
+    if (!error) {
+      setConnectedIdentities(data?.identities || [])
     }
+  }, [])
+
+  const handleAvatarSelected = async (event) => {
+    const file = event?.target?.files?.[0]
+    if (!file || !user?.id) return
 
     setAvatarUploading(true)
-    const fileExt = file.name.split(".").pop() || "png"
-    const filePath = `${user.id}/${Date.now()}.${fileExt}`
+    setAvatarError("")
 
     try {
-      if (avatarPath) {
-        await client.storage.from(avatarBucket).remove([avatarPath])
-      }
+      const extension = file.name.split(".").pop() || "jpg"
+      const nextPath = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${extension}`
 
       const { error: uploadError } = await client.storage
         .from(avatarBucket)
-        .upload(filePath, file, { upsert: true, contentType: file.type })
+        .upload(nextPath, file, { cacheControl: "3600", upsert: false })
 
-      if (uploadError) {
-        throw uploadError
-      }
+      if (uploadError) throw uploadError
 
-      const { data } = client.storage.from(avatarBucket).getPublicUrl(filePath)
-      const publicUrl = data?.publicUrl
+      const {
+        data: { publicUrl },
+      } = client.storage.from(avatarBucket).getPublicUrl(nextPath)
 
-      const { error: updateError } = await client.auth.updateUser({
-        data: { avatar_url: publicUrl, avatar_path: filePath },
-      })
-
-      if (updateError) {
-        throw updateError
-      }
-
-      setAvatarUrl(publicUrl || "")
-      setAvatarPath(filePath)
+      setAvatarUrl(publicUrl)
+      setAvatarPath(nextPath)
+      markChanged()
     } catch (error) {
-      console.error("Failed to upload avatar:", error)
-      const message = String(error?.message || "")
-      if (message.toLowerCase().includes("bucket not found")) {
-        setAvatarError(`Storage bucket "${avatarBucket}" not found. Create it in Supabase Storage.`)
-      } else if (message.toLowerCase().includes("row-level security") || message.toLowerCase().includes("policy")) {
-        setAvatarError("Storage policy blocked the upload. Enable INSERT/UPDATE/DELETE policies for avatars.")
-      } else {
-        setAvatarError("Could not upload avatar.")
-      }
+      setAvatarError(error?.message || "Could not upload avatar.")
     } finally {
       setAvatarUploading(false)
-      if (event.target) event.target.value = ""
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
     }
   }
 
   const handleRemoveAvatar = async () => {
-    if (!user) return
-    setAvatarError("")
-    setAvatarUploading(true)
-    try {
-      if (avatarPath) {
-        await client.storage.from(avatarBucket).remove([avatarPath])
-      }
-      const { error } = await client.auth.updateUser({
-        data: { avatar_url: null, avatar_path: null },
-      })
-      if (error) {
-        throw error
-      }
-      setAvatarUrl("")
-      setAvatarPath("")
-    } catch (error) {
-      console.error("Failed to remove avatar:", error)
-      const message = String(error?.message || "")
-      if (message.toLowerCase().includes("bucket not found")) {
-        setAvatarError(`Storage bucket "${avatarBucket}" not found. Create it in Supabase Storage.`)
-      } else if (message.toLowerCase().includes("row-level security") || message.toLowerCase().includes("policy")) {
-        setAvatarError("Storage policy blocked the removal. Enable DELETE policies for avatars.")
-      } else {
-        setAvatarError("Could not remove avatar.")
-      }
-    } finally {
-      setAvatarUploading(false)
+    if (!avatarUrl && !avatarPath) return
+
+    if (avatarPath) {
+      await client.storage.from(avatarBucket).remove([avatarPath])
     }
+
+    setAvatarUrl("")
+    setAvatarPath("")
+    markChanged()
   }
 
-  const handleUnmute = async (targetId) => {
+  const handleBannerPrompt = () => {
+    const nextValue = window.prompt("Paste a banner image URL", profile.bannerImage || "")
+    if (nextValue === null) return
+    updateProfileState({ bannerImage: nextValue.trim() })
+  }
+
+  const handleUnmuteUser = async (targetUserId) => {
     if (!user) return
-    const nextIds = mutedIds.filter((id) => id !== targetId)
+
+    const nextIds = mutedIds.filter((id) => String(id) !== String(targetUserId))
     setMutedError("")
-    const { error } = await client.auth.updateUser({ data: { muted_user_ids: nextIds } })
+
+    const { error } = await client.auth.updateUser({
+      data: { muted_user_ids: nextIds },
+    })
+
     if (error) {
-      console.error("Failed to unmute user:", error)
-      setMutedError(error.message || "Could not unmute user.")
+      setMutedError(error.message || "Could not update muted users.")
       return
     }
+
     setMutedIds(nextIds)
-    setMutedUsers((prev) => prev.filter((entry) => entry.userId !== targetId))
+    setMutedUsers((current) => current.filter((entry) => String(entry.userId) !== String(targetUserId)))
+    setSaveMessage("Muted users updated.")
   }
 
-  const updatePreference = async (key, value) => {
-    if (!user) return
-    const { error } = await client.auth.updateUser({ data: { [key]: value } })
+  const handleConnectProvider = async (provider) => {
+    setConnectionPending(provider)
+    setConnectionError("")
+    setConnectionMessage("")
+
+    const { error } = await client.auth.linkIdentity({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/settings`,
+      },
+    })
+
     if (error) {
-      console.error("Failed to update preference:", error)
+      setConnectionError(error.message || `Could not connect ${provider}.`)
+      setConnectionPending("")
+      return
     }
+
+    setConnectionPending("")
+    setConnectionMessage(`Continue with ${provider} to finish linking that account.`)
+  }
+
+  const handleDisconnectProvider = async (provider) => {
+    const identity = linkedProviders.get(provider)
+    if (!identity) return
+
+    setConnectionPending(provider)
+    setConnectionError("")
+    setConnectionMessage("")
+
+    const { error } = await client.auth.unlinkIdentity(identity)
+
+    if (error) {
+      setConnectionError(error.message || `Could not disconnect ${provider}.`)
+      setConnectionPending("")
+      return
+    }
+
+    await refreshConnectedIdentities()
+    setConnectionPending("")
+    setConnectionMessage(`${provider[0].toUpperCase()}${provider.slice(1)} disconnected.`)
+  }
+
+  const handleExportSettings = () => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      profile,
+      privacy,
+      notifications,
+      display,
+      listSettings,
+      content,
+      account,
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement("a")
+    anchor.href = url
+    anchor.download = `hikari-settings-${new Date().toISOString().slice(0, 10)}.json`
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDiscardChanges = () => {
+    resetFromUser(user)
+    setSaveMessage("")
+    setAvatarError("")
+    setConnectionError("")
+  }
+
+  const handleSaveAll = async () => {
+    if (!user) return
+
+    setSaving(true)
+    setSaveError("")
+    setSaveMessage("")
+
+    try {
+      const normalizedHandle = normalizeHandle(profile.username)
+      if (!normalizedHandle) {
+        throw new Error("Choose a valid username.")
+      }
+
+      const availability = await checkHandleAvailability(normalizedHandle, user.id)
+      if (availability.error && !availability.skipped) {
+        throw availability.error
+      }
+      if (!availability.available) {
+        throw new Error(`@${normalizedHandle} is already taken.`)
+      }
+
+      const nextMetadata = {
+        display_name: profile.displayName || user.email?.split("@")[0] || "Hikari User",
+        username: normalizedHandle,
+        handle: normalizedHandle,
+        bio: profile.bio || "",
+        location: profile.location || "",
+        website: profile.website || "",
+        birthday: profile.birthday || "",
+        gender: profile.gender || defaultProfile.gender,
+        avatar_url: avatarUrl || null,
+        avatar_path: avatarPath || null,
+        banner_url: profile.bannerImage || null,
+        public_profile: privacy.publicProfile,
+        show_watch_activity: privacy.showActivity,
+        show_stats: privacy.showStats,
+        show_favorites: privacy.showFavorites,
+        show_scores: privacy.showScores,
+        show_progress_dates: privacy.showProgressDates,
+        show_online_status: privacy.showOnline,
+        show_last_seen: privacy.showLastSeen,
+        hide_from_search: privacy.hideFromSearch,
+        allow_messages: privacy.allowMessages,
+        allow_comments: privacy.allowComments,
+        public_list_visibility: publicListVisibility,
+        email_notifications: notifications.emailEnabled,
+        push_notifications: notifications.pushEnabled,
+        notify_episode: notifications.emailNewEpisode || notifications.pushNewEpisode,
+        notify_pre_air: notifications.pushAiring,
+        notify_digest: notifications.emailWeeklyDigest,
+        notification_preferences: notifications,
+        theme: display.theme,
+        language: display.language,
+        score_format: display.scoreFormat,
+        display_settings: display,
+        list_settings: listSettings,
+        content_settings: {
+          ...content,
+          showSpoilers: content.showSpoilers,
+        },
+        adult_content: content.adultContent,
+        spoilers_off: content.showSpoilers === "hide",
+        account_settings: account,
+        two_factor_enabled: account.twoFactorEnabled,
+        muted_user_ids: mutedIds,
+      }
+
+      const { data, error } = await client.auth.updateUser({
+        data: nextMetadata,
+      })
+
+      if (error) throw error
+
+      const profileResult = await upsertPublicProfile(user, {
+        handle: normalizedHandle,
+        display_name: nextMetadata.display_name,
+        avatar_url: avatarUrl || null,
+        banner_url: profile.bannerImage || null,
+        bio: profile.bio || null,
+        location: profile.location || null,
+        website: profile.website || null,
+        show_online_status: privacy.showOnline,
+        show_watch_activity: privacy.showActivity,
+      })
+
+      if (profileResult?.error) {
+        if (isHandleTakenError(profileResult.error)) {
+          throw new Error(`@${normalizedHandle} is already taken.`)
+        }
+        throw profileResult.error
+      }
+
+      await applyPublicListVisibility(publicListVisibility)
+      setTheme(display.theme)
+      setHasChanges(false)
+      setSaveMessage("Settings saved.")
+
+      if (data?.user) {
+        resetFromUser(data.user)
+      }
+    } catch (error) {
+      setSaveError(error?.message || "Could not save settings.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const renderSectionContent = () => {
+    if (activeSection === "profile") {
+      return (
+        <div className="space-y-6">
+          <SettingsPanel
+            title="Profile Header"
+            description="Use the revamped profile header while keeping your live Hikari data underneath it."
+          >
+            <div className="overflow-hidden rounded-[28px] border border-border/60 bg-card/50">
+              <div
+                className="relative h-44 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_transparent_55%),linear-gradient(180deg,rgba(14,23,38,0.74),rgba(7,12,22,0.96))]"
+                style={
+                  profile.bannerImage
+                    ? {
+                        backgroundImage: `linear-gradient(180deg, rgba(8,12,22,0.3), rgba(8,12,22,0.88)), url(${profile.bannerImage})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                      }
+                    : undefined
+                }
+              >
+                <div className="absolute right-4 top-4 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="rounded-full bg-background/80 px-4 text-foreground backdrop-blur"
+                    onClick={handleBannerPrompt}
+                  >
+                    <Camera className="h-4 w-4" />
+                    Change Banner
+                  </Button>
+                </div>
+              </div>
+
+              <div className="px-6 pb-6">
+                <div className="flex flex-col gap-5 md:flex-row md:items-end">
+                  <div className="-mt-14 flex items-end gap-4">
+                    <div className="relative">
+                      <div className="h-28 w-28 overflow-hidden rounded-[28px] border-4 border-background bg-muted shadow-[0_0_40px_rgba(34,211,238,0.28)]">
+                        {avatarUrl ? (
+                          <img src={avatarUrl} alt={profile.displayName || "Profile avatar"} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.24),_transparent_55%),linear-gradient(180deg,rgba(14,23,38,0.9),rgba(7,12,22,0.96))] text-3xl font-black text-white">
+                            {(profile.displayName || user?.email || "H").charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:scale-105"
+                      >
+                        <Camera className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <div className="pb-1">
+                      <h2 className="text-2xl font-black tracking-tight text-foreground">
+                        {profile.displayName || "Your profile"}
+                      </h2>
+                      <p className="mt-1 text-sm text-muted-foreground">@{normalizeHandle(profile.username || "user") || "user"}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3 md:ml-auto">
+                    <Button
+                      type="button"
+                      className="rounded-full bg-primary px-5 text-primary-foreground shadow-[0_12px_35px_rgba(34,211,238,0.28)]"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={avatarUploading}
+                    >
+                      <Upload className="h-4 w-4" />
+                      {avatarUploading ? "Uploading..." : "Upload Avatar"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full border-border/60 bg-background/40 px-5"
+                      onClick={handleRemoveAvatar}
+                      disabled={!avatarUrl && !avatarPath}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarSelected}
+                />
+
+                {avatarError ? <p className="mt-4 text-sm text-destructive">{avatarError}</p> : null}
+              </div>
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Basic Information" description="These fields sync to your profile and public share page.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="display-name">Display name</Label>
+                <Input
+                  id="display-name"
+                  value={profile.displayName}
+                  onChange={(event) => updateProfileState({ displayName: event.target.value })}
+                  className="h-11 rounded-xl border-border/60 bg-background/50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  value={profile.username}
+                  onChange={(event) => updateProfileState({ username: event.target.value })}
+                  className="h-11 rounded-xl border-border/60 bg-background/50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  value={profile.email}
+                  disabled
+                  className="h-11 rounded-xl border-border/60 bg-background/40 text-muted-foreground"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="website">Website</Label>
+                <Input
+                  id="website"
+                  value={profile.website}
+                  onChange={(event) => updateProfileState({ website: event.target.value })}
+                  placeholder="https://your-site.com"
+                  className="h-11 rounded-xl border-border/60 bg-background/50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="location">Location</Label>
+                <Input
+                  id="location"
+                  value={profile.location}
+                  onChange={(event) => updateProfileState({ location: event.target.value })}
+                  placeholder="City, Country"
+                  className="h-11 rounded-xl border-border/60 bg-background/50"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="birthday">Birthday</Label>
+                <Input
+                  id="birthday"
+                  type="date"
+                  value={profile.birthday}
+                  onChange={(event) => updateProfileState({ birthday: event.target.value })}
+                  className="h-11 rounded-xl border-border/60 bg-background/50"
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  rows={4}
+                  maxLength={240}
+                  value={profile.bio}
+                  onChange={(event) => updateProfileState({ bio: event.target.value })}
+                  placeholder="Tell people what you're into."
+                  className="resize-none rounded-2xl border-border/60 bg-background/50"
+                />
+                <p className="text-xs text-muted-foreground">{profile.bio.length}/240</p>
+              </div>
+            </div>
+          </SettingsPanel>
+        </div>
+      )
+    }
+
+    if (activeSection === "privacy") {
+      return (
+        <div className="space-y-6">
+          <SettingsPanel title="Profile Visibility" description="Choose what people can see on your public page.">
+            <div className="space-y-4">
+              <ToggleRow
+                id="public-profile"
+                label="Public profile"
+                desc="Keep your public share page turned on."
+                checked={privacy.publicProfile}
+                onChange={(checked) => updatePrivacyState({ publicProfile: checked })}
+                icon={Globe}
+              />
+              <ToggleRow
+                id="show-activity"
+                label="Show activity"
+                desc="Let people see your recent watch or read activity."
+                checked={privacy.showActivity}
+                onChange={(checked) => updatePrivacyState({ showActivity: checked })}
+                icon={Play}
+              />
+              <ToggleRow
+                id="show-stats"
+                label="Show stats"
+                desc="Display your totals, hours watched, and score data."
+                checked={privacy.showStats}
+                onChange={(checked) => updatePrivacyState({ showStats: checked })}
+                icon={Star}
+              />
+              <ToggleRow
+                id="show-favorites"
+                label="Show favorites"
+                desc="Expose your favorite titles on the share page."
+                checked={privacy.showFavorites}
+                onChange={(checked) => updatePrivacyState({ showFavorites: checked })}
+                icon={Heart}
+              />
+              <ToggleRow
+                id="show-scores"
+                label="Show scores"
+                desc="Include your ratings wherever they appear publicly."
+                checked={privacy.showScores}
+                onChange={(checked) => updatePrivacyState({ showScores: checked })}
+                icon={Star}
+              />
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Public Lists" description="Choose which list statuses show up on your public profile.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <ToggleRow
+                id="show-watching"
+                label="Watching / Reading"
+                desc="Show active titles."
+                checked={privacy.showWatching}
+                onChange={(checked) => updatePrivacyState({ showWatching: checked })}
+                icon={Play}
+              />
+              <ToggleRow
+                id="show-completed"
+                label="Completed / Read"
+                desc="Show finished titles."
+                checked={privacy.showCompleted}
+                onChange={(checked) => updatePrivacyState({ showCompleted: checked })}
+                icon={Save}
+              />
+              <ToggleRow
+                id="show-planned"
+                label="Planned"
+                desc="Show planned titles."
+                checked={privacy.showPlanned}
+                onChange={(checked) => updatePrivacyState({ showPlanned: checked })}
+                icon={Calendar}
+              />
+              <ToggleRow
+                id="show-onhold"
+                label="On Hold"
+                desc="Show paused titles."
+                checked={privacy.showOnHold}
+                onChange={(checked) => updatePrivacyState({ showOnHold: checked })}
+                icon={Volume2}
+              />
+              <ToggleRow
+                id="show-dropped"
+                label="Dropped"
+                desc="Show dropped titles."
+                checked={privacy.showDropped}
+                onChange={(checked) => updatePrivacyState({ showDropped: checked })}
+                icon={Trash2}
+              />
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Privacy Controls" description="These apply to your account presence across the site.">
+            <div className="space-y-4">
+              <ToggleRow
+                id="show-online"
+                label="Show online status"
+                desc="Let people see when you are online."
+                checked={privacy.showOnline}
+                onChange={(checked) => updatePrivacyState({ showOnline: checked })}
+                icon={User}
+              />
+              <ToggleRow
+                id="show-last-seen"
+                label="Show last seen"
+                desc="Display when you were last active."
+                checked={privacy.showLastSeen}
+                onChange={(checked) => updatePrivacyState({ showLastSeen: checked })}
+                icon={Calendar}
+              />
+              <ToggleRow
+                id="hide-search"
+                label="Hide from search"
+                desc="Keep your profile out of user search results."
+                checked={privacy.hideFromSearch}
+                onChange={(checked) => updatePrivacyState({ hideFromSearch: checked })}
+                icon={Lock}
+              />
+            </div>
+
+            <div className="grid gap-4 pt-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Who can message you</Label>
+                <Select value={privacy.allowMessages} onValueChange={(value) => updatePrivacyState({ allowMessages: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="everyone">Everyone</SelectItem>
+                    <SelectItem value="followers">Followers only</SelectItem>
+                    <SelectItem value="nobody">Nobody</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Who can comment</Label>
+                <Select value={privacy.allowComments} onValueChange={(value) => updatePrivacyState({ allowComments: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="everyone">Everyone</SelectItem>
+                    <SelectItem value="followers">Followers only</SelectItem>
+                    <SelectItem value="nobody">Nobody</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Muted Users" description="Unmute people directly from settings.">
+            {mutedLoading ? (
+              <p className="text-sm text-muted-foreground">Loading muted users...</p>
+            ) : mutedUsers.length ? (
+              <div className="space-y-3">
+                {mutedUsers.map((entry) => (
+                  <div
+                    key={entry.userId}
+                    className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-11 w-11 overflow-hidden rounded-full bg-muted">
+                        {entry.avatarUrl ? (
+                          <img src={entry.avatarUrl} alt={entry.displayName} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-sm font-bold text-foreground">
+                            {entry.displayName.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{entry.displayName}</p>
+                        <p className="text-sm text-muted-foreground">{entry.handle}</p>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="rounded-full border-border/60 bg-background/50"
+                      onClick={() => handleUnmuteUser(entry.userId)}
+                    >
+                      Unmute
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">You do not have any muted users right now.</p>
+            )}
+
+            {mutedError ? <p className="mt-4 text-sm text-destructive">{mutedError}</p> : null}
+          </SettingsPanel>
+        </div>
+      )
+    }
+
+    if (activeSection === "notifications") {
+      return (
+        <div className="space-y-6">
+          <SettingsPanel title="Notification Channels" description="Turn email and push delivery on or off.">
+            <div className="space-y-4">
+              <ToggleRow
+                id="email-enabled"
+                label="Email notifications"
+                desc="Allow emails for the notification types below."
+                checked={notifications.emailEnabled}
+                onChange={(checked) => updateNotificationState({ emailEnabled: checked })}
+                icon={Mail}
+              />
+              <ToggleRow
+                id="push-enabled"
+                label="Push notifications"
+                desc="Allow site or mobile push notifications."
+                checked={notifications.pushEnabled}
+                onChange={(checked) => updateNotificationState({ pushEnabled: checked })}
+                icon={Smartphone}
+              />
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="What You Get Notified About" description="Match the alerts you actually care about.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <ToggleRow
+                id="email-new-episode"
+                label="New episode emails"
+                desc="Email me about new episodes."
+                checked={notifications.emailNewEpisode}
+                onChange={(checked) => updateNotificationState({ emailNewEpisode: checked })}
+                icon={Bell}
+              />
+              <ToggleRow
+                id="push-new-episode"
+                label="New episode push"
+                desc="Push alert for newly available episodes."
+                checked={notifications.pushNewEpisode}
+                onChange={(checked) => updateNotificationState({ pushNewEpisode: checked })}
+                icon={Bell}
+              />
+              <ToggleRow
+                id="push-airing"
+                label="Pre-air reminders"
+                desc="Get reminders before something airs."
+                checked={notifications.pushAiring}
+                onChange={(checked) => updateNotificationState({ pushAiring: checked })}
+                icon={Calendar}
+              />
+              <ToggleRow
+                id="email-digest"
+                label="Weekly digest"
+                desc="Weekly summary of your activity and updates."
+                checked={notifications.emailWeeklyDigest}
+                onChange={(checked) => updateNotificationState({ emailWeeklyDigest: checked })}
+                icon={Mail}
+              />
+              <ToggleRow
+                id="friend-activity"
+                label="Friend activity"
+                desc="Updates when people you follow post or log progress."
+                checked={notifications.emailFriendActivity}
+                onChange={(checked) =>
+                  updateNotificationState({ emailFriendActivity: checked, pushFriendActivity: checked })
+                }
+                icon={User}
+              />
+              <ToggleRow
+                id="messages"
+                label="Messages and comments"
+                desc="Alerts for replies, comments, and direct messages."
+                checked={notifications.pushMessages}
+                onChange={(checked) =>
+                  updateNotificationState({
+                    pushMessages: checked,
+                    emailMessages: checked,
+                    pushComments: checked,
+                    emailComments: checked,
+                  })
+                }
+                icon={MessageSquare}
+              />
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Quiet Hours" description="Silence push notifications overnight.">
+            <div className="space-y-4">
+              <ToggleRow
+                id="quiet-hours"
+                label="Enable quiet hours"
+                desc="Pause push notifications during the hours below."
+                checked={notifications.quietHoursEnabled}
+                onChange={(checked) => updateNotificationState({ quietHoursEnabled: checked })}
+                icon={Volume2}
+              />
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Quiet hours start</Label>
+                  <Input
+                    type="time"
+                    value={notifications.quietHoursStart}
+                    onChange={(event) => updateNotificationState({ quietHoursStart: event.target.value })}
+                    className="h-11 rounded-xl border-border/60 bg-background/50"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Quiet hours end</Label>
+                  <Input
+                    type="time"
+                    value={notifications.quietHoursEnd}
+                    onChange={(event) => updateNotificationState({ quietHoursEnd: event.target.value })}
+                    className="h-11 rounded-xl border-border/60 bg-background/50"
+                  />
+                </div>
+              </div>
+            </div>
+          </SettingsPanel>
+        </div>
+      )
+    }
+
+    if (activeSection === "display") {
+      return (
+        <div className="space-y-6">
+          <SettingsPanel title="Theme" description="Make the settings page match the rest of your Hikari look.">
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                { id: "light", label: "Light" },
+                { id: "dark", label: "Dark" },
+                { id: "system", label: "System" },
+              ].map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => {
+                    updateDisplayState({ theme: option.id })
+                    setTheme(option.id)
+                  }}
+                  className={cn(
+                    "rounded-2xl border px-4 py-4 text-left transition",
+                    display.theme === option.id
+                      ? "border-primary/70 bg-primary/10 text-foreground"
+                      : "border-border/60 bg-background/40 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  <p className="font-semibold">{option.label}</p>
+                  <p className="mt-1 text-sm">Use {option.label.toLowerCase()} mode.</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="pt-4">
+              <Label className="mb-3 block">Accent color</Label>
+              <div className="flex flex-wrap gap-3">
+                {accentColors.map((color) => (
+                  <button
+                    key={color.id}
+                    type="button"
+                    onClick={() => updateDisplayState({ accentColor: color.id })}
+                    className={cn(
+                      "flex items-center gap-3 rounded-full border px-3 py-2 transition",
+                      display.accentColor === color.id
+                        ? "border-primary/60 bg-primary/10"
+                        : "border-border/60 bg-background/40",
+                    )}
+                  >
+                    <span className={cn("h-4 w-4 rounded-full", color.className)} />
+                    <span className="text-sm font-medium capitalize">{color.id}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Display Preferences" description="Control title language, score format, and card layout.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Language</Label>
+                <Select value={display.language} onValueChange={(value) => updateDisplayState({ language: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="es">Spanish</SelectItem>
+                    <SelectItem value="fr">French</SelectItem>
+                    <SelectItem value="ja">Japanese</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Title language</Label>
+                <Select value={display.titleLanguage} onValueChange={(value) => updateDisplayState({ titleLanguage: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="romaji">Romaji</SelectItem>
+                    <SelectItem value="english">English</SelectItem>
+                    <SelectItem value="native">Native</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Score format</Label>
+                <Select value={display.scoreFormat} onValueChange={(value) => updateDisplayState({ scoreFormat: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10point">10 Point</SelectItem>
+                    <SelectItem value="100point">100 Point</SelectItem>
+                    <SelectItem value="5star">5 Star</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Default list view</Label>
+                <Select value={display.defaultListView} onValueChange={(value) => updateDisplayState({ defaultListView: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="grid">Grid</SelectItem>
+                    <SelectItem value="list">List</SelectItem>
+                    <SelectItem value="compact">Compact</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="pt-5">
+              <div className="mb-3 flex items-center justify-between">
+                <Label>Cards per row</Label>
+                <span className="text-sm text-muted-foreground">{display.cardsPerRow}</span>
+              </div>
+              <input
+                type="range"
+                min={3}
+                max={8}
+                step={1}
+                value={display.cardsPerRow}
+                onChange={(event) => updateDisplayState({ cardsPerRow: Number(event.target.value) || 5 })}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+              />
+            </div>
+
+            <div className="space-y-4 pt-5">
+              <ToggleRow
+                id="reduce-motion"
+                label="Reduce motion"
+                desc="Tone down animations across the app."
+                checked={display.reduceMotion}
+                onChange={(checked) => updateDisplayState({ reduceMotion: checked })}
+                icon={Palette}
+              />
+              <ToggleRow
+                id="show-trailers"
+                label="Show trailers"
+                desc="Display trailer blocks where available."
+                checked={display.showTrailers}
+                onChange={(checked) => updateDisplayState({ showTrailers: checked })}
+                icon={Play}
+              />
+              <ToggleRow
+                id="autoplay-trailers"
+                label="Autoplay trailers"
+                desc="Autoplay muted trailers when supported."
+                checked={display.autoplayTrailers}
+                onChange={(checked) => updateDisplayState({ autoplayTrailers: checked })}
+                icon={Play}
+              />
+            </div>
+          </SettingsPanel>
+        </div>
+      )
+    }
+
+    if (activeSection === "lists") {
+      return (
+        <div className="space-y-6">
+          <SettingsPanel title="Default List Behavior" description="Set how Hikari handles new entries and sorts your library.">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Default status</Label>
+                <Select value={listSettings.defaultStatus} onValueChange={(value) => updateListSettingsState({ defaultStatus: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="watching">Watching</SelectItem>
+                    <SelectItem value="plan_to_watch">Plan to Watch</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Sort by</Label>
+                <Select value={listSettings.sortBy} onValueChange={(value) => updateListSettingsState({ sortBy: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="last-updated">Last updated</SelectItem>
+                    <SelectItem value="title">Title</SelectItem>
+                    <SelectItem value="score">Score</SelectItem>
+                    <SelectItem value="progress">Progress</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Sort direction</Label>
+                <Select
+                  value={listSettings.sortDirection}
+                  onValueChange={(value) => updateListSettingsState({ sortDirection: value })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">Descending</SelectItem>
+                    <SelectItem value="asc">Ascending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-5">
+              <ToggleRow
+                id="confirm-status-change"
+                label="Confirm status changes"
+                desc="Ask before moving something between statuses."
+                checked={listSettings.confirmStatusChange}
+                onChange={(checked) => updateListSettingsState({ confirmStatusChange: checked })}
+                icon={Shield}
+              />
+              <ToggleRow
+                id="auto-add-to-list"
+                label="Auto-add to list"
+                desc="Add titles to your library when you start them."
+                checked={listSettings.autoAddToList}
+                onChange={(checked) => updateListSettingsState({ autoAddToList: checked })}
+                icon={Play}
+              />
+              <ToggleRow
+                id="show-progress-bar"
+                label="Show progress bar"
+                desc="Keep progress bars on cards and rows."
+                checked={listSettings.showProgressBar}
+                onChange={(checked) => updateListSettingsState({ showProgressBar: checked })}
+                icon={Save}
+              />
+              <ToggleRow
+                id="show-airing-countdown"
+                label="Show airing countdown"
+                desc="Show the next episode countdown when available."
+                checked={listSettings.showAiringCountdown}
+                onChange={(checked) => updateListSettingsState({ showAiringCountdown: checked })}
+                icon={Calendar}
+              />
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Custom Lists" description="Manage your custom list collections.">
+            {customLists.length ? (
+              <div className="space-y-3">
+                {customLists.map((list) => (
+                  <div
+                    key={list.id}
+                    className="flex items-center justify-between rounded-2xl border border-border/50 bg-background/40 px-4 py-3"
+                  >
+                    <div>
+                      <p className="font-medium text-foreground">{list.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Updated {new Date(list.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </p>
+                    </div>
+                    <Button asChild variant="outline" className="rounded-full border-border/60 bg-background/50">
+                      <Link href="/lists">Open</Link>
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">You have not made any custom lists yet.</p>
+            )}
+          </SettingsPanel>
+        </div>
+      )
+    }
+
+    if (activeSection === "content") {
+      return (
+        <div className="space-y-6">
+          <SettingsPanel title="Content Filters" description="Choose how spoilers and adult titles are handled.">
+            <div className="space-y-4">
+              <ToggleRow
+                id="adult-content"
+                label="Adult content"
+                desc="Allow 18+ titles in search and recommendations."
+                checked={content.adultContent}
+                onChange={(checked) => updateContentState({ adultContent: checked })}
+                icon={Eye}
+              />
+              <ToggleRow
+                id="blur-nsfw"
+                label="Blur NSFW art"
+                desc="Blur sensitive covers until you hover or open them."
+                checked={content.blurNSFW}
+                onChange={(checked) => updateContentState({ blurNSFW: checked })}
+                icon={Eye}
+              />
+            </div>
+
+            <div className="space-y-2 pt-4">
+              <Label>Spoiler handling</Label>
+              <Select value={content.showSpoilers} onValueChange={(value) => updateContentState({ showSpoilers: value })}>
+                <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="hide">Hide spoilers</SelectItem>
+                  <SelectItem value="blur">Blur spoilers</SelectItem>
+                  <SelectItem value="show">Show spoilers</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Playback" description="Keep your watch experience aligned with the rest of the redesign.">
+            <div className="space-y-4">
+              <ToggleRow
+                id="auto-next-episode"
+                label="Auto-play next episode"
+                desc="Start the next episode automatically."
+                checked={content.autoNextEpisode}
+                onChange={(checked) => updateContentState({ autoNextEpisode: checked })}
+                icon={Play}
+              />
+              <ToggleRow
+                id="auto-skip-intro"
+                label="Auto-skip intros"
+                desc="Skip opening sequences when possible."
+                checked={content.autoSkipIntro}
+                onChange={(checked) => updateContentState({ autoSkipIntro: checked })}
+                icon={Play}
+              />
+              <ToggleRow
+                id="auto-skip-outro"
+                label="Auto-skip outros"
+                desc="Skip ending sequences when possible."
+                checked={content.autoSkipOutro}
+                onChange={(checked) => updateContentState({ autoSkipOutro: checked })}
+                icon={Play}
+              />
+            </div>
+
+            <div className="grid gap-4 pt-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Video quality</Label>
+                <Select value={content.videoQuality} onValueChange={(value) => updateContentState({ videoQuality: value })}>
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="1080p">1080p</SelectItem>
+                    <SelectItem value="720p">720p</SelectItem>
+                    <SelectItem value="480p">480p</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Subtitle language</Label>
+                <Select
+                  value={content.subtitleLanguage}
+                  onValueChange={(value) => updateContentState({ subtitleLanguage: value })}
+                >
+                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">English</SelectItem>
+                    <SelectItem value="ja">Japanese</SelectItem>
+                    <SelectItem value="es">Spanish</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </SettingsPanel>
+        </div>
+      )
+    }
+
+    if (activeSection === "import-export") {
+      return (
+        <div className="space-y-6">
+          <SettingsPanel title="Import" description="Bring your lists in from the services you already use.">
+            <div className="grid gap-3 md:grid-cols-2">
+              {[
+                { href: "/import?source=mal", label: "MyAnimeList", icon: Download },
+                { href: "/import?source=anilist", label: "AniList", icon: Download },
+                { href: "/import?source=kitsu", label: "Kitsu", icon: Download },
+                { href: "/import", label: "Open Import Center", icon: ChevronRight },
+              ].map((item) => (
+                <Button
+                  key={item.label}
+                  asChild
+                  variant="outline"
+                  className="h-14 justify-start rounded-2xl border-border/60 bg-background/40 px-4"
+                >
+                  <Link href={item.href}>
+                    <item.icon className="h-4 w-4" />
+                    {item.label}
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          </SettingsPanel>
+
+          <SettingsPanel title="Export" description="Download a copy of your settings right now.">
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" className="rounded-full px-5" onClick={handleExportSettings}>
+                <Download className="h-4 w-4" />
+                Export settings JSON
+              </Button>
+              <Button asChild type="button" variant="outline" className="rounded-full border-border/60 bg-background/50 px-5">
+                <Link href="/lists">Open my full lists</Link>
+              </Button>
+            </div>
+          </SettingsPanel>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-6">
+        <SettingsPanel title="Security" description="Manage your sign-in methods and account security.">
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-border/50 bg-background/40 px-4 py-3">
+              <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Account email</p>
+              <p className="mt-2 font-medium text-foreground">{user?.email || "No email on file"}</p>
+            </div>
+
+            <ToggleRow
+              id="two-factor"
+              label="Two-factor authentication"
+              desc="Store your preference now and wire the full flow later."
+              checked={account.twoFactorEnabled}
+              onChange={(checked) => updateAccountState({ twoFactorEnabled: checked })}
+              icon={Shield}
+            />
+          </div>
+        </SettingsPanel>
+
+        <SettingsPanel title="Connected Providers" description="Link or unlink the providers you use to sign in.">
+          <div className="space-y-3">
+            {providerOptions.map((provider) => {
+              const connected = linkedProviders.has(provider.id)
+              return (
+                <div
+                  key={provider.id}
+                  className="flex flex-col gap-3 rounded-2xl border border-border/50 bg-background/40 p-4 md:flex-row md:items-center md:justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-background/70">
+                      <provider.icon className="h-5 w-5 text-foreground" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">{provider.label}</p>
+                      <p className="text-sm text-muted-foreground">{provider.description}</p>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant={connected ? "outline" : "default"}
+                    className={cn(
+                      "rounded-full px-5",
+                      connected ? "border-border/60 bg-background/50" : "",
+                    )}
+                    disabled={connectionPending === provider.id}
+                    onClick={() =>
+                      connected ? handleDisconnectProvider(provider.id) : handleConnectProvider(provider.id)
+                    }
+                  >
+                    {connectionPending === provider.id
+                      ? "Working..."
+                      : connected
+                        ? "Disconnect"
+                        : "Connect"}
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
+
+          {connectionError ? <p className="mt-4 text-sm text-destructive">{connectionError}</p> : null}
+          {connectionMessage ? <p className="mt-4 text-sm text-primary">{connectionMessage}</p> : null}
+        </SettingsPanel>
+
+        <SettingsPanel title="Plan" description="Keep the premium area consistent with the rest of the redesign.">
+          <div className="flex flex-col gap-4 rounded-[28px] border border-amber-500/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.12),rgba(34,211,238,0.08))] p-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="flex items-center gap-2 font-semibold text-foreground">
+                <Crown className="h-4 w-4 text-amber-400" />
+                {headerUser.isPremium ? "Premium active" : "Free plan"}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {headerUser.isPremium
+                  ? "Your premium perks stay linked to this account."
+                  : "Upgrade later if you want premium-only perks."}
+              </p>
+            </div>
+
+            <Button asChild className="rounded-full px-5">
+              <Link href="/premium">Open Premium</Link>
+            </Button>
+          </div>
+        </SettingsPanel>
+
+        <SettingsPanel title="Danger Zone" description="Low-frequency account actions live here.">
+          <div className="space-y-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full justify-start rounded-2xl border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
+              onClick={logout}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Sign out
+            </Button>
+          </div>
+        </SettingsPanel>
+      </div>
+    )
   }
 
   return (
     <RequireAuth>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_35%),linear-gradient(180deg,rgba(4,8,16,0.98),rgba(3,7,14,1))] text-foreground">
         <Navigation />
 
-        <main className="pb-20 pt-16 md:pb-8">
-          <div className="px-4 py-8 md:px-8">
-            <div className="mx-auto max-w-4xl">
-            <div className="mb-8">
-              <h1 className="text-2xl font-bold text-foreground md:text-3xl">Settings</h1>
-              <p className="text-muted-foreground">Manage your account and preferences</p>
+        {hasChanges ? (
+          <motion.div
+            initial={{ y: -48, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="fixed left-0 right-0 top-16 z-40 border-b border-primary/20 bg-primary/10 backdrop-blur-xl"
+          >
+            <div className="container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <p className="font-medium text-foreground">You have unsaved settings changes.</p>
+                <p className="text-sm text-muted-foreground">Save to update your live Hikari account and public profile.</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-full border-border/60 bg-background/50"
+                  onClick={handleDiscardChanges}
+                >
+                  Discard
+                </Button>
+                <Button type="button" className="rounded-full px-5" onClick={handleSaveAll} disabled={saving}>
+                  <Save className="h-4 w-4" />
+                  {saving ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
             </div>
+          </motion.div>
+        ) : null}
 
-            <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2 bg-secondary md:w-auto md:grid-cols-5">
-                <TabsTrigger value="profile" className="gap-2">
-                  <User className="h-4 w-4" />
-                  <span className="hidden md:inline">Profile</span>
-                </TabsTrigger>
-                <TabsTrigger value="notifications" className="gap-2">
-                  <Bell className="h-4 w-4" />
-                  <span className="hidden md:inline">Notifications</span>
-                </TabsTrigger>
-                <TabsTrigger value="spoilers" className="gap-2">
-                  <Shield className="h-4 w-4" />
-                  <span className="hidden md:inline">Spoilers</span>
-                </TabsTrigger>
-                <TabsTrigger value="appearance" className="gap-2">
-                  <Palette className="h-4 w-4" />
-                  <span className="hidden md:inline">Appearance</span>
-                </TabsTrigger>
-                <TabsTrigger value="connections" className="gap-2">
-                  <Link2 className="h-4 w-4" />
-                  <span className="hidden md:inline">Connections</span>
-                </TabsTrigger>
-              </TabsList>
+        <main className="container mx-auto px-4 pb-16 pt-24">
+          <div className="mb-8">
+            <p className="text-sm uppercase tracking-[0.3em] text-primary/70">Account Settings</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Manage your profile and preferences</h1>
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
+              This is the new settings surface wired to your real Hikari account, public profile, notifications, and theme.
+            </p>
+          </div>
 
-              <TabsContent value="profile">
-                <Card className="bg-card">
-                  <CardHeader>
-                    <CardTitle>Profile Settings</CardTitle>
-                    <CardDescription>Update your personal information</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center gap-6">
-                      <div className="h-20 w-20 rounded-full bg-secondary flex items-center justify-center overflow-hidden">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt="Profile avatar" className="h-full w-full object-cover" />
-                        ) : (
-                          <span className="text-2xl font-bold text-foreground">
-                            {user?.user_metadata?.display_name?.[0] || user?.email?.[0] || "U"}
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleAvatarSelect}
-                        />
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => fileInputRef.current?.click()}
-                            disabled={avatarUploading}
-                          >
-                            {avatarUploading ? "Uploading..." : "Change Avatar"}
-                          </Button>
-                          {avatarUrl ? (
-                            <Button
-                              variant="ghost"
-                              onClick={handleRemoveAvatar}
-                              disabled={avatarUploading}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              Remove
-                            </Button>
-                          ) : null}
-                        </div>
-                        <p className="text-xs text-muted-foreground">JPG, PNG or GIF. Max 2MB.</p>
-                        {avatarError ? (
-                          <p className="text-xs text-red-400">{avatarError}</p>
-                        ) : null}
-                      </div>
-                    </div>
+          {saveError ? (
+            <div className="mb-6 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {saveError}
+            </div>
+          ) : null}
 
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="display-name">Name</Label>
-                        <Input
-                          id="display-name"
-                          value={displayName}
-                          onChange={(event) => setDisplayName(event.target.value)}
-                          placeholder="Ray"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="handle">Handle</Label>
-                        <Input
-                          id="handle"
-                          value={handle}
-                          onChange={(event) => setHandle(event.target.value)}
-                          placeholder="@ray"
-                        />
-                      </div>
-                    </div>
+          {saveMessage ? (
+            <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
+              {saveMessage}
+            </div>
+          ) : null}
 
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Bio</Label>
-                      <Textarea
-                        id="bio"
-                        value={bio}
-                        onChange={(event) => setBio(event.target.value)}
-                        placeholder="Tell us about yourself..."
-                        className="min-h-24"
-                      />
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="location">Location</Label>
-                        <Input
-                          id="location"
-                          value={location}
-                          onChange={(event) => setLocation(event.target.value)}
-                          placeholder="City, Country"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="website">Website</Label>
-                        <Input
-                          id="website"
-                          value={website}
-                          onChange={(event) => setWebsite(event.target.value)}
-                          placeholder="https://"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <Button className="gap-2" onClick={handleSaveProfile} disabled={savingProfile}>
-                      <Save className="h-4 w-4" />
-                        {savingProfile ? "Saving..." : "Save Changes"}
-                      </Button>
-                      {profileSaved && <span className="text-xs text-emerald-400">Saved</span>}
-                      {profileError && <span className="text-xs text-red-400">{profileError}</span>}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-card mt-6">
-                  <CardHeader>
-                    <CardTitle>Muted Users</CardTitle>
-                    <CardDescription>Manage the people you muted in Social.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {mutedLoading ? (
-                      <p className="text-sm text-muted-foreground">Loading muted users...</p>
-                    ) : mutedError ? (
-                      <p className="text-sm text-red-400">{mutedError}</p>
-                    ) : mutedUsers.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No muted users.</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {mutedUsers.map((entry) => (
-                          <div
-                            key={entry.userId}
-                            className="flex items-center justify-between rounded-lg border border-border/50 p-3"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-full bg-secondary overflow-hidden flex items-center justify-center">
-                                {entry.avatarUrl ? (
-                                  <img
-                                    src={entry.avatarUrl}
-                                    alt={entry.displayName}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">
-                                    {entry.displayName.slice(0, 1).toUpperCase()}
-                                  </span>
-                                )}
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium text-foreground">{entry.displayName}</p>
-                                <p className="text-xs text-muted-foreground">{entry.handle}</p>
-                              </div>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={() => handleUnmute(entry.userId)}>
-                              Unmute
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
+          <div className="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-[28px] border border-border/60 bg-card/40 p-3 backdrop-blur-sm">
+                {sections.map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setActiveSection(section.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition",
+                      activeSection === section.id
+                        ? "bg-primary/12 text-foreground"
+                        : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
                     )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                  >
+                    <section.icon className="h-4 w-4" />
+                    <span className="font-medium">{section.label}</span>
+                    <ChevronRight
+                      className={cn(
+                        "ml-auto h-4 w-4 transition-transform",
+                        activeSection === section.id ? "translate-x-0.5 text-primary" : "",
+                      )}
+                    />
+                  </button>
+                ))}
+              </div>
+            </aside>
 
-              <TabsContent value="notifications">
-                <Card className="bg-card">
-                  <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
-                    <CardDescription>Choose what notifications you receive</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-foreground">Episode Reminders</p>
-                        <p className="text-sm text-muted-foreground">Get notified when new episodes air</p>
-                      </div>
-                      <Switch
-                        checked={notifyEpisodes}
-                        onCheckedChange={async (value) => {
-                          setNotifyEpisodes(value)
-                          setSavingNotifications(true)
-                          await updatePreference("notify_episode", value)
-                          setSavingNotifications(false)
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-foreground">30 Minutes Before</p>
-                        <p className="text-sm text-muted-foreground">Reminder before episode airs</p>
-                      </div>
-                      <Switch
-                        checked={notifyPreAir}
-                        onCheckedChange={async (value) => {
-                          setNotifyPreAir(value)
-                          setSavingNotifications(true)
-                          await updatePreference("notify_pre_air", value)
-                          setSavingNotifications(false)
-                        }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-foreground">Daily Digest</p>
-                        <p className="text-sm text-muted-foreground">Summary of today's airing shows</p>
-                      </div>
-                      <Switch
-                        checked={notifyDigest}
-                        onCheckedChange={async (value) => {
-                          setNotifyDigest(value)
-                          setSavingNotifications(true)
-                          await updatePreference("notify_digest", value)
-                          setSavingNotifications(false)
-                        }}
-                      />
-                    </div>
-                    {savingNotifications ? (
-                      <p className="text-xs text-muted-foreground">Saving preferences...</p>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="spoilers">
-                <Card className="bg-card">
-                  <CardHeader>
-                    <CardTitle>Spoiler Protection</CardTitle>
-                    <CardDescription>Control how spoilers are displayed</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between rounded-lg bg-secondary p-4">
-                      <div className="flex items-center gap-3">
-                        {spoilersOff ? <EyeOff className="h-6 w-6 text-primary" /> : <Eye className="h-6 w-6 text-muted-foreground" />}
-                        <div>
-                          <p className="font-medium text-foreground">Spoiler Protection {spoilersOff ? "On" : "Off"}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {spoilersOff ? "Spoiler content is hidden by default" : "All content is visible"}
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={spoilersOff}
-                        onCheckedChange={(value) => {
-                          setSpoilersOff(value)
-                          updatePreference("spoilers_off", value)
-                        }}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="appearance">
-                <Card className="bg-card">
-                  <CardHeader>
-                    <CardTitle>Appearance</CardTitle>
-                    <CardDescription>Customize how Hikari looks</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <Label>Theme</Label>
-                      <Select value={theme} onValueChange={setTheme}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="dark">Dark</SelectItem>
-                          <SelectItem value="light">Light</SelectItem>
-                          <SelectItem value="system">System</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="connections">
-                <Card className="bg-card">
-                  <CardHeader>
-                    <CardTitle>Connected Accounts</CardTitle>
-                    <CardDescription>Manage your external list imports</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                      <div>
-                        <p className="font-medium text-foreground">MyAnimeList</p>
-                        <p className="text-sm text-muted-foreground">
-                          Connect via OAuth or import your MAL XML.
-                        </p>
-                      </div>
-                      <Button asChild>
-                        <a href="/api/mal/authorize?returnTo=/import">Connect</a>
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                      <div>
-                        <p className="font-medium text-foreground">AniList</p>
-                        <p className="text-sm text-muted-foreground">Import using your AniList username.</p>
-                      </div>
-                      <Button asChild variant="outline">
-                        <a href="/import">Go to Import</a>
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg border border-border p-4">
-                      <div>
-                        <p className="font-medium text-foreground">Kitsu</p>
-                        <p className="text-sm text-muted-foreground">Import from a Kitsu JSON export.</p>
-                      </div>
-                      <Button asChild variant="outline">
-                        <a href="/import">Go to Import</a>
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-            </div>
+            <motion.div
+              key={activeSection}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.24 }}
+            >
+              {renderSectionContent()}
+            </motion.div>
           </div>
         </main>
       </div>

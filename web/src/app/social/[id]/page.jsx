@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { Navigation } from "@/components/Navigation"
+import RequireAuth from "@/components/RequireAuth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -52,7 +53,8 @@ const buildThreads = (comments) => {
 
 export default function SocialPostPage() {
   const { id } = useParams()
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  const isMod = user?.user_metadata?.is_mod === true || user?.user_metadata?.isMod === true
   const [post, setPost] = useState(null)
   const [loadingPost, setLoadingPost] = useState(true)
   const [postError, setPostError] = useState("")
@@ -64,6 +66,7 @@ export default function SocialPostPage() {
   const [commentSubmitting, setCommentSubmitting] = useState(false)
 
   useEffect(() => {
+    if (!user || !isMod) return
     let active = true
 
     const loadPost = async () => {
@@ -89,9 +92,10 @@ export default function SocialPostPage() {
     return () => {
       active = false
     }
-  }, [id, user?.id])
+  }, [id, user?.id, isMod])
 
   useEffect(() => {
+    if (!user || !isMod) return
     let active = true
 
     const loadComments = async () => {
@@ -117,7 +121,7 @@ export default function SocialPostPage() {
     return () => {
       active = false
     }
-  }, [id])
+  }, [id, user?.id, isMod])
 
   const commentThreads = useMemo(() => buildThreads(comments), [comments])
 
@@ -362,117 +366,139 @@ export default function SocialPostPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
+    <RequireAuth>
+      {loading ? (
+        <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+          Loading...
+        </div>
+      ) : !isMod ? (
+        <div className="min-h-screen bg-background">
+          <Navigation />
+          <main className="pt-28 pb-20 md:pb-8">
+            <div className="mx-auto max-w-3xl px-4">
+              <div className="rounded-2xl border border-border/50 bg-card/60 p-8 text-center">
+                <h1 className="text-2xl font-semibold text-foreground">Social Is Under Construction</h1>
+                <p className="mt-3 text-muted-foreground">
+                  This area is currently available to moderators only while we finish building it.
+                </p>
+              </div>
+            </div>
+          </main>
+        </div>
+      ) : (
+        <div className="min-h-screen bg-background">
+          <Navigation />
 
-      <main className="pt-28 pb-20 md:pb-8">
-        <div className="mx-auto max-w-4xl px-4 space-y-6">
-          {loadingPost ? (
-            <Card className="bg-card/50 border-border/50">
-              <CardContent className="py-12 text-center text-muted-foreground">Loading post...</CardContent>
-            </Card>
-          ) : postError ? (
-            <Card className="bg-card/50 border-border/50">
-              <CardContent className="py-12 text-center text-muted-foreground">{postError}</CardContent>
-            </Card>
-          ) : post ? (
-            <SocialPost
-              post={{
-                id: post.id,
-                user: {
-                  name: post.user_display_name || "User",
-                  handle: post.user_handle || "@user",
-                  avatar: post.user_display_name?.slice(0, 1).toUpperCase() || "U",
-                },
-                userAvatarUrl: post.user_avatar_url || undefined,
-                content: post.content,
-                timestamp: new Date(post.created_at).toLocaleString(),
-                isLiked: post.is_liked,
-                isReposted: post.is_reposted,
-                isSaved: post.is_saved,
-                likes: post.like_count || 0,
-                reposts: post.repost_count || 0,
-                comments: post.comment_count || 0,
-                hasSpoilers: post.has_spoilers,
-                spoilerRange: post.spoiler_range,
-                attachedMedia: post.attached_media_title,
-                attachedMediaId: post.attached_media_id,
-                attachedList: post.attached_list_name,
-                attachedListId: post.attached_list_id,
-                fandom: post.fandom,
-                postType: post.post_type,
-                linkEmbed,
-                pollOptions: post.poll_options,
-                pollCounts: post.poll_counts,
-                pollTotal: post.poll_total,
-                pollUserVote: post.poll_user_vote,
-                postUrl: `/social/${post.id}`,
-              }}
-              onToggleLike={() => handleToggleReaction("like")}
-              onToggleRepost={() => handleToggleReaction("repost")}
-              onToggleSave={() => handleToggleReaction("save")}
-              onVotePoll={user ? handleVotePoll : undefined}
-              onReport={user ? handleReportPost : undefined}
-              onReportUser={user ? handleReportUser : undefined}
-              onMuteUser={user ? handleMuteUser : undefined}
-            />
-          ) : null}
+          <main className="pt-28 pb-20 md:pb-8">
+            <div className="mx-auto max-w-4xl px-4 space-y-6">
+              {loadingPost ? (
+                <Card className="bg-card/50 border-border/50">
+                  <CardContent className="py-12 text-center text-muted-foreground">Loading post...</CardContent>
+                </Card>
+              ) : postError ? (
+                <Card className="bg-card/50 border-border/50">
+                  <CardContent className="py-12 text-center text-muted-foreground">{postError}</CardContent>
+                </Card>
+              ) : post ? (
+                <SocialPost
+                  post={{
+                    id: post.id,
+                    user: {
+                      name: post.user_display_name || "User",
+                      handle: post.user_handle || "@user",
+                      avatar: post.user_display_name?.slice(0, 1).toUpperCase() || "U",
+                    },
+                    userAvatarUrl: post.user_avatar_url || undefined,
+                    content: post.content,
+                    timestamp: new Date(post.created_at).toLocaleString(),
+                    isLiked: post.is_liked,
+                    isReposted: post.is_reposted,
+                    isSaved: post.is_saved,
+                    likes: post.like_count || 0,
+                    reposts: post.repost_count || 0,
+                    comments: post.comment_count || 0,
+                    hasSpoilers: post.has_spoilers,
+                    spoilerRange: post.spoiler_range,
+                    attachedMedia: post.attached_media_title,
+                    attachedMediaId: post.attached_media_id,
+                    attachedList: post.attached_list_name,
+                    attachedListId: post.attached_list_id,
+                    fandom: post.fandom,
+                    postType: post.post_type,
+                    linkEmbed,
+                    pollOptions: post.poll_options,
+                    pollCounts: post.poll_counts,
+                    pollTotal: post.poll_total,
+                    pollUserVote: post.poll_user_vote,
+                    postUrl: `/social/${post.id}`,
+                  }}
+                  onToggleLike={() => handleToggleReaction("like")}
+                  onToggleRepost={() => handleToggleReaction("repost")}
+                  onToggleSave={() => handleToggleReaction("save")}
+                  onVotePoll={user ? handleVotePoll : undefined}
+                  onReport={user ? handleReportPost : undefined}
+                  onReportUser={user ? handleReportUser : undefined}
+                  onMuteUser={user ? handleMuteUser : undefined}
+                />
+              ) : null}
 
-          <Card className="bg-card/50 border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <MessageCircle className="h-4 w-4" />
-                Comments
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!user ? (
-                <p className="text-sm text-muted-foreground">Sign in to join the discussion.</p>
-              ) : (
-                <div className="space-y-2">
-                  {replyTo && (
-                    <div className="rounded-lg border border-border/50 bg-secondary/30 p-2 text-xs text-muted-foreground">
-                      Replying to {replyTo.user_display_name || "User"}
+              <Card className="bg-card/50 border-border/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <MessageCircle className="h-4 w-4" />
+                    Comments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!user ? (
+                    <p className="text-sm text-muted-foreground">Sign in to join the discussion.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {replyTo && (
+                        <div className="rounded-lg border border-border/50 bg-secondary/30 p-2 text-xs text-muted-foreground">
+                          Replying to {replyTo.user_display_name || "User"}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="ml-2 h-6 px-2 text-xs"
+                            onClick={() => setReplyTo(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      )}
+                      <Textarea
+                        placeholder="Write a comment..."
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        className="min-h-24"
+                      />
+                      {commentError && <p className="text-xs text-destructive">{commentError}</p>}
                       <Button
-                        size="sm"
-                        variant="ghost"
-                        className="ml-2 h-6 px-2 text-xs"
-                        onClick={() => setReplyTo(null)}
+                        onClick={handleSubmitComment}
+                        disabled={commentSubmitting || !commentText.trim()}
                       >
-                        Cancel
+                        {commentSubmitting ? "Posting..." : "Post Comment"}
                       </Button>
                     </div>
                   )}
-                  <Textarea
-                    placeholder="Write a comment..."
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    className="min-h-24"
-                  />
-                  {commentError && <p className="text-xs text-destructive">{commentError}</p>}
-                  <Button
-                    onClick={handleSubmitComment}
-                    disabled={commentSubmitting || !commentText.trim()}
-                  >
-                    {commentSubmitting ? "Posting..." : "Post Comment"}
-                  </Button>
-                </div>
-              )}
 
-              {loadingComments ? (
-                <p className="text-sm text-muted-foreground">Loading comments...</p>
-              ) : commentThreads.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No comments yet.</p>
-              ) : (
-                <div className="space-y-4">
-                  {commentThreads.map((comment) => renderComment(comment))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  {loadingComments ? (
+                    <p className="text-sm text-muted-foreground">Loading comments...</p>
+                  ) : commentThreads.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No comments yet.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      {commentThreads.map((comment) => renderComment(comment))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </main>
         </div>
-      </main>
-    </div>
+      )}
+    </RequireAuth>
   )
 }
 

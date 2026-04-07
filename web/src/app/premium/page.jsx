@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
-import { Crown, Zap, ArrowRight, Star } from "lucide-react"
+import { Heart, Zap, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export default function PremiumPage() {
@@ -16,23 +16,23 @@ export default function PremiumPage() {
   const plans = [
     {
       id: "monthly",
-      name: "Monthly",
+      name: "Supporter",
       price: 5,
       period: "month",
       popular: false,
     },
     {
       id: "yearly",
-      name: "Yearly",
+      name: "Patron",
       price: 4,
       period: "month",
       billed: 48,
       popular: true,
-      savings: "Save 20%",
+      savings: "Give yearly",
     },
     {
       id: "lifetime",
-      name: "Lifetime",
+      name: "Lifetime Backer",
       price: 99,
       period: "once",
       popular: false,
@@ -54,18 +54,18 @@ export default function PremiumPage() {
 
           <div className="relative mx-auto max-w-4xl text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-500/10 border border-amber-500/20 mb-6">
-              <Crown className="h-5 w-5 text-amber-400" />
-              <span className="text-amber-400 font-medium">Hikari Premium</span>
+              <Heart className="h-5 w-5 text-amber-400" />
+              <span className="text-amber-400 font-medium">Support Hikari</span>
             </div>
 
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Upgrade your
+              Donate to keep
               <br />
-              <span className="text-amber-400">anime experience</span>
+              <span className="text-amber-400">Hikari thriving</span>
             </h1>
 
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-12">
-              Auto-tracking, unlimited AI recommendations, and exclusive features designed for serious anime fans.
+              Your support helps cover hosting, keeps the app fast, and funds the next wave of features.
             </p>
 
             {/* Pricing Toggle */}
@@ -83,7 +83,7 @@ export default function PremiumPage() {
               <span className={cn("text-sm font-medium", billingPeriod === "yearly" ? "text-foreground" : "text-muted-foreground")}>
                 Yearly
               </span>
-              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Save 20%</Badge>
+              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">Give yearly</Badge>
             </div>
 
             {/* Pricing Cards */}
@@ -133,11 +133,11 @@ export default function PremiumPage() {
               className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:opacity-90 rounded-xl px-8 h-14 text-lg"
             >
               <Zap className="h-5 w-5" />
-              Start Premium Now
+              Donate Now
               <ArrowRight className="h-5 w-5" />
             </Button>
 
-            <p className="text-xs text-muted-foreground mt-4">7-day free trial • Cancel anytime • Secure payment</p>
+            <p className="text-xs text-muted-foreground mt-4">Every bit helps - Cancel anytime - Secure payment</p>
           </div>
         </section>
       </main>
