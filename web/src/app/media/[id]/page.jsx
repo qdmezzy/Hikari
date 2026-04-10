@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from 'react'
-import { motion } from "framer-motion"
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { motion } from 'framer-motion'
 import useAuth from '@/hooks/useAuth'
 import client from '@/lib/client'
 import { Navigation } from '@/components/Navigation'
@@ -58,6 +58,21 @@ const MEDIA_FIELDS = `
     rankings { rank type allTime year season }
     genres
     tags { name }
+    characters(perPage: 12, sort: [ROLE, RELEVANCE]) {
+      edges {
+        role
+        node {
+          id
+          name { full native }
+          image { large medium }
+        }
+        voiceActors(language: JAPANESE, sort: [RELEVANCE]) {
+          id
+          name { full }
+          image { large medium }
+        }
+      }
+    }
     studios { nodes { name } }
     externalLinks { site url type language }
     streamingEpisodes { title thumbnail url site }
@@ -203,7 +218,7 @@ const scoreSearchMatch = (media, searchCandidate) => {
 }
 
 async function getMedia(rawId) {
-  const { numericCandidates, searchCandidate, hasExplicitNumericPrefix } = buildMediaLookupHints(rawId)
+  const { numericCandidates, searchCandidate } = buildMediaLookupHints(rawId)
 
   try {
     const request = async (query, variables) => {
@@ -222,7 +237,7 @@ async function getMedia(rawId) {
       for (const candidate of numericCandidates) {
         const direct = await request(MEDIA_BY_ID, { id: candidate })
         const directMatch = direct?.data?.Media
-        if (directMatch && (hasExplicitNumericPrefix || !searchCandidate || mediaMatchesSearch(directMatch, searchCandidate))) {
+        if (directMatch && (!searchCandidate || mediaMatchesSearch(directMatch, searchCandidate))) {
           return directMatch
         }
       }
@@ -232,7 +247,7 @@ async function getMedia(rawId) {
       for (const candidate of numericCandidates) {
         const malDirect = await request(MEDIA_BY_MAL_ID, { idMal: candidate })
         const malMatch = malDirect?.data?.Media
-        if (malMatch && (hasExplicitNumericPrefix || !searchCandidate || mediaMatchesSearch(malMatch, searchCandidate))) {
+        if (malMatch && (!searchCandidate || mediaMatchesSearch(malMatch, searchCandidate))) {
           return malMatch
         }
       }
@@ -329,7 +344,7 @@ function getMangaDexId(externalLinks = []) {
 
 function MediaPageSkeleton() {
   return (
-    <main className="animate-page-in pb-20 pt-16 md:pb-8 md:pt-0">
+    <main className="pb-20 pt-16 md:pb-8 md:pt-0">
       <div className="relative h-64 overflow-hidden md:h-80">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-card to-background" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%)]" />
@@ -396,7 +411,7 @@ function MediaPageSkeleton() {
 function MediaNotFoundState() {
   return (
     <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 pt-16 md:pt-0">
-      <div className="animate-page-in w-full max-w-xl rounded-3xl border border-border/50 bg-card/60 p-8 text-center shadow-2xl shadow-black/20 backdrop-blur-xl">
+      <div className="w-full max-w-xl rounded-3xl border border-border/50 bg-card/60 p-8 text-center shadow-2xl shadow-black/20 backdrop-blur-xl">
         <Badge className="mb-4 bg-primary/15 text-primary">Unavailable</Badge>
         <h1 className="mb-3 text-3xl font-black text-foreground">This title could not be loaded</h1>
         <p className="mb-6 text-muted-foreground">
@@ -945,6 +960,7 @@ export default function MediaPage() {
     if (!label) return "bg-muted-foreground/40"
     return providerColors[label.toLowerCase()] || "bg-muted-foreground/40"
   }
+  const providerSectionLabel = media.type === "MANGA" ? "Where to read" : "Where to watch"
 
   const nextAiring = media.nextAiringEpisode
   const nextAiringLabel = nextAiring
@@ -974,6 +990,24 @@ export default function MediaPage() {
     }))
 
   const favoriteActive = Number.isFinite(mediaId) && favoriteIds.includes(mediaId)
+  const characterEntries = (media.characters?.edges || [])
+    .filter((edge) => edge?.node)
+    .map((edge, index) => {
+      const characterName = edge.node?.name?.full || edge.node?.name?.native || "Unknown character"
+      const nativeName =
+        edge.node?.name?.native && edge.node.name.native !== characterName ? edge.node.name.native : null
+      const voiceActor = edge.voiceActors?.[0]
+      return {
+        id: edge.node?.id || `${characterName}-${index}`,
+        name: characterName,
+        nativeName,
+        image: edge.node?.image?.large || edge.node?.image?.medium || "/placeholder.svg",
+        role: formatEnumLabel(edge.role) || "Character",
+        voiceActorName: voiceActor?.name?.full || null,
+        voiceActorImage: voiceActor?.image?.large || voiceActor?.image?.medium || null,
+      }
+    })
+    .slice(0, 12)
   const primaryReferenceLinks = [
     { label: "AniList", url: `https://anilist.co/${media.type?.toLowerCase() || "anime"}/${media.id}` },
     ...(media.externalLinks || [])
@@ -986,7 +1020,7 @@ export default function MediaPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
 
-      <main className="animate-page-in pb-20 pt-16 md:pb-8 md:pt-0">
+      <main className="pb-20 pt-16 md:pb-8 md:pt-0">
         {/* Banner */}
         <div className="relative h-[50vh] overflow-hidden">
           <img
@@ -998,15 +1032,18 @@ export default function MediaPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
         </div>
 
-        <div className="relative z-10 mx-auto -mt-64 max-w-7xl px-4">
+        <div
+          className="relative z-10 mx-auto -mt-64 max-w-7xl animate-fade-in px-4"
+          style={{ animationDuration: "220ms" }}
+        >
           <div>
             {/* Main Info */}
             <div className="flex flex-col gap-8 lg:flex-row">
               {/* Poster */}
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
+                transition={{ duration: 0.34, ease: "easeOut" }}
                 className="flex-shrink-0"
               >
                 <div className="relative">
@@ -1129,9 +1166,9 @@ export default function MediaPage() {
 
               {/* Info */}
               <motion.div
-                initial={{ opacity: 0, y: 30 }}
+                initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.1 }}
+                transition={{ duration: 0.34, delay: 0.08, ease: "easeOut" }}
                 className="flex-1 space-y-6"
               >
                 <div>
@@ -1202,6 +1239,37 @@ export default function MediaPage() {
                     </div>
                   ))}
                 </div>
+
+                {watchProviders.length > 0 ? (
+                  <div
+                    className="animate-fade-in rounded-[24px] border border-white/10 bg-[#08121d]/72 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+                    style={{ animationDuration: "260ms", animationDelay: "40ms" }}
+                  >
+                    <div className="mb-3 flex items-center gap-2 text-white/45">
+                      {media.type === "MANGA" ? (
+                        <Bookmark className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                      <span className="text-xs uppercase tracking-[0.18em]">{providerSectionLabel}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {watchProviders.map((provider) => (
+                        <a
+                          key={provider.id}
+                          href={provider.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0c1724]/90 px-4 py-2.5 text-sm font-medium text-white/78 transition-all duration-200 hover:border-primary/35 hover:bg-white/[0.06] hover:text-white"
+                        >
+                          <span className={cn("h-2.5 w-2.5 rounded-full", getProviderColor(provider.label))} />
+                          <span>{provider.label}</span>
+                          <ExternalLink className="h-3.5 w-3.5 text-white/38 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white/70" />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </motion.div>
             </div>
 
@@ -1518,11 +1586,70 @@ export default function MediaPage() {
               </TabsContent>
 
               <TabsContent value="characters" className="mt-6">
-                <Card className="rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl">
-                  <CardContent className="py-10 text-center text-white/55">
-                    Character information from the redesign pack is coming next.
-                  </CardContent>
-                </Card>
+                {characterEntries.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {characterEntries.map((character) => (
+                      <Card
+                        key={character.id}
+                        className="overflow-hidden rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl"
+                      >
+                        <CardContent className="p-0">
+                          <div className="flex items-stretch">
+                            <div className="relative w-24 shrink-0 overflow-hidden bg-white/[0.04] sm:w-28">
+                              <img
+                                src={character.image}
+                                alt={character.name}
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                            <div className="flex min-w-0 flex-1 flex-col justify-between p-4">
+                              <div>
+                                <div className="mb-2 flex items-center gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className="border-white/10 bg-white/[0.03] text-white/70"
+                                  >
+                                    {character.role}
+                                  </Badge>
+                                </div>
+                                <h3 className="line-clamp-2 text-lg font-semibold text-white">
+                                  {character.name}
+                                </h3>
+                                {character.nativeName ? (
+                                  <p className="mt-1 line-clamp-1 text-sm text-white/45">{character.nativeName}</p>
+                                ) : null}
+                              </div>
+
+                              {character.voiceActorName ? (
+                                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+                                  {character.voiceActorImage ? (
+                                    <img
+                                      src={character.voiceActorImage}
+                                      alt={character.voiceActorName}
+                                      className="h-9 w-9 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-9 w-9 rounded-full bg-white/[0.08]" />
+                                  )}
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] uppercase tracking-[0.22em] text-white/35">Voice Actor</p>
+                                    <p className="truncate text-sm text-white/75">{character.voiceActorName}</p>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl">
+                    <CardContent className="py-10 text-center text-white/55">
+                      No character details are available for this title yet.
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
             </Tabs>
 

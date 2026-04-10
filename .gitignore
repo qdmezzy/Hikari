@@ -1,19 +1,18 @@
-# Root .gitignore for Hikari
-
-# Node
+# Workspace build artifacts
+.next/
 node_modules/
+*.log
 
-# Next build outputs (app lives in /web)
-/web/.next/
+# Web app artifacts
+web/.next/
+web/node_modules/
+web/web/
 
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# Discord bot artifacts
+discord-bot/node_modules/
+discord-bot/bot.log
 
-# Environment files
-.env*
-
-# OS files
-.DS_Store
+# Local environment files
+.env
+.env.*
+!.env.example

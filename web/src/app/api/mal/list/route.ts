@@ -68,7 +68,7 @@ const refreshToken = async (refreshTokenValue: string) => {
 }
 
 export async function GET() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   let accessToken = cookieStore.get("mal_access_token")?.value || ""
   const refreshTokenValue = cookieStore.get("mal_refresh_token")?.value || ""
   const expiresAt = Number(cookieStore.get("mal_expires_at")?.value || "0")
@@ -88,7 +88,10 @@ export async function GET() {
         expiresIn: Number(refreshed?.expires_in) || 3600,
       }
     } catch (error) {
-      return NextResponse.json({ error: error.message || "MAL token refresh failed." }, { status: 401 })
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "MAL token refresh failed." },
+        { status: 401 },
+      )
     }
   }
 
@@ -129,6 +132,9 @@ export async function GET() {
     }
     return response
   } catch (error) {
-    return NextResponse.json({ error: error.message || "Failed to fetch MAL list." }, { status: 500 })
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to fetch MAL list." },
+      { status: 500 },
+    )
   }
 }

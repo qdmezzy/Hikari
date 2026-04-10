@@ -3,17 +3,27 @@
 import { useState, useRef, useEffect, useCallback } from "react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Heart, Bookmark, Share2, Play, Plus, ChevronUp, ChevronDown, 
-  Flame, Sparkles, Zap, Wind, Moon, Check,
-  Star, Info, HeartIcon
+  Flame, Sparkles, Zap, Wind, Moon, Check, Volume2, VolumeX,
+  Star, Info, HeartIcon, Eye, EyeOff
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { PageLoader } from "@/components/ui/page-loader"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Navigation } from "@/components/Navigation"
 import { cn } from "@/lib/utils"
 import { getMediaHref } from "@/lib/anilist"
+import useAuth from "@/hooks/useAuth"
 
 // Vibe filters
 const vibeFilters = [
@@ -40,11 +50,19 @@ type DiscoverItem = {
   trailerId: string | null
 }
 
+const DISCOVER_SORT_PRESETS = [
+  ["TRENDING_DESC", "POPULARITY_DESC"],
+  ["POPULARITY_DESC", "TRENDING_DESC"],
+  ["SCORE_DESC", "POPULARITY_DESC"],
+  ["FAVOURITES_DESC", "POPULARITY_DESC"],
+  ["START_DATE_DESC", "POPULARITY_DESC"],
+]
+
 const DISCOVER_QUERY = `
-query ($page: Int, $perPage: Int) {
+query ($page: Int, $perPage: Int, $sort: [MediaSort]) {
   Page(page: $page, perPage: $perPage) {
-    pageInfo { hasNextPage }
-    media(type: ANIME, sort: TRENDING_DESC, isAdult: false) {
+    pageInfo { currentPage hasNextPage lastPage }
+    media(type: ANIME, sort: $sort, isAdult: false) {
       id
       title { romaji english }
       coverImage { extraLarge large }
@@ -112,6 +130,20 @@ const mapMediaToDiscoverItem = (media: any): DiscoverItem | null => {
 }
 
 const fallbackDiscoverFeed: DiscoverItem[] = []
+const DISCOVER_PAGE_SIZE = 50
+const DISCOVER_MIN_BUFFER = 18
+const DISCOVER_INITIAL_PAGE_MIN = 1
+const DISCOVER_INITIAL_PAGE_MAX = 12
+const DISCOVER_MAX_PAGE_HOPS = 5
+
+const shuffleDiscoverItems = <T,>(items: T[]) => {
+  const copy = [...items]
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[copy[i], copy[j]] = [copy[j], copy[i]]
+  }
+  return copy
+}
 
 const formatNumber = (num: number) => {
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
@@ -120,6 +152,8 @@ const formatNumber = (num: number) => {
 }
 
 export default function DiscoverPage() {
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [discoverFeed, setDiscoverFeed] = useState<DiscoverItem[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [activeVibe, setActiveVibe] = useState("all")
@@ -129,16 +163,39 @@ export default function DiscoverPage() {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [isMuted, setIsMuted] = useState(true)
+  const [spoilerSafe, setSpoilerSafe] = useState(false)
   const [isTrailerLoaded, setIsTrailerLoaded] = useState(false)
   const [showTrailerFrame, setShowTrailerFrame] = useState(false)
+  const [isTrailerPlayerOpen, setIsTrailerPlayerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const loadMoreInFlightRef = useRef(false)
+  const discoverSortRef = useRef(
+    DISCOVER_SORT_PRESETS[Math.floor(Math.random() * DISCOVER_SORT_PRESETS.length)]
+  )
+  const discoverStartPageRef = useRef(
+    Math.floor(Math.random() * (DISCOVER_INITIAL_PAGE_MAX - DISCOVER_INITIAL_PAGE_MIN + 1)) + DISCOVER_INITIAL_PAGE_MIN
+  )
 
   const filteredFeed = activeVibe === "all" 
     ? discoverFeed 
     : discoverFeed.filter(item => item.vibes.includes(activeVibe))
 
   const currentAnime = filteredFeed[currentIndex] || filteredFeed[0]
+  const isDiscoverPending = !currentAnime && (loadingMore || discoverFeed.length === 0)
+
+  const redirectToLogin = useCallback(() => {
+    if (typeof window === "undefined") return
+    const next = `${window.location.pathname}${window.location.search}`
+    router.push(`/login?next=${encodeURIComponent(next)}`)
+  }, [router])
+
+  const ensureSignedIn = useCallback(() => {
+    if (authLoading) return false
+    if (user) return true
+    redirectToLogin()
+    return false
+  }, [authLoading, redirectToLogin, user])
 
   const goToNext = useCallback(() => {
     if (isTransitioning || currentIndex >= filteredFeed.length - 1) return
@@ -155,11 +212,21 @@ export default function DiscoverPage() {
   }, [isTransitioning, currentIndex])
 
   const toggleLike = (id: number) => {
+    if (!ensureSignedIn()) return
     setLiked(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
   const toggleSave = (id: number) => {
+    if (!ensureSignedIn()) return
     setSaved(prev => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  const toggleMute = () => {
+    setIsMuted((prev) => !prev)
+  }
+
+  const toggleSpoilerSafe = () => {
+    setSpoilerSafe((prev) => !prev)
   }
 
   const loadFeedPage = useCallback(async (nextPage: number, append = false) => {
@@ -168,30 +235,54 @@ export default function DiscoverPage() {
     setLoadingMore(true)
 
     try {
-      const response = await fetch("/api/anilist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: DISCOVER_QUERY,
-          variables: { page: nextPage, perPage: 30 },
-        }),
-      })
+      const requestPage = async (pageNumber: number) => {
+        const response = await fetch("/api/anilist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: DISCOVER_QUERY,
+            variables: {
+              page: pageNumber,
+              perPage: DISCOVER_PAGE_SIZE,
+              sort: discoverSortRef.current,
+            },
+          }),
+        })
 
-      const json = await response.json()
-      if (!response.ok || json?.errors) {
-        throw new Error(json?.errors?.[0]?.message || "Failed to load discovery feed.")
+        const json = await response.json()
+        if (!response.ok || json?.errors) {
+          throw new Error(json?.errors?.[0]?.message || "Failed to load discovery feed.")
+        }
+
+        return {
+          json,
+          items: shuffleDiscoverItems(
+            ((json?.data?.Page?.media || [])
+              .map(mapMediaToDiscoverItem)
+              .filter(Boolean) as DiscoverItem[])
+          ),
+          pageInfo: json?.data?.Page?.pageInfo,
+        }
       }
 
-      const items = (json?.data?.Page?.media || [])
-        .map(mapMediaToDiscoverItem)
-        .filter(Boolean) as DiscoverItem[]
+      let resolved = await requestPage(nextPage)
+      let hops = 0
 
-      if (items.length) {
+      while (!resolved.items.length && resolved.pageInfo?.hasNextPage && hops < DISCOVER_MAX_PAGE_HOPS) {
+        hops += 1
+        resolved = await requestPage(Number(resolved.pageInfo?.currentPage || nextPage) + 1)
+      }
+
+      if (!resolved.items.length && !append && Number(resolved.pageInfo?.currentPage || nextPage) !== 1) {
+        resolved = await requestPage(1)
+      }
+
+      if (resolved.items.length) {
         setDiscoverFeed((prev) => {
-          if (!append) return items
+          if (!append) return resolved.items
           const seen = new Set(prev.map((item) => item.id))
           const merged = [...prev]
-          items.forEach((item) => {
+          resolved.items.forEach((item) => {
             if (seen.has(item.id)) return
             seen.add(item.id)
             merged.push(item)
@@ -202,8 +293,8 @@ export default function DiscoverPage() {
         setDiscoverFeed([])
       }
 
-      setPage(nextPage)
-      setHasMore(Boolean(json?.data?.Page?.pageInfo?.hasNextPage))
+      setPage(Number(resolved.pageInfo?.currentPage || nextPage))
+      setHasMore(Boolean(resolved.pageInfo?.hasNextPage))
     } catch (error) {
       if (!append) {
         setDiscoverFeed([])
@@ -217,14 +308,24 @@ export default function DiscoverPage() {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown" || e.key === "j") goToNext()
+      if (e.key === "ArrowDown" || e.key === "j") {
+        if (currentIndex >= filteredFeed.length - 1) {
+          if (hasMore && !loadingMore) {
+            loadFeedPage(page + 1, true)
+          }
+        } else {
+          goToNext()
+        }
+      }
       if (e.key === "ArrowUp" || e.key === "k") goToPrev()
       if (e.key === "l") currentAnime && toggleLike(currentAnime.id)
       if (e.key === "s") currentAnime && toggleSave(currentAnime.id)
+      if (e.key === "m") toggleMute()
+      if (e.key === "x") toggleSpoilerSafe()
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [goToNext, goToPrev, currentAnime])
+  }, [currentAnime, currentIndex, filteredFeed.length, goToNext, goToPrev, hasMore, loadFeedPage, loadingMore, page, toggleLike, toggleSave])
 
   // Scroll/swipe handling
   useEffect(() => {
@@ -270,12 +371,19 @@ export default function DiscoverPage() {
   }, [goToNext, goToPrev])
 
   useEffect(() => {
-    loadFeedPage(1)
+    loadFeedPage(discoverStartPageRef.current)
   }, [loadFeedPage])
 
   useEffect(() => {
+    if (!hasMore || loadingMore) return
+    if (discoverFeed.length >= DISCOVER_MIN_BUFFER) return
+    if (!discoverFeed.length && page !== 1) return
+    loadFeedPage(page + 1, true)
+  }, [discoverFeed.length, hasMore, loadingMore, page, loadFeedPage])
+
+  useEffect(() => {
     if (!filteredFeed.length || !hasMore || loadingMore) return
-    if (currentIndex >= filteredFeed.length - 4) {
+    if (currentIndex >= filteredFeed.length - 6) {
       loadFeedPage(page + 1, true)
     }
   }, [currentIndex, filteredFeed.length, hasMore, loadingMore, page, loadFeedPage])
@@ -290,21 +398,36 @@ export default function DiscoverPage() {
   useEffect(() => {
     setIsTrailerLoaded(false)
     setShowTrailerFrame(false)
+    setIsTrailerPlayerOpen(false)
   }, [currentAnime?.id])
 
   useEffect(() => {
+    if (spoilerSafe) return
     if (!isTrailerLoaded || !currentAnime?.trailerId) return
     const timeout = window.setTimeout(() => {
       setShowTrailerFrame(true)
     }, 700)
     return () => window.clearTimeout(timeout)
-  }, [isTrailerLoaded, currentAnime?.trailerId])
+  }, [isTrailerLoaded, currentAnime?.trailerId, spoilerSafe])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const savedPreference = window.localStorage.getItem("hikari-discover-spoiler-safe")
+    if (savedPreference === "1") {
+      setSpoilerSafe(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem("hikari-discover-spoiler-safe", spoilerSafe ? "1" : "0")
+  }, [spoilerSafe])
 
   // YouTube embed URL with parameters
   const getYouTubeUrl = (trailerId: string) => {
     const params = new URLSearchParams({
       autoplay: "1",
-      mute: "1",
+      mute: isMuted ? "1" : "0",
       controls: "0",
       rel: "0",
       modestbranding: "1",
@@ -313,6 +436,22 @@ export default function DiscoverPage() {
       playlist: trailerId,
       disablekb: "1",
       fs: "0",
+      iv_load_policy: "3",
+      cc_load_policy: "0",
+    })
+    return `https://www.youtube-nocookie.com/embed/${trailerId}?${params.toString()}`
+  }
+
+  const getControllableYouTubeUrl = (trailerId: string) => {
+    const params = new URLSearchParams({
+      autoplay: "1",
+      mute: spoilerSafe ? "1" : isMuted ? "1" : "0",
+      controls: "1",
+      rel: "0",
+      modestbranding: "1",
+      playsinline: "1",
+      disablekb: "0",
+      fs: "1",
       iv_load_policy: "3",
       cc_load_policy: "0",
     })
@@ -348,7 +487,7 @@ export default function DiscoverPage() {
                   className="object-cover"
                   priority
                 />
-                {currentAnime.trailerId ? (
+                {currentAnime.trailerId && !spoilerSafe ? (
                   <div
                     className={cn(
                       "absolute inset-0 overflow-hidden transition-opacity duration-700",
@@ -356,7 +495,7 @@ export default function DiscoverPage() {
                     )}
                   >
                     <iframe
-                      key={currentAnime.trailerId}
+                      key={`${currentAnime.trailerId}-${isMuted ? "muted" : "sound"}`}
                       src={getYouTubeUrl(currentAnime.trailerId)}
                       onLoad={() => setIsTrailerLoaded(true)}
                       className="absolute left-1/2 top-1/2 h-[140vh] w-[180vw] -translate-x-1/2 -translate-y-1/2 border-0 pointer-events-none"
@@ -402,9 +541,21 @@ export default function DiscoverPage() {
                     </div>
 
                     {/* Description */}
-                    <p className="text-white/80 leading-relaxed line-clamp-2 text-sm md:text-base">
-                      {currentAnime.description}
-                    </p>
+                    {spoilerSafe ? (
+                      <div className="max-w-lg rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white/78 backdrop-blur-md">
+                        <div className="flex items-center gap-2 text-white">
+                          <EyeOff className="h-4 w-4 text-primary" />
+                          <span className="font-medium">Spoiler-safe mode is on</span>
+                        </div>
+                        <p className="mt-2 text-white/62">
+                          Trailers and synopses are hidden until you turn spoilers back on.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-white/80 leading-relaxed line-clamp-2 text-sm md:text-base">
+                        {currentAnime.description}
+                      </p>
+                    )}
 
                     {/* Stats */}
                     <div className="flex items-center gap-4 text-sm text-white/70">
@@ -434,6 +585,7 @@ export default function DiscoverPage() {
                         )}
                         onClick={(e) => {
                           e.stopPropagation()
+                          if (!ensureSignedIn()) return
                           toggleSave(currentAnime.id)
                         }}
                       >
@@ -463,19 +615,13 @@ export default function DiscoverPage() {
           )}
         </AnimatePresence>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center px-4">
-          <div className="max-w-md rounded-3xl border border-white/10 bg-black/50 p-8 text-center backdrop-blur-xl">
-            <h1 className="text-2xl font-bold text-white">Discover feed is loading</h1>
-            <p className="mt-3 text-sm text-white/70">
-              We removed the old hardcoded backup clips here, so this view now waits for live AniList data.
-            </p>
-          </div>
-        </div>
+        <PageLoader label="Loading discover feed..." />
       )}
 
         {/* Side Actions */}
+        {currentAnime ? (
         <motion.div 
-          className="fixed right-4 lg:right-8 bottom-32 lg:bottom-40 flex flex-col gap-4 z-20"
+          className="fixed bottom-28 right-5 z-30 flex flex-col gap-4 md:right-7 lg:bottom-36 lg:right-10"
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
@@ -491,6 +637,7 @@ export default function DiscoverPage() {
               )}
               onClick={(e) => {
                 e.stopPropagation()
+                if (!ensureSignedIn()) return
                 currentAnime && toggleLike(currentAnime.id)
               }}
             >
@@ -512,6 +659,7 @@ export default function DiscoverPage() {
               )}
               onClick={(e) => {
                 e.stopPropagation()
+                if (!ensureSignedIn()) return
                 currentAnime && toggleSave(currentAnime.id)
               }}
             >
@@ -532,65 +680,183 @@ export default function DiscoverPage() {
             </Button>
             <span className="text-xs text-white/80 font-medium">Share</span>
           </div>
+
+          {/* Trailer Controls */}
+          {currentAnime?.trailerId && !spoilerSafe ? (
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsTrailerPlayerOpen(true)
+                }}
+              >
+                <Play className="w-6 h-6 text-white" />
+              </Button>
+              <span className="text-xs text-white/80 font-medium">Player</span>
+            </div>
+          ) : null}
+
+          {/* Audio */}
+          <div className="flex flex-col items-center gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn(
+                "h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50",
+                !spoilerSafe && !isMuted && "text-primary",
+              )}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleMute()
+              }}
+              disabled={spoilerSafe}
+            >
+              {isMuted || spoilerSafe ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6" />}
+            </Button>
+            <span className="text-xs text-white/80 font-medium">{spoilerSafe ? "Hidden" : isMuted ? "Muted" : "Audio"}</span>
+          </div>
         </motion.div>
+        ) : null}
 
         {/* Navigation Arrows */}
-        <div className="fixed right-4 lg:right-8 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20">
+        {currentAnime ? (
+        <div className="fixed bottom-9 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/32 px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.28)] backdrop-blur-xl">
           <Button
             size="icon"
             variant="ghost"
-            className="h-10 w-10 rounded-full bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 disabled:opacity-30"
+            className="h-9 w-9 rounded-full bg-white/[0.05] text-white transition-all hover:bg-white/[0.12] disabled:opacity-30"
             onClick={(e) => {
               e.stopPropagation()
               goToPrev()
             }}
             disabled={currentIndex === 0}
           >
-            <ChevronUp className="w-5 h-5" />
+            <ChevronUp className="h-4 w-4" />
           </Button>
+          <div className="h-5 w-px bg-white/10" />
           <Button
             size="icon"
             variant="ghost"
-            className="h-10 w-10 rounded-full bg-black/30 backdrop-blur-sm text-white hover:bg-black/50 disabled:opacity-30"
+            className="h-9 w-9 rounded-full bg-white/[0.05] text-white transition-all hover:bg-white/[0.12] disabled:opacity-30"
             onClick={(e) => {
               e.stopPropagation()
+              if (currentIndex >= filteredFeed.length - 1) {
+                if (hasMore && !loadingMore) {
+                  loadFeedPage(page + 1, true)
+                }
+                return
+              }
               goToNext()
             }}
-            disabled={currentIndex === filteredFeed.length - 1}
+            disabled={currentIndex === filteredFeed.length - 1 && !hasMore && !loadingMore}
           >
-            <ChevronDown className="w-5 h-5" />
+            <ChevronDown className="h-4 w-4" />
           </Button>
         </div>
+        ) : null}
 
-        {/* Vibe Filters - Cleaner horizontal pill design */}
-        <div className="fixed left-1/2 -translate-x-1/2 top-20 lg:top-24 flex items-center gap-2 z-20 p-1.5 bg-black/40 backdrop-blur-md rounded-full">
-          {vibeFilters.map(vibe => (
+        {currentAnime ? (
+        <div className="fixed left-1/2 top-20 z-20 max-w-[calc(100vw-1rem)] -translate-x-1/2 px-2 lg:top-24">
+          <div className="mx-auto flex flex-wrap items-center justify-center gap-1.5 rounded-full border border-white/10 bg-[rgba(8,14,22,0.58)] px-2.5 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-lg">
+            {vibeFilters.map(vibe => (
+              <button
+                key={vibe.id}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200",
+                  activeVibe === vibe.id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-white/68 hover:bg-white/[0.06] hover:text-white"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setActiveVibe(vibe.id)
+                  setCurrentIndex(0)
+                }}
+              >
+                <vibe.icon className="h-3.5 w-3.5" />
+                <span className="whitespace-nowrap">{vibe.label}</span>
+              </button>
+            ))}
+
+            <div className="mx-1 hidden h-5 w-px bg-white/10 md:block" />
+
             <button
-              key={vibe.id}
               className={cn(
-                "px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2",
-                activeVibe === vibe.id 
-                  ? `bg-gradient-to-r ${vibe.color} text-white shadow-lg` 
-                  : "text-white/70 hover:text-white hover:bg-white/10"
+                "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200",
+                spoilerSafe
+                  ? "bg-primary/16 text-primary"
+                  : "text-white/68 hover:bg-white/[0.06] hover:text-white",
               )}
               onClick={(e) => {
                 e.stopPropagation()
-                setActiveVibe(vibe.id)
-                setCurrentIndex(0)
+                toggleSpoilerSafe()
               }}
             >
-              <vibe.icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{vibe.label}</span>
+              {spoilerSafe ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              <span className="whitespace-nowrap">{spoilerSafe ? "Spoiler Safe" : "Spoilers"}</span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-white/42">X</span>
             </button>
-          ))}
+          </div>
         </div>
+        ) : null}
 
-        {loadingMore ? (
+        {loadingMore && !isDiscoverPending ? (
           <div className="fixed bottom-4 right-4 lg:right-8 z-20 rounded-full bg-black/35 px-3 py-1.5 text-xs font-medium text-white/75 backdrop-blur-sm">
             Loading more...
           </div>
         ) : null}
       </div>
+
+      {currentAnime?.trailerId ? (
+        <Dialog open={isTrailerPlayerOpen} onOpenChange={setIsTrailerPlayerOpen}>
+          <DialogContent className="max-w-4xl border-white/10 bg-[rgba(7,12,18,0.94)] p-0 text-white shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl" showCloseButton>
+            <DialogHeader className="border-b border-white/10 px-6 py-4">
+              <DialogTitle className="text-xl font-semibold text-white">
+                Trailer Player
+              </DialogTitle>
+              <DialogDescription className="text-white/60">
+                Pause, scrub, jump around, or fullscreen the trailer here.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="px-6 pb-6 pt-4">
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+                <div className="relative aspect-video">
+                  <iframe
+                    src={getControllableYouTubeUrl(currentAnime.trailerId)}
+                    className="absolute inset-0 h-full w-full border-0"
+                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-white">{currentAnime.title}</p>
+                  <p className="text-xs text-white/55">
+                    Use the YouTube controls to pause, seek backward or forward, and go fullscreen.
+                  </p>
+                </div>
+                <Button
+                  asChild
+                  variant="outline"
+                  className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
+                >
+                  <Link
+                    href={`https://www.youtube.com/watch?v=${currentAnime.trailerId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open on YouTube
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   )
 }

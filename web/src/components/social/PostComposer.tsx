@@ -68,6 +68,7 @@ type PostComposerProps = {
   isAuthenticated?: boolean
   avatarUrl?: string
   avatarInitial?: string
+  variant?: "default" | "community"
 }
 
 export function PostComposer({
@@ -77,6 +78,7 @@ export function PostComposer({
   isAuthenticated = false,
   avatarUrl,
   avatarInitial = "U",
+  variant = "default",
 }: PostComposerProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [content, setContent] = useState("")
@@ -96,6 +98,10 @@ export function PostComposer({
   const [mediaLoading, setMediaLoading] = useState(false)
   const [mediaError, setMediaError] = useState("")
   const [listQuery, setListQuery] = useState("")
+  const isCommunity = variant === "community"
+  const communityPlaceholder = isCommunity
+    ? "What are you watching right now?"
+    : "Share your thoughts on an anime..."
 
   const fandomOptions = useMemo(() => {
     const set = new Set(
@@ -224,36 +230,72 @@ export function PostComposer({
   }
 
   return (
-    <Card className="relative overflow-hidden border border-white/10 bg-gradient-to-br from-zinc-950/80 via-zinc-950/60 to-fuchsia-500/10 shadow-xl shadow-black/30">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(236,72,153,0.18),_transparent_60%)]" />
-      <CardContent className="relative p-5">
+    <Card
+      className={cn(
+        "relative overflow-hidden shadow-xl shadow-black/30",
+        isCommunity
+          ? "border border-border/50 bg-card/60 backdrop-blur-sm"
+          : "border border-white/10 bg-gradient-to-br from-zinc-950/80 via-zinc-950/60 to-fuchsia-500/10",
+      )}
+    >
+      {!isCommunity ? (
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(236,72,153,0.18),_transparent_60%)]" />
+      ) : null}
+      <CardContent className={cn("relative", isCommunity ? "p-4" : "p-5")}>
         <div className="flex gap-3">
-          <Avatar className="h-9 w-9 flex-shrink-0">
+          <Avatar className={cn("flex-shrink-0", isCommunity ? "h-10 w-10 ring-2 ring-border/50" : "h-9 w-9")}>
             {avatarUrl ? <AvatarImage src={avatarUrl} alt="Profile avatar" /> : null}
-            <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-blue-500 text-white text-sm">
+            <AvatarFallback
+              className={cn(
+                "text-white text-sm",
+                isCommunity ? "bg-primary" : "bg-gradient-to-br from-cyan-500 to-blue-500",
+              )}
+            >
               {avatarInitial}
             </AvatarFallback>
           </Avatar>
 
           <div className="flex-1 space-y-3">
-            <Textarea
-              placeholder={isAuthenticated ? "Share your thoughts on an anime..." : "Sign in to start posting..."}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onFocus={() => {
-                if (isAuthenticated) setIsExpanded(true)
-              }}
-              disabled={!isAuthenticated}
-              className={cn(
-                "resize-none border border-white/10 bg-black/40 focus-visible:ring-1 focus-visible:ring-pink-500/40 transition-all text-sm placeholder:text-white/40",
-                isExpanded ? "min-h-20" : "min-h-9",
-              )}
-            />
+            {isCommunity && !isExpanded ? (
+              <Input
+                placeholder={isAuthenticated ? communityPlaceholder : "Sign in to start posting..."}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onFocus={() => {
+                  if (isAuthenticated) setIsExpanded(true)
+                }}
+                disabled={!isAuthenticated}
+                className="h-12 rounded-xl border-border/50 bg-muted/30 text-sm shadow-sm shadow-black/10"
+              />
+            ) : (
+              <Textarea
+                placeholder={isAuthenticated ? communityPlaceholder : "Sign in to start posting..."}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onFocus={() => {
+                  if (isAuthenticated) setIsExpanded(true)
+                }}
+                disabled={!isAuthenticated}
+                className={cn(
+                  "resize-none transition-all text-sm",
+                  isCommunity
+                    ? "border-border/50 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/30"
+                    : "border border-white/10 bg-black/40 focus-visible:ring-1 focus-visible:ring-pink-500/40 placeholder:text-white/40",
+                  isExpanded ? "min-h-20" : "min-h-9",
+                )}
+              />
+            )}
 
             {(fandomInput || attachedMedia || attachedList) && (
               <div className="flex flex-wrap gap-1.5 animate-in fade-in duration-200">
                 {fandomInput && (
-                  <Badge variant="secondary" className="gap-1 text-xs bg-white/10 border border-white/10">
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "gap-1 border text-xs",
+                      isCommunity ? "border-border/50 bg-muted/40 text-foreground" : "border-white/10 bg-white/10",
+                    )}
+                  >
                     <Users className="h-3 w-3" />
                     {fandomInput}
                     <X
@@ -263,7 +305,13 @@ export function PostComposer({
                   </Badge>
                 )}
                 {attachedMedia && (
-                  <Badge variant="secondary" className="gap-1 text-xs bg-white/10 border border-white/10">
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "gap-1 border text-xs",
+                      isCommunity ? "border-border/50 bg-muted/40 text-foreground" : "border-white/10 bg-white/10",
+                    )}
+                  >
                     <Film className="h-3 w-3" />
                     {attachedMedia.title}
                     <X
@@ -273,7 +321,13 @@ export function PostComposer({
                   </Badge>
                 )}
                 {attachedList && (
-                  <Badge variant="secondary" className="gap-1 text-xs bg-white/10 border border-white/10">
+                  <Badge
+                    variant="secondary"
+                    className={cn(
+                      "gap-1 border text-xs",
+                      isCommunity ? "border-border/50 bg-muted/40 text-foreground" : "border-white/10 bg-white/10",
+                    )}
+                  >
                     <List className="h-3 w-3" />
                     {attachedList.name}
                     <X
@@ -286,7 +340,12 @@ export function PostComposer({
             )}
 
             {showPoll && isExpanded && (
-              <div className="space-y-2 rounded-xl bg-black/40 border border-white/10 p-3 animate-in slide-in-from-top-2 duration-200">
+              <div
+                className={cn(
+                  "space-y-2 rounded-xl p-3 animate-in slide-in-from-top-2 duration-200",
+                  isCommunity ? "border border-border/50 bg-muted/30" : "border border-white/10 bg-black/40",
+                )}
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium">Create Poll</span>
                   <X
@@ -304,7 +363,7 @@ export function PostComposer({
                         newOptions[index] = e.target.value
                         setPollOptions(newOptions)
                       }}
-                      className="bg-black/40 border-white/10 h-8 text-sm"
+                      className={cn("h-8 text-sm", isCommunity ? "border-border/50 bg-background/40" : "bg-black/40 border-white/10")}
                     />
                     {pollOptions.length > 2 && (
                       <Button
@@ -333,7 +392,12 @@ export function PostComposer({
             )}
 
             {showClip && isExpanded && (
-              <div className="space-y-2 rounded-xl bg-black/40 border border-white/10 p-3 animate-in slide-in-from-top-2 duration-200">
+              <div
+                className={cn(
+                  "space-y-2 rounded-xl p-3 animate-in slide-in-from-top-2 duration-200",
+                  isCommunity ? "border border-border/50 bg-muted/30" : "border border-white/10 bg-black/40",
+                )}
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium">Clip Link</span>
                   <X
@@ -349,7 +413,7 @@ export function PostComposer({
                   placeholder="Paste YouTube/Twitter clip link..."
                   value={clipLink}
                   onChange={(e) => setClipLink(e.target.value)}
-                  className="bg-black/40 border-white/10 h-8 text-sm"
+                  className={cn("h-8 text-sm", isCommunity ? "border-border/50 bg-background/40" : "bg-black/40 border-white/10")}
                 />
                 <div className="flex items-center gap-2">
                   <Switch
@@ -367,7 +431,7 @@ export function PostComposer({
             )}
 
             {hasSpoilers && isExpanded && (
-              <div className="space-y-2 rounded-xl bg-red-500/10 border border-red-500/20 p-3 animate-in slide-in-from-top-2 duration-200">
+              <div className="space-y-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 animate-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
@@ -382,23 +446,30 @@ export function PostComposer({
                   placeholder="Spoilers up to Episode/Chapter..."
                   value={spoilerEpisode}
                   onChange={(e) => setSpoilerEpisode(e.target.value)}
-                  className="bg-black/40 border-white/10 h-8 text-sm"
+                  className={cn("h-8 text-sm", isCommunity ? "border-border/50 bg-background/40" : "bg-black/40 border-white/10")}
                 />
               </div>
             )}
 
             {isExpanded && (
-              <div className="flex flex-wrap items-center gap-1 border-t border-white/10 pt-3 animate-in fade-in duration-200">
+              <div
+                className={cn(
+                  "flex flex-wrap items-center gap-1 pt-3 animate-in fade-in duration-200",
+                  isCommunity ? "border-t border-border/40" : "border-t border-white/10",
+                )}
+              >
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowClip((prev) => !prev)}
                   className={cn(
-                    "gap-1 h-7 px-2 text-xs rounded-full bg-white/5 hover:bg-white/10",
+                    "gap-1 h-7 px-2 text-xs rounded-full",
+                    isCommunity ? "bg-muted/40 hover:bg-muted/70" : "bg-white/5 hover:bg-white/10",
                     showClip ? "text-cyan-400" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Film className="h-3.5 w-3.5" />
+                  {isCommunity ? <span>Clip</span> : null}
                 </Button>
 
                 <Button
@@ -406,11 +477,13 @@ export function PostComposer({
                   size="sm"
                   onClick={() => setShowPoll((prev) => !prev)}
                   className={cn(
-                    "gap-1 h-7 px-2 text-xs rounded-full bg-white/5 hover:bg-white/10",
+                    "gap-1 h-7 px-2 text-xs rounded-full",
+                    isCommunity ? "bg-muted/40 hover:bg-muted/70" : "bg-white/5 hover:bg-white/10",
                     showPoll ? "text-purple-400" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <BarChart2 className="h-3.5 w-3.5" />
+                  {isCommunity ? <span>Poll</span> : null}
                 </Button>
 
                 <Dialog>
@@ -418,9 +491,13 @@ export function PostComposer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="gap-1 h-7 px-2 text-muted-foreground hover:text-foreground text-xs rounded-full bg-white/5 hover:bg-white/10"
+                    className={cn(
+                      "gap-1 h-7 px-2 text-xs rounded-full text-muted-foreground hover:text-foreground",
+                      isCommunity ? "bg-muted/40 hover:bg-muted/70" : "bg-white/5 hover:bg-white/10",
+                    )}
                   >
                     <Link2 className="h-3.5 w-3.5" />
+                    {isCommunity ? <span>Add Anime</span> : null}
                   </Button>
                 </DialogTrigger>
                   <DialogContent>
@@ -477,9 +554,13 @@ export function PostComposer({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="gap-1 h-7 px-2 text-muted-foreground hover:text-foreground text-xs rounded-full bg-white/5 hover:bg-white/10"
+                    className={cn(
+                      "gap-1 h-7 px-2 text-xs rounded-full text-muted-foreground hover:text-foreground",
+                      isCommunity ? "bg-muted/40 hover:bg-muted/70" : "bg-white/5 hover:bg-white/10",
+                    )}
                   >
                     <List className="h-3.5 w-3.5" />
+                    {isCommunity ? <span>Add List</span> : null}
                   </Button>
                 </DialogTrigger>
                   <DialogContent>
@@ -522,16 +603,18 @@ export function PostComposer({
                   size="sm"
                   onClick={() => setHasSpoilers((prev) => !prev)}
                   className={cn(
-                    "gap-1 h-7 px-2 text-xs rounded-full bg-white/5 hover:bg-white/10",
+                    "gap-1 h-7 px-2 text-xs rounded-full",
+                    isCommunity ? "bg-muted/40 hover:bg-muted/70" : "bg-white/5 hover:bg-white/10",
                     hasSpoilers ? "text-red-400" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <AlertTriangle className="h-3.5 w-3.5" />
+                  {isCommunity ? <span>Spoiler</span> : null}
                 </Button>
               </div>
             )}
 
-            {isExpanded && (
+            {isExpanded && !isCommunity && (
               <div className="flex flex-wrap gap-2">
                 {postCategories.map((category) => (
                   <Badge
@@ -549,7 +632,7 @@ export function PostComposer({
               </div>
             )}
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               {isExpanded ? (
                 <div className="flex items-center gap-2">
                   <Users className="h-3.5 w-3.5 text-muted-foreground" />
@@ -558,7 +641,7 @@ export function PostComposer({
                     value={fandomInput}
                     onChange={(e) => setFandomInput(e.target.value)}
                     placeholder="Fandom"
-                    className="w-44 bg-secondary/50 border-0 h-8 text-xs"
+                    className={cn("w-44 h-8 text-xs", isCommunity ? "border-border/50 bg-muted/30" : "bg-secondary/50 border-0")}
                   />
                   <datalist id="fandom-options">
                     {fandomOptions.map((fandom) => (
@@ -573,7 +656,12 @@ export function PostComposer({
               <Button
                 onClick={handlePost}
                 disabled={!isAuthenticated || !content.trim()}
-                className="rounded-full px-5 h-8 text-sm bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 hover:scale-105 transition-transform"
+                className={cn(
+                  "px-5 text-sm transition-transform",
+                  isCommunity
+                    ? "h-9 rounded-lg bg-primary shadow-lg shadow-primary/20 hover:bg-primary/90"
+                    : "bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 hover:scale-105",
+                )}
               >
                 Post
               </Button>

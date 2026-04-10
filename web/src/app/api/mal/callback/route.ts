@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   const code = url.searchParams.get("code")
   const state = url.searchParams.get("state")
 
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const storedState = cookieStore.get("mal_state")?.value
   const verifier = cookieStore.get("mal_verifier")?.value
   const returnTo = cookieStore.get("mal_return_to")?.value || "/import"
