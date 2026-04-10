@@ -18,10 +18,25 @@ query ($ids: [Int], $perPage: Int) {
       description(asHtml: false)
       startDate { year month day }
       studios(isMain: true) { nodes { name } }
+      externalLinks { site url type }
     }
   }
 }
 `
+
+const STREAMING_SITE_PRIORITY = [
+  "Crunchyroll",
+  "Netflix",
+  "Hulu",
+  "HIDIVE",
+  "Funimation",
+  "Amazon Prime Video",
+  "Disney Plus",
+  "Max",
+  "Bilibili",
+  "Apple TV",
+  "YouTube",
+]
 
 export const chunkIds = (ids = [], size = 50) => {
   const batches = []
@@ -87,6 +102,25 @@ export const getMediaHref = (mediaOrId, maybeTitle) => {
 }
 
 export const getPrimaryStudio = (media) => media?.studios?.nodes?.[0]?.name || ""
+
+export const getStreamingLinks = (media) => {
+  const links = Array.isArray(media?.externalLinks) ? media.externalLinks : []
+  const normalized = links.filter(
+    (link) =>
+      link?.url &&
+      (String(link?.type || "").toLowerCase() === "streaming" || STREAMING_SITE_PRIORITY.includes(String(link?.site || ""))),
+  )
+
+  return normalized.sort((left, right) => {
+    const leftIndex = STREAMING_SITE_PRIORITY.indexOf(String(left?.site || ""))
+    const rightIndex = STREAMING_SITE_PRIORITY.indexOf(String(right?.site || ""))
+    const safeLeft = leftIndex === -1 ? STREAMING_SITE_PRIORITY.length : leftIndex
+    const safeRight = rightIndex === -1 ? STREAMING_SITE_PRIORITY.length : rightIndex
+    return safeLeft - safeRight
+  })
+}
+
+export const getPreferredStreamingLink = (media) => getStreamingLinks(media)[0] || null
 
 export const sanitizeDescription = (value) =>
   String(value || "")

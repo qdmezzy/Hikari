@@ -466,7 +466,7 @@ function ListPageContent() {
             className="mb-8"
           >
             <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">My List</h1>
-            <p className="text-muted-foreground">Your real anime and manga tracking is back in the redesign.</p>
+            <p className="text-muted-foreground">Keep up with everything you're watching and reading.</p>
           </motion.div>
 
           <motion.div

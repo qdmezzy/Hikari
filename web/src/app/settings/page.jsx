@@ -1602,7 +1602,7 @@ export default function SettingsPage() {
             </div>
           </SettingsPanel>
 
-          <SettingsPanel title="Playback" description="Keep your watch experience aligned with the rest of the redesign.">
+          <SettingsPanel title="Playback" description="Tune playback, subtitles, and spoiler preferences.">
             <div className="space-y-4">
               <ToggleRow
                 id="auto-next-episode"
@@ -1776,7 +1776,7 @@ export default function SettingsPage() {
           {connectionMessage ? <p className="mt-4 text-sm text-primary">{connectionMessage}</p> : null}
         </SettingsPanel>
 
-        <SettingsPanel title="Plan" description="Keep the premium area consistent with the rest of the redesign.">
+        <SettingsPanel title="Plan" description="Manage your current plan and premium access.">
           <div className="flex flex-col gap-4 rounded-[28px] border border-amber-500/20 bg-[linear-gradient(135deg,rgba(251,191,36,0.12),rgba(34,211,238,0.08))] p-5 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="flex items-center gap-2 font-semibold text-foreground">

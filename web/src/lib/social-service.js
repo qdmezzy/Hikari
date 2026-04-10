@@ -299,7 +299,7 @@ export const voteOnPoll = async ({ postId, userId, optionIndex }) => {
   return true
 }
 
-export const reportSocialPost = async ({ postId, reporterId, reason, target }) => {
+export const reportSocialPost = async ({ postId, reporterId, reason = null, target }) => {
   return reportContent({
     reporterId,
     reason,

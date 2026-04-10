@@ -86,7 +86,7 @@ export function SocialSidebar() {
   }, [user?.id])
 
   const trendingTopics = useMemo(() => {
-    const counts = posts.reduce((acc, post) => {
+    const counts = posts.reduce<Record<string, number>>((acc, post) => {
       if (mutedIds.includes(String(post.user_id))) return acc
       if (!post.fandom) return acc
       const key = post.fandom.trim()
@@ -96,14 +96,14 @@ export function SocialSidebar() {
     return Object.entries(counts)
       .map(([name, count]) => ({
         tag: `#${name.replace(/\s+/g, "")}`,
-        posts: count,
+        posts: Number(count) || 0,
       }))
       .sort((a, b) => b.posts - a.posts)
       .slice(0, 3)
   }, [posts])
 
   const activeFandoms = useMemo(() => {
-    const counts = posts.reduce((acc, post) => {
+    const counts = posts.reduce<Record<string, number>>((acc, post) => {
       if (mutedIds.includes(String(post.user_id))) return acc
       if (!post.fandom) return acc
       const key = post.fandom.trim()
@@ -113,7 +113,7 @@ export function SocialSidebar() {
     return Object.entries(counts)
       .map(([name, count]) => ({
         name,
-        posts: count,
+        posts: Number(count) || 0,
       }))
       .sort((a, b) => b.posts - a.posts)
       .slice(0, 3)

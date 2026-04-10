@@ -1,13 +1,13 @@
 "use client"
 
+import * as React from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { getMediaHref } from "@/lib/anilist"
-import { Star } from "lucide-react"
-import { useState } from "react"
+import { ExternalLink, Star } from "lucide-react"
 
-export function AnimeCard({
+export const AnimeCard = React.memo(function AnimeCard({
   id,
   title,
   image,
@@ -18,13 +18,14 @@ export function AnimeCard({
   showProgress = false,
   className,
   index = 0,
+  watchUrl,
+  watchLabel,
 }) {
-  const [isHovered, setIsHovered] = useState(false)
   const progress = currentEpisode && episodes ? (currentEpisode / episodes) * 100 : 0
+  const detailsHref = getMediaHref(id, title)
 
   return (
-    <Link
-      href={getMediaHref(id, title)}
+    <div
       className={cn(
         "group relative block overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,16,24,0.98)_0%,rgba(5,9,14,1)_100%)] shadow-[0_18px_44px_rgba(0,0,0,0.35)] transition-all duration-500 hover:-translate-y-1 hover:border-primary/30 hover:shadow-[0_28px_64px_rgba(4,14,24,0.55)]",
         className,
@@ -34,23 +35,19 @@ export function AnimeCard({
         animationDelay: `${index * 60}ms`,
         opacity: 0,
       }}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
+      <Link href={detailsHref} className="absolute inset-0 z-10" aria-label={`Open ${title}`} />
       <div className="relative aspect-[3/4] overflow-hidden">
         <Image
           src={image || "/placeholder.svg?height=400&width=300"}
           alt={title}
           fill
-          className={cn("object-cover transition-all duration-700", isHovered && "scale-110")}
+          className="object-cover transition-all duration-700 group-hover:scale-110"
           style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
         />
 
         <div
-          className={cn(
-            "absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_42%),linear-gradient(180deg,rgba(4,10,18,0.08)_0%,rgba(4,10,18,0.34)_40%,rgba(3,6,10,0.95)_100%)] transition-opacity duration-500",
-            isHovered ? "opacity-100" : "opacity-85",
-          )}
+          className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_42%),linear-gradient(180deg,rgba(4,10,18,0.08)_0%,rgba(4,10,18,0.34)_40%,rgba(3,6,10,0.95)_100%)] opacity-90 transition-opacity duration-500 group-hover:opacity-100"
           style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
         />
 
@@ -81,6 +78,18 @@ export function AnimeCard({
             {type === "anime" ? "Anime" : "Manga"}
             {episodes ? ` / ${episodes} ${type === "anime" ? "episodes" : "chapters"}` : ""}
           </p>
+          {watchUrl ? (
+            <a
+              href={watchUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => event.stopPropagation()}
+              className="relative z-20 mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/12 bg-black/45 px-3 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur-md transition-colors hover:border-primary/35 hover:text-primary"
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" />
+              <span className="truncate">{watchLabel || "Where to watch"}</span>
+            </a>
+          ) : null}
         </div>
         {showProgress && progress > 0 ? (
           <div className="absolute inset-x-4 bottom-0 overflow-hidden rounded-t-full">
@@ -96,7 +105,7 @@ export function AnimeCard({
           </div>
         ) : null}
       </div>
-    </Link>
+    </div>
   )
-}
+})
 

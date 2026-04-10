@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useRouter } from "next/navigation"
 import { Navigation } from "@/components/Navigation"
 import { AnimeCard } from "@/components/AnimeCard"
 import { 
@@ -26,6 +27,7 @@ import {
   getMediaTitle,
   getPrimaryStudio,
   sanitizeDescription,
+  getPreferredStreamingLink,
 } from "@/lib/anilist"
 
 const HOME_TRENDING_QUERY = `
@@ -44,6 +46,7 @@ query ($page: Int, $perPage: Int) {
       popularity
       status
       studios(isMain: true) { nodes { name } }
+      externalLinks { site url type }
     }
   }
 }
@@ -63,6 +66,7 @@ query ($season: MediaSeason, $seasonYear: Int, $page: Int, $perPage: Int) {
       description(asHtml: false)
       genres
       studios(isMain: true) { nodes { name } }
+      externalLinks { site url type }
     }
   }
 }
@@ -166,6 +170,8 @@ const mapMediaToHomeAnime = (media: any, rank?: number) => ({
   studio: getPrimaryStudio(media),
   popularity: Number(media?.popularity || 0),
   status: formatAniListStatus(media?.status),
+  watchUrl: getPreferredStreamingLink(media)?.url || "",
+  watchLabel: getPreferredStreamingLink(media)?.site ? `Watch on ${getPreferredStreamingLink(media).site}` : "",
   rank,
 })
 
@@ -204,10 +210,13 @@ type AnimeItem = {
   day?: string
   time?: string
   isToday?: boolean
+  watchUrl?: string
+  watchLabel?: string
 }
 
 export default function HomePage() {
-  const { user } = useAuth()
+  const router = useRouter()
+  const { user, loading: authLoading } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [currentFeatured, setCurrentFeatured] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -219,6 +228,11 @@ export default function HomePage() {
   const [continueLoading, setContinueLoading] = useState(true)
   const [homeError, setHomeError] = useState("")
   const [continueError, setContinueError] = useState("")
+
+  const runSearch = () => {
+    const trimmed = searchQuery.trim()
+    router.push(trimmed ? `/search?query=${encodeURIComponent(trimmed)}` : "/search")
+  }
 
   useEffect(() => {
     setIsLoaded(true)
@@ -295,6 +309,10 @@ export default function HomePage() {
     let active = true
 
     const loadContinueWatching = async () => {
+      if (authLoading) {
+        return
+      }
+
       if (!user) {
         setContinueWatching([])
         setContinueLoading(false)
@@ -371,7 +389,7 @@ export default function HomePage() {
     return () => {
       active = false
     }
-  }, [user])
+  }, [authLoading, user])
 
   const featured = useMemo(() => featuredAnime[currentFeatured] || null, [currentFeatured, featuredAnime])
 
@@ -571,12 +589,12 @@ export default function HomePage() {
                     </>
                   ) : (
                     <>
-                      <Badge className="w-fit bg-primary/20 text-primary border-primary/20">Live anime data</Badge>
+                      <Badge className="w-fit bg-primary/20 text-primary border-primary/20">Featured picks</Badge>
                       <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tight text-foreground">
-                        Track anime without fake demo shelves.
+                        Track anime with Hikari.
                       </h1>
                       <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
-                        The redesign is now waiting on real AniList data instead of shipping hardcoded titles.
+                        Discover new series, keep your list updated, and pick up where you left off.
                       </p>
                       {homeError ? <p className="text-sm text-rose-400">{homeError}</p> : null}
                     </>
@@ -629,25 +647,29 @@ export default function HomePage() {
             {/* Carousel Indicators */}
             <div className="flex items-center justify-center gap-3 mt-12">
               {(featuredAnime.length ? featuredAnime : Array.from({ length: 3 })).map((_, index) => (
-                <button
+                <motion.button
                   key={index}
+                  layout
                   onClick={() => setCurrentFeatured(index)}
-                  className={`relative overflow-hidden h-1.5 rounded-full transition-all duration-500 ${
+                  transition={{ type: "spring", stiffness: 260, damping: 28 }}
+                  aria-label={`Show featured title ${index + 1}`}
+                  className={`relative h-1.5 overflow-hidden rounded-full ${
                     index === currentFeatured 
-                      ? "w-12 bg-foreground/15" 
-                      : "w-6 bg-foreground/20 hover:bg-foreground/40"
+                      ? "w-14 bg-foreground/15" 
+                      : "w-7 bg-foreground/20 hover:bg-foreground/35"
                   }`}
                 >
                   {index === currentFeatured ? (
                     <motion.span
                       key={`${featured?.id || "featured"}-${index}`}
-                      initial={{ width: "0%" }}
-                      animate={{ width: "100%" }}
+                      initial={{ scaleX: 0, opacity: 0.9 }}
+                      animate={{ scaleX: 1, opacity: 1 }}
                       transition={{ duration: FEATURED_ROTATION_MS / 1000, ease: "linear" }}
-                      className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-accent"
+                      style={{ originX: 0 }}
+                      className="absolute inset-0 rounded-full bg-gradient-to-r from-primary via-accent to-primary shadow-[0_0_16px_rgba(34,211,238,0.38)] will-change-transform"
                     />
                   ) : null}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -665,10 +687,16 @@ export default function HomePage() {
                   placeholder="Search for anime, manga, characters..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault()
+                      runSearch()
+                    }
+                  }}
                   className="pl-14 pr-36 py-7 text-lg bg-transparent border-0 focus-visible:ring-0 placeholder:text-muted-foreground/60 sm:pr-40"
                 />
                 <div className="absolute right-3 flex items-center gap-2">
-                  <Link href={searchQuery ? `/search?query=${encodeURIComponent(searchQuery)}` : "/search"}>
+                  <Link href={searchQuery.trim() ? `/search?query=${encodeURIComponent(searchQuery.trim())}` : "/search"}>
                     <Button className="h-11 rounded-xl border border-white/10 bg-secondary/85 px-4 text-foreground shadow-[0_10px_24px_rgba(0,0,0,0.22)] transition-all duration-300 hover:border-primary/30 hover:bg-secondary">
                       <Search className="mr-2 h-4 w-4 text-primary" />
                       <span className="text-sm font-semibold">Search</span>
@@ -772,8 +800,8 @@ export default function HomePage() {
                 </h3>
                 <p className="text-muted-foreground mb-6">
                   {user
-                    ? "This shelf now stays empty until we have your real list activity."
-                    : "The redesign no longer shows fake continue-watching cards to logged-out users."}
+                    ? "Start tracking a title and your progress will show up here."
+                    : "Sign in to keep your watch progress synced across the app."}
                 </p>
                 <Button asChild className="bg-accent hover:bg-accent/90">
                   <Link href={user ? "/search" : "/login"}>{user ? "Browse Anime" : "Sign In"}</Link>
@@ -794,7 +822,7 @@ export default function HomePage() {
                 <Flame className="w-6 h-6 text-orange-500" />
                 <div>
                   <h2 className="text-2xl font-bold text-foreground">Trending Now</h2>
-                  <p className="text-sm text-muted-foreground">Live AniList titles instead of the old static shelf</p>
+                  <p className="text-sm text-muted-foreground">Popular titles people are watching right now</p>
                 </div>
               </div>
               <Link href="/search" className="text-accent hover:text-accent/80 flex items-center gap-1 text-sm font-medium group">
@@ -821,6 +849,8 @@ export default function HomePage() {
                     image={anime.cover}
                     episodes={anime.episodes || undefined}
                     rating={anime.rating || undefined}
+                    watchUrl={anime.watchUrl || undefined}
+                    watchLabel={anime.watchLabel || undefined}
                     type="anime"
                     index={index}
                   />
@@ -923,7 +953,7 @@ export default function HomePage() {
               Track anime <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">spoiler-free</span>
             </h2>
             <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Real shelves, real progress, and a redesigned homepage that no longer ships placeholder entries.
+              Keep your watch history organized, manage your lists, and discover something new every day.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link href="/register">

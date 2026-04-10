@@ -54,8 +54,9 @@ export default function ForgotPasswordPage() {
           <Card className="bg-card/80 backdrop-blur-xl border-border/50 shadow-2xl">
             <CardHeader className="text-center pb-2">
               <Link href="/" className="inline-flex items-center justify-center gap-2 mb-6">
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Sparkles className="h-5 w-5 text-white" />
+                <div className="relative flex h-10 w-10 items-center justify-center">
+                  <div className="absolute inset-0 rounded-full bg-primary/18 blur-lg" />
+                  <Sparkles className="relative h-6 w-6 text-primary drop-shadow-[0_0_18px_rgba(34,211,238,0.38)]" />
                 </div>
                 <span className="text-2xl font-bold text-gradient">Hikari</span>
               </Link>

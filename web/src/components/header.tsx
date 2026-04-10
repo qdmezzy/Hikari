@@ -1,12 +1,13 @@
 "use client"
 
 import * as React from "react"
+import dynamic from "next/dynamic"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { 
   Search, 
-  Bell, 
+  Bell,
   User, 
   Menu, 
   X,
@@ -14,9 +15,11 @@ import {
   Compass,
   ListVideo,
   Calendar,
+  Users,
   Settings,
   LogOut,
-  Crown
+  Crown,
+  Shield
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -30,9 +33,27 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/theme-toggle"
 
+const NotificationsMenu = dynamic(
+  () => import("@/components/notifications/NotificationsMenu").then((mod) => mod.NotificationsMenu),
+  {
+    ssr: false,
+    loading: () => (
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative h-10 w-10 rounded-xl text-muted-foreground/70 hover:bg-primary/10"
+      >
+        <Bell className="h-5 w-5" />
+        <span className="sr-only">Notifications</span>
+      </Button>
+    ),
+  },
+)
+
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/discover", label: "Discover", icon: Compass },
+  { href: "/community", label: "Community", icon: Users },
   { href: "/search", label: "Browse", icon: Search },
   { href: "/lists", label: "My List", icon: ListVideo },
   { href: "/calendar", label: "Schedule", icon: Calendar },
@@ -45,16 +66,30 @@ interface HeaderProps {
     username: string
     isPremium?: boolean
   } | null
+  authUser?: any | null
+  authLoading?: boolean
   onLogout?: () => void
 }
 
-export function Header({ user, onLogout }: HeaderProps) {
+export const Header = React.memo(function Header({ user, authUser, authLoading = false, onLogout }: HeaderProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
   const [isScrolled, setIsScrolled] = React.useState(false)
+  const actualIsMod = authUser?.user_metadata?.is_mod === true || authUser?.user_metadata?.isMod === true
+  const isMod = !authLoading && actualIsMod
+  const prefetchTargets = React.useMemo(() => {
+    const targets = navItems.map((item) => item.href)
+    if (user) {
+      targets.push("/profile", "/settings", "/lists")
+    }
+    if (isMod) {
+      targets.push("/mod")
+    }
+    return Array.from(new Set(targets))
+  }, [isMod, user])
 
   const runSearch = React.useCallback(() => {
     const trimmed = searchQuery.trim()
@@ -62,12 +97,45 @@ export function Header({ user, onLogout }: HeaderProps) {
   }, [router, searchQuery])
 
   React.useEffect(() => {
+    let frameId: number | null = null
+    let lastScrolled = window.scrollY > 20
+    setIsScrolled(lastScrolled)
+
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20)
+      if (frameId !== null) return
+      frameId = window.requestAnimationFrame(() => {
+        frameId = null
+        const nextScrolled = window.scrollY > 20
+        if (nextScrolled !== lastScrolled) {
+          lastScrolled = nextScrolled
+          setIsScrolled(nextScrolled)
+        }
+      })
     }
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
+
+    window.addEventListener("scroll", handleScroll, { passive: true })
+
+    return () => {
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId)
+      }
+      window.removeEventListener("scroll", handleScroll)
+    }
   }, [])
+
+  React.useEffect(() => {
+    const prefetchRoutes = () => {
+      prefetchTargets.forEach((href) => {
+        router.prefetch(href)
+      })
+    }
+
+    const timeoutId = window.setTimeout(prefetchRoutes, 250)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [prefetchTargets, router])
 
   return (
     <header className={cn(
@@ -90,23 +158,37 @@ export function Header({ user, onLogout }: HeaderProps) {
             {navItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+              const isCommunityLocked = item.href === "/community" && !isMod
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  onMouseEnter={() => router.prefetch(item.href)}
                   className={cn(
                     "relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
-                    isActive 
-                      ? "text-primary" 
-                      : "text-muted-foreground hover:text-foreground"
+                    isCommunityLocked
+                      ? isActive
+                        ? "text-foreground/70"
+                        : "text-muted-foreground/55 hover:text-muted-foreground"
+                      : isActive
+                        ? "text-primary"
+                        : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Icon className="h-4 w-4" />
                   {item.label}
+                  {isCommunityLocked ? (
+                    <span className="rounded-full border border-border/60 bg-muted/35 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75">
+                      Soon
+                    </span>
+                  ) : null}
                   {isActive && (
                     <motion.div
                       layoutId="nav-indicator"
-                      className="absolute inset-0 bg-primary/10 rounded-xl -z-10"
+                      className={cn(
+                        "absolute inset-0 rounded-xl -z-10",
+                        isCommunityLocked ? "bg-white/5" : "bg-primary/10",
+                      )}
                       transition={{ type: "spring", duration: 0.5 }}
                     />
                   )}
@@ -151,18 +233,40 @@ export function Header({ user, onLogout }: HeaderProps) {
             {/* Theme Toggle */}
             <ThemeToggle />
 
-            {user ? (
+            {isMod ? (
               <>
-                {/* Notifications */}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="relative h-10 w-10 rounded-xl hover:bg-primary/10"
+                <Button
+                  asChild
+                  variant="ghost"
+                  className="hidden sm:inline-flex h-10 rounded-xl border border-emerald-500/25 bg-emerald-500/10 px-4 text-emerald-300 shadow-[0_10px_30px_-18px_rgba(16,185,129,0.9)] transition-all hover:border-emerald-400/35 hover:bg-emerald-500/15 hover:text-emerald-200"
                 >
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <span className="sr-only">Notifications</span>
+                  <Link href="/mod" className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    <span className="font-semibold">Mod</span>
+                  </Link>
                 </Button>
+
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="sm:hidden h-10 w-10 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 shadow-[0_10px_30px_-18px_rgba(16,185,129,0.9)] transition-all hover:border-emerald-400/35 hover:bg-emerald-500/15 hover:text-emerald-200"
+                >
+                  <Link href="/mod" aria-label="Open moderation">
+                    <Shield className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </>
+            ) : null}
+
+            {authLoading && !user ? (
+              <div className="flex items-center gap-3">
+                <div className="hidden h-10 w-24 animate-pulse rounded-xl border border-white/5 bg-white/5 sm:block" />
+                <div className="h-10 w-28 animate-pulse rounded-xl border border-white/5 bg-white/5" />
+              </div>
+            ) : user ? (
+              <>
+                <NotificationsMenu user={authUser} />
 
                 {/* User Menu */}
                 <DropdownMenu>
@@ -322,6 +426,7 @@ export function Header({ user, onLogout }: HeaderProps) {
                   {navItems.map((item, index) => {
                     const Icon = item.icon
                     const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))
+                    const isCommunityLocked = item.href === "/community" && !isMod
                     return (
                       <motion.div
                         key={item.href}
@@ -331,20 +436,58 @@ export function Header({ user, onLogout }: HeaderProps) {
                       >
                         <Link
                           href={item.href}
+                          onMouseEnter={() => router.prefetch(item.href)}
                           onClick={() => setIsMobileMenuOpen(false)}
                           className={cn(
-                            "flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all",
-                            isActive 
-                              ? "bg-primary/10 text-primary" 
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                            "flex items-center justify-between gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all",
+                            isCommunityLocked
+                              ? isActive
+                                ? "bg-white/5 text-foreground/70"
+                                : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/35"
+                              : isActive
+                                ? "bg-primary/10 text-primary"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                           )}
                         >
-                          <Icon className="h-5 w-5" />
-                          {item.label}
+                          <span className="flex items-center gap-4">
+                            <Icon className="h-5 w-5" />
+                            {item.label}
+                          </span>
+                          {isCommunityLocked ? (
+                            <span className="rounded-full border border-border/60 bg-muted/35 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-muted-foreground/75">
+                              Soon
+                            </span>
+                          ) : null}
                         </Link>
                       </motion.div>
                     )
                   })}
+                  {isMod ? (
+                    <motion.div
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: navItems.length * 0.05 }}
+                    >
+                      <Link
+                        href="/mod"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className={cn(
+                          "flex items-center justify-between gap-4 rounded-xl border px-4 py-3 text-sm font-semibold transition-all",
+                          pathname === "/mod" || pathname.startsWith("/mod/")
+                            ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
+                            : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 hover:border-emerald-400/30 hover:bg-emerald-500/15 hover:text-emerald-200",
+                        )}
+                      >
+                        <span className="flex items-center gap-4">
+                          <Shield className="h-5 w-5" />
+                          Mod Panel
+                        </span>
+                        <span className="rounded-full bg-black/20 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-emerald-100/80">
+                          Staff
+                        </span>
+                      </Link>
+                    </motion.div>
+                  ) : null}
                   {!user && (
                     <>
                       <div className="my-2 border-t border-border/50" />
@@ -372,4 +515,4 @@ export function Header({ user, onLogout }: HeaderProps) {
       </div>
     </header>
   )
-}
+})

@@ -682,7 +682,7 @@ export function SocialFeed() {
                       title: post.content?.slice(0, 80) || "Watch clip",
                       thumbnails: clipMeta?.thumbnail ? [clipMeta.thumbnail] : [],
                       siteName: clipMeta?.site,
-                      type: "video",
+                      type: "video" as const,
                     }
                   : undefined
                 return (

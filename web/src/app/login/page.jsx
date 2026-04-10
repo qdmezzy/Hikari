@@ -236,8 +236,9 @@ export default function LoginPage() {
           >
             <Link href="/" className="flex items-center gap-3 group">
               <div className="relative">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/30 group-hover:scale-110 transition-transform">
-                  <Sparkles className="h-7 w-7 text-white" />
+                <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl opacity-70 transition-opacity group-hover:opacity-100" />
+                <div className="relative flex h-14 w-14 items-center justify-center transition-transform group-hover:scale-110">
+                  <Sparkles className="h-9 w-9 text-primary drop-shadow-[0_0_22px_rgba(34,211,238,0.42)]" />
                 </div>
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
               </div>
