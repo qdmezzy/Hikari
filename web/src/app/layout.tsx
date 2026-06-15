@@ -3,6 +3,7 @@ import "./globals.css"
 import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google"
 import { Toaster } from "sonner"
 import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
 import { AuthProvider } from "@/components/context/AuthProvider"
 import { ThemeProvider } from "@/components/theme/theme-provider"
 import { EmailVerificationBanner } from "@/components/common/EmailVerificationBanner"
@@ -63,6 +64,7 @@ export default function RootLayout({ children }) {
           <Toaster theme="system" position="bottom-right" richColors closeButton />
         </ThemeProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
