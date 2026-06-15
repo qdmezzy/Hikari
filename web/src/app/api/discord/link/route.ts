@@ -19,6 +19,47 @@ const readSupabaseConfig = () => {
 const errorResponse = (message: string, status = 400) =>
   NextResponse.json({ error: message }, { status });
 
+const DISCORD_API = "https://discord.com/api/v10";
+
+// Best-effort DM to the user confirming the link. Never throws (the user may
+// have DMs closed, or the bot token may be unset).
+const notifyDiscordLinked = async (discordUserId: string, username: string | null, origin: string) => {
+  const token = readFirstEnv("DISCORD_BOT_TOKEN");
+  if (!token) return;
+  try {
+    const dmRes = await fetch(`${DISCORD_API}/users/@me/channels`, {
+      method: "POST",
+      headers: { Authorization: `Bot ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ recipient_id: discordUserId }),
+    });
+    const channel = await dmRes.json().catch(() => null);
+    if (!channel?.id) return;
+
+    await fetch(`${DISCORD_API}/channels/${channel.id}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bot ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        embeds: [
+          {
+            title: "✅ Account linked",
+            description: `Your Discord is now connected to **Hikari**${
+              username ? ` as **@${username}**` : ""
+            }.\nTry \`/profile\`, \`/watching\`, or \`/favorites\` right here.`,
+            color: 0x3b82f6,
+            footer: { text: "光 Hikari" },
+            timestamp: new Date().toISOString(),
+          },
+        ],
+        components: origin
+          ? [{ type: 1, components: [{ type: 2, style: 5, label: "Open Hikari", url: origin }] }]
+          : [],
+      }),
+    });
+  } catch {
+    /* best-effort */
+  }
+};
+
 const sanitizeDiscordId = (value: unknown) => String(value || "").trim();
 const sanitizeDiscordName = (value: unknown) => String(value || "").trim().slice(0, 100);
 
@@ -94,6 +135,18 @@ export async function POST(req: Request) {
     if (upsertError) {
       return errorResponse(upsertError.message || "Failed to create Discord link.", 500);
     }
+
+    // Best-effort confirmation DM in Discord (won't block/break linking).
+    const origin = (() => {
+      const configured = readFirstEnv("NEXT_PUBLIC_APP_URL", "HIKARI_WEB_BASE_URL", "NEXT_PUBLIC_SITE_URL");
+      if (configured) return configured.replace(/\/+$/, "");
+      try {
+        return new URL(req.url).origin;
+      } catch {
+        return "";
+      }
+    })();
+    await notifyDiscordLinked(discordUserId, linkedRow?.hikari_username ?? null, origin);
 
     return NextResponse.json({
       ok: true,

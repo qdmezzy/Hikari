@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@source "../../b_8p0mcDWLqIF";
+@source "..";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -25,7 +25,7 @@
   --secondary: oklch(0.92 0.02 220);
   --secondary-foreground: oklch(0.25 0.02 240);
   --muted: oklch(0.94 0.015 220);
-  --muted-foreground: oklch(0.45 0.02 240);
+  --muted-foreground: oklch(0.42 0.02 240);
   --accent: oklch(0.75 0.12 200);
   --accent-foreground: oklch(0.15 0.02 240);
   --destructive: oklch(0.55 0.22 25);
@@ -103,6 +103,7 @@
 @theme inline {
   --font-sans: "Geist", "Geist Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-jp: var(--font-jp), "Geist", sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -162,10 +163,109 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
+    /* Native-app feel: nothing is selectable by default. Copy-worthy surfaces
+       opt back in below (form fields + the .selectable utility). */
+    -webkit-user-select: none;
+    user-select: none;
+    /* Remove the blue flash on tap for mobile. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Re-enable text selection only where users genuinely need to read/copy. */
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  .selectable,
+  .selectable * {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* Branded selection highlight. */
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 28%, transparent);
+    color: var(--foreground);
+  }
+
+  /* Interactive elements get a pointer; disabled ones make it clear. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+
+  /* Images shouldn't be draggable/selectable — feels like a prototype otherwise. */
+  img {
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
+  /* Consistent, accessible focus ring across the app. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* Respect users who prefer reduced motion. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  input,
+  textarea,
+  select {
+    color: var(--foreground);
+    caret-color: var(--primary);
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  textarea:-webkit-autofill:hover,
+  textarea:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    box-shadow: 0 0 0 1000px color-mix(in oklch, var(--card) 92%, transparent) inset;
+    transition: background-color 9999s ease-out 0s;
+    caret-color: var(--primary);
   }
 }
 
 @layer utilities {
+  .card-elevated {
+    @apply rounded-xl border border-border/60 bg-card/80 shadow-sm backdrop-blur-sm;
+  }
+
+  .animate-rise {
+    animation: rise-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Japanese accent typography helpers */
+  .font-jp {
+    font-family: var(--font-jp);
+  }
+
+  .writing-vertical {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+  }
+
   .glass {
     @apply bg-card/80 backdrop-blur-md border border-border/50;
   }
@@ -180,6 +280,17 @@
 
   .glass-subtle {
     @apply bg-card/60 backdrop-blur-sm border border-border/30;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -935,6 +1046,15 @@
   /* Backdrop blur is expensive on lower-end phones. */
   .backdrop-blur-2xl {
     backdrop-filter: blur(10px) !important;
+  }
+
+  .glass,
+  .glass-card,
+  .glass-strong,
+  .glass-subtle {
+    backdrop-filter: blur(10px) !important;
+    background: color-mix(in oklch, var(--card) 94%, transparent) !important;
+    border-color: color-mix(in oklch, var(--border) 88%, transparent) !important;
   }
 }
 

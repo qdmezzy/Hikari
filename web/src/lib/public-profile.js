@@ -21,7 +21,12 @@ const pickLocation = (user) => user?.user_metadata?.location || null
 
 const pickWebsite = (user) => user?.user_metadata?.website || null
 
-const pickJoinedAt = (user) => user?.created_at || null
+const pickJoinedAt = (user) =>
+  user?.user_metadata?.joined_at ||
+  user?.user_metadata?.joined_date ||
+  user?.user_metadata?.member_since ||
+  user?.created_at ||
+  null
 
 const pickHandle = (user) =>
   normalizeHandle(
@@ -29,6 +34,12 @@ const pickHandle = (user) =>
       user?.user_metadata?.handle ||
       (user?.email ? user.email.split("@")[0] : "user"),
   )
+
+const pickFavoriteMediaIds = (user) => {
+  const ids = user?.user_metadata?.favorite_media_ids
+  if (!Array.isArray(ids)) return []
+  return Array.from(new Set(ids.map((id) => Number(id)).filter(Number.isFinite)))
+}
 
 const getErrorText = (error) => {
   if (!error) return ""
@@ -54,6 +65,17 @@ const isMissingJoinedAtColumn = (error) => {
   const code = String(error?.code || "")
   const text = getErrorText(error)
   return code === "42703" || code === "PGRST204" || text.includes("joined_at")
+}
+
+const isMissingFavoritesColumn = (error) => {
+  const code = String(error?.code || "")
+  const text = getErrorText(error)
+  return (
+    code === "42703" ||
+    code === "PGRST204" ||
+    text.includes("favorite_media_ids") ||
+    text.includes("show_favorites")
+  )
 }
 
 const isHandleUniqueViolation = (error) => {
@@ -93,6 +115,29 @@ export const buildPublicProfilePayload = (user, overrides = {}) => {
   }
 }
 
+/**
+ * Best-effort sync of the user's favorites to their public profile row so they
+ * appear on the shared /u/[handle] page. Never throws and never affects the
+ * core profile upsert (so profile sharing / the View button can't break if the
+ * favorite_media_ids / show_favorites columns aren't migrated yet).
+ */
+export const syncPublicFavorites = async (user) => {
+  try {
+    if (!user?.id) return
+    const { error } = await client
+      .from("public_profiles")
+      .update({
+        favorite_media_ids: pickFavoriteMediaIds(user),
+        show_favorites: user?.user_metadata?.show_favorites ?? true,
+      })
+      .eq("user_id", user.id)
+    // Missing columns / missing row are non-fatal — favorites just won't sync yet.
+    if (error) return
+  } catch {
+    /* swallow */
+  }
+}
+
 export const upsertPublicProfile = async (user, overrides = {}) => {
   const payload = buildPublicProfilePayload(user, overrides)
   if (!payload?.user_id || !payload.handle) {
@@ -104,6 +149,15 @@ export const upsertPublicProfile = async (user, overrides = {}) => {
     .upsert(payload, { onConflict: "user_id" })
     .select("*")
     .single()
+
+  if (error && isMissingFavoritesColumn(error)) {
+    const { favorite_media_ids, show_favorites, ...legacyPayload } = payload
+    ;({ data, error } = await client
+      .from("public_profiles")
+      .upsert(legacyPayload, { onConflict: "user_id" })
+      .select("*")
+      .single())
+  }
 
   if (error && isMissingJoinedAtColumn(error)) {
     const { joined_at, ...legacyPayload } = payload

@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ModNavigation } from "@/components/ModNavigation"
-import RequireAuth from "@/components/RequireAuth"
+import { ModNavigation } from "@/components/layout/ModNavigation"
+import RequireAuth from "@/components/common/RequireAuth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -188,7 +188,7 @@ export default function ModHistoryPage() {
                       post.user_handle ||
                       post.user_display_name ||
                       "Unknown"
-                    const targetUrl = report.target_url || (report.post_id ? `/social/${report.post_id}` : "")
+                    const targetUrl = report.target_url || (report.post_id ? `/community/${report.post_id}` : "")
                     return (
                       <Card key={report.id} className="bg-card/50 border-border/50">
                         <CardContent className="p-5 space-y-3">

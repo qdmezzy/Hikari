@@ -1,0 +1,23 @@
+<svg width="400" height="600" viewBox="0 0 400 600" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Hikari placeholder">
+  <defs>
+    <linearGradient id="hk-bg" x1="0" y1="0" x2="400" y2="600" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1b2433"/>
+      <stop offset="0.55" stop-color="#141b27"/>
+      <stop offset="1" stop-color="#0e131c"/>
+    </linearGradient>
+    <linearGradient id="hk-mark" x1="160" y1="250" x2="240" y2="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <radialGradient id="hk-glow" cx="0.5" cy="0.42" r="0.5">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="600" fill="url(#hk-bg)"/>
+  <rect width="400" height="600" fill="url(#hk-glow)"/>
+  <g transform="translate(200 285)" fill="url(#hk-mark)">
+    <path d="M0 -46 L11 -14 L44 -14 L17 6 L27 38 L0 18 L-27 38 L-17 6 L-44 -14 L-11 -14 Z"/>
+  </g>
+  <text x="200" y="372" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="22" font-weight="700" letter-spacing="3" fill="#5b6b85">HIKARI</text>
+</svg>

@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { Navigation } from "@/components/Navigation"
-import RequireAuth from "@/components/RequireAuth"
+import { Navigation } from "@/components/layout/Navigation"
+import RequireAuth from "@/components/common/RequireAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"

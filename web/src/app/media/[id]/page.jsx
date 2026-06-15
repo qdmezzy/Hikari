@@ -6,9 +6,9 @@ import { useParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import useAuth from '@/hooks/useAuth'
 import client from '@/lib/client'
-import { Navigation } from '@/components/Navigation'
-import { AnimeCard } from '@/components/AnimeCard'
-import { SectionHeader } from '@/components/SectionHeader'
+import { Navigation } from '@/components/layout/Navigation'
+import { AnimeCard } from '@/components/media/AnimeCard'
+import { SectionHeader } from '@/components/media/SectionHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +40,10 @@ import { cn } from '@/lib/utils'
 import { awardXp, XP_ACTIONS } from '@/lib/xp'
 import { addNotification } from '@/lib/notifications-store'
 import { reportContent } from '@/lib/reporting'
+import { logListActivity } from '@/lib/activity-service'
+import { AddToCollection } from '@/components/lists/AddToCollection'
+import { syncPublicFavorites } from '@/lib/public-profile'
+import { toast } from 'sonner'
 
 const MEDIA_FIELDS = `
     id
@@ -436,6 +440,7 @@ export default function MediaPage() {
   // Add to list state
   const [status, setStatus] = useState(null)
   const [progress, setProgress] = useState(0)
+  const [entryScore, setEntryScore] = useState(0)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState(null)
@@ -520,6 +525,7 @@ export default function MediaPage() {
         setExistingProgress(0)
         setStatus(null)
         setProgress(0)
+        setEntryScore(0)
         const { data, error } = await client
           .from('list_entries')
           .select('*')
@@ -530,6 +536,7 @@ export default function MediaPage() {
         if (!error && data) {
           setStatus(data.status)
           setProgress(data.progress || 0)
+          setEntryScore(Number(data.score) || 0)
           setHasEntry(true)
           setExistingProgress(data.progress || 0)
         }
@@ -568,12 +575,16 @@ export default function MediaPage() {
     if (updateError) {
       console.error("Failed to update favorites:", updateError)
       setFavoriteIds(previous)
+      toast.error("Couldn't update favorites. Please try again.")
     } else {
+      // Keep the shareable public profile in sync so favorites show on /u/[handle].
+      syncPublicFavorites({ ...user, user_metadata: { ...user.user_metadata, favorite_media_ids: normalizedNext } })
       addNotification(user.id, {
         title: isFavorite ? "Removed from favorites" : "Added to favorites",
         message: `${media?.title?.english || media?.title?.romaji || "This title"} ${isFavorite ? "was removed from" : "was added to"} your favorites.`,
         type: "favorite",
       })
+      toast.success(isFavorite ? "Removed from favorites" : "Added to favorites")
     }
     setFavoriteSaving(false)
   }
@@ -692,10 +703,12 @@ export default function MediaPage() {
     if (reviewError) {
       console.error("Failed to save review:", reviewError)
       setReviewsError(reviewError.message || "Failed to save review.")
+      toast.error(reviewError.message || "Couldn't save your review.")
       setSubmittingReview(false)
       return
     }
 
+    const wasEditing = reviewExists
     await loadReviews()
     if (!reviewExists) {
       awardXp(user, XP_ACTIONS.review_create, "review_create")
@@ -706,6 +719,7 @@ export default function MediaPage() {
       message: `Your review for ${media?.title?.english || media?.title?.romaji || "this title"} is live.`,
       type: "review",
     })
+    toast.success(wasEditing ? "Review updated" : "Review posted")
     setSubmittingReview(false)
   }
 
@@ -766,6 +780,7 @@ export default function MediaPage() {
           media_type: media.type,
           status: status,
           progress: progress,
+          score: entryScore > 0 ? entryScore : null,
         }, {
           onConflict: 'user_id,media_id'
         })
@@ -776,6 +791,15 @@ export default function MediaPage() {
 
       setSaved(true)
       setPopoverOpen(false)
+      const statusLabels = {
+        watching: "Watching",
+        completed: "Completed",
+        plan_to_watch: "Plan to Watch",
+        on_hold: "On Hold",
+        dropped: "Dropped",
+        rewatching: "Rewatching",
+      }
+      toast.success(`Saved to ${statusLabels[status] || "your list"}`)
       if (!hasEntry) {
         awardXp(user, XP_ACTIONS.list_add, "list_add")
         setHasEntry(true)
@@ -794,6 +818,14 @@ export default function MediaPage() {
           type: "list",
         })
       }
+      void logListActivity({
+        user,
+        media,
+        mediaId,
+        mediaType: media.type,
+        status,
+        progress,
+      })
       setExistingProgress(progress)
       setTimeout(() => setSaved(false), 2000)
     } catch (err) {
@@ -908,8 +940,17 @@ export default function MediaPage() {
       ]
     : []
 
+  const parseEpisodeNumber = (title) => {
+    const labelled = String(title || "").match(/episode\s*(\d+)/i)
+    if (labelled) return Number(labelled[1])
+    const firstNumber = String(title || "").match(/\d+/)
+    return firstNumber ? Number(firstNumber[0]) : Number.POSITIVE_INFINITY
+  }
+
   const streamingEpisodes = (media.streamingEpisodes || [])
     .filter((episode) => episode?.title && episode?.url)
+    .slice()
+    .sort((a, b) => parseEpisodeNumber(a.title) - parseEpisodeNumber(b.title))
     .map((episode, index) => ({
       id: `${episode.site || "stream"}-${index}`,
       title: episode.title,
@@ -1077,7 +1118,13 @@ export default function MediaPage() {
                           )}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-80 p-0">
+                      <PopoverContent
+                        side="bottom"
+                        align="start"
+                        sideOffset={8}
+                        avoidCollisions={false}
+                        className="max-h-[70vh] w-80 overflow-y-auto p-0"
+                      >
                         <div className="overflow-hidden rounded-xl border border-border/50 bg-card/95 shadow-2xl backdrop-blur-xl">
                           <div className="border-b border-border/50 p-4">
                             <h4 className="font-medium">Add to List</h4>
@@ -1117,6 +1164,30 @@ export default function MediaPage() {
                                 placeholder="0"
                               />
                             </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="score">Your Score</Label>
+                              <Input
+                                id="score"
+                                type="number"
+                                value={entryScore || ""}
+                                onChange={(e) => {
+                                  const nextValue = Number(e.target.value)
+                                  if (!Number.isFinite(nextValue)) {
+                                    setEntryScore(0)
+                                    return
+                                  }
+                                  setEntryScore(Math.max(0, Math.min(10, Math.round(nextValue))))
+                                }}
+                                disabled={saving}
+                                min="0"
+                                max="10"
+                                step="1"
+                                placeholder="Optional"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Save a personal rating from 1 to 10. Leave it blank if you have not rated this yet.
+                              </p>
+                            </div>
                             <Button onClick={handleSaveToList} disabled={saving} className="w-full">
                               {saving ? 'Saving...' : 'Save'}
                             </Button>
@@ -1145,6 +1216,8 @@ export default function MediaPage() {
                     <Heart className={cn("mr-2 h-5 w-5", favoriteActive && "fill-current")} />
                     {favoriteActive ? "Favorited" : "Add to Favorites"}
                   </Button>
+
+                  <AddToCollection user={user} mediaId={mediaId} mediaType={media?.type} />
 
                 </div>
 
@@ -1311,7 +1384,7 @@ export default function MediaPage() {
                         <CardTitle className="text-white">Synopsis</CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="whitespace-pre-line leading-8 text-white/68">{synopsis}</p>
+                        <p className="selectable whitespace-pre-line leading-8 text-white/68">{synopsis}</p>
                       </CardContent>
                     </Card>
 
@@ -1512,11 +1585,7 @@ export default function MediaPage() {
                           disabled={submittingReview}
                         />
                         {reviewsError && <p className="text-sm text-rose-300">{reviewsError}</p>}
-                        <div className="flex items-center justify-between">
-                          <label className="flex items-center gap-2 text-sm text-white/45">
-                            <input type="checkbox" className="rounded" disabled />
-                            Contains spoilers (soon)
-                          </label>
+                        <div className="flex items-center justify-end">
                           <Button onClick={handleSubmitReview} disabled={submittingReview} className="rounded-xl bg-gradient-to-r from-cyan-500 to-sky-500 text-white">
                             {submittingReview ? "Saving..." : "Submit Review"}
                           </Button>
@@ -1707,6 +1776,7 @@ export default function MediaPage() {
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Close trailer"
               className="absolute top-4 right-4 h-10 w-10 rounded-full bg-black/50 hover:bg-black/70"
               onClick={() => setTrailerPlaying(null)}
             >

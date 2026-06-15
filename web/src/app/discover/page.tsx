@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Navigation } from "@/components/Navigation"
+import { Navigation } from "@/components/layout/Navigation"
 import { cn } from "@/lib/utils"
 import { getMediaHref } from "@/lib/anilist"
 import useAuth from "@/hooks/useAuth"
@@ -461,8 +461,8 @@ export default function DiscoverPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      
-      <div 
+
+      <div
         ref={containerRef}
         className="fixed inset-0 pt-16 lg:pt-20 overflow-hidden"
       >
@@ -516,25 +516,25 @@ export default function DiscoverPage() {
                   <div className="max-w-xl space-y-4">
                     {/* Badges */}
                     <div className="flex flex-wrap gap-2">
-                      <Badge className="bg-gradient-to-r from-primary to-accent text-white border-0">
-                        <Sparkles className="w-3 h-3 mr-1" />
-                        For You
+                      <Badge className="border border-white/10 bg-white/[0.08] text-white/[0.82]">
+                        <Sparkles className="w-3 h-3 mr-1 text-white/[0.58]" />
+                        {vibeFilters.find((vibe) => vibe.id === activeVibe)?.label || "For You"}
                       </Badge>
-                      <Badge variant="outline" className="border-primary/50 text-primary bg-primary/10 backdrop-blur-sm">
-                        <Star className="w-3 h-3 mr-1 fill-current" />
+                      <Badge variant="outline" className="border-white/10 bg-white/[0.06] text-white/[0.78] backdrop-blur-sm">
+                        <Star className="w-3 h-3 mr-1 fill-current text-white/[0.62]" />
                         {currentAnime.rating}
                       </Badge>
                     </div>
 
                     {/* Title */}
-                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-white drop-shadow-lg">
+                    <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md md:text-4xl lg:text-5xl">
                       {currentAnime.title}
                     </h1>
 
                     {/* Genres */}
-                    <div className="flex flex-wrap gap-2">
-                      {currentAnime.genres.map(genre => (
-                        <span key={genre} className="px-3 py-1 text-sm rounded-full bg-white/10 backdrop-blur-sm text-white/90">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      {currentAnime.genres.slice(0, 5).map(genre => (
+                        <span key={genre} className="text-sm font-medium text-white/[0.68]">
                           {genre}
                         </span>
                       ))}
@@ -542,12 +542,12 @@ export default function DiscoverPage() {
 
                     {/* Description */}
                     {spoilerSafe ? (
-                      <div className="max-w-lg rounded-2xl border border-white/10 bg-black/35 px-4 py-3 text-sm text-white/78 backdrop-blur-md">
+                      <div className="max-w-lg rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/[0.76] backdrop-blur-md">
                         <div className="flex items-center gap-2 text-white">
-                          <EyeOff className="h-4 w-4 text-primary" />
+                          <EyeOff className="h-4 w-4 text-white/[0.62]" />
                           <span className="font-medium">Spoiler-safe mode is on</span>
                         </div>
-                        <p className="mt-2 text-white/62">
+                        <p className="mt-2 text-white/[0.62]">
                           Trailers and synopses are hidden until you turn spoilers back on.
                         </p>
                       </div>
@@ -578,9 +578,9 @@ export default function DiscoverPage() {
                       <Button 
                         size="lg"
                         className={cn(
-                          "font-semibold shadow-lg transition-all",
+                          "font-semibold shadow-md transition-all",
                           saved[currentAnime.id] 
-                            ? "bg-green-500 hover:bg-green-600 text-white"
+                            ? "border border-white/[0.16] bg-white/[0.14] text-white hover:bg-white/[0.18]"
                             : "bg-primary hover:bg-primary/90 text-primary-foreground"
                         )}
                         onClick={(e) => {
@@ -601,7 +601,7 @@ export default function DiscoverPage() {
                           </>
                         )}
                       </Button>
-                      <Button size="lg" variant="outline" className="bg-white/10 backdrop-blur-sm border-white/20 text-white hover:bg-white/20" asChild>
+                      <Button size="lg" variant="outline" className="border-white/[0.14] bg-white/[0.06] text-white/[0.88] backdrop-blur-sm hover:bg-white/[0.12] hover:text-white" asChild>
                         <Link href={getMediaHref(currentAnime.id, currentAnime.title)}>
                           <Info className="w-5 h-5 mr-2" />
                           Details
@@ -655,7 +655,7 @@ export default function DiscoverPage() {
               variant="ghost"
               className={cn(
                 "h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50",
-                saved[currentAnime?.id] && "text-primary"
+                saved[currentAnime?.id] && "bg-white/[0.14] text-white"
               )}
               onClick={(e) => {
                 e.stopPropagation()
@@ -706,7 +706,7 @@ export default function DiscoverPage() {
               variant="ghost"
               className={cn(
                 "h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50",
-                !spoilerSafe && !isMuted && "text-primary",
+                !spoilerSafe && !isMuted && "bg-white/[0.14] text-white",
               )}
               onClick={(e) => {
                 e.stopPropagation()
@@ -767,8 +767,8 @@ export default function DiscoverPage() {
                 className={cn(
                   "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200",
                   activeVibe === vibe.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-white/68 hover:bg-white/[0.06] hover:text-white"
+                    ? "bg-white text-background"
+                    : "text-white/[0.68] hover:bg-white/[0.06] hover:text-white"
                 )}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -784,11 +784,12 @@ export default function DiscoverPage() {
             <div className="mx-1 hidden h-5 w-px bg-white/10 md:block" />
 
             <button
+              title={spoilerSafe ? "Spoiler-safe mode is on — tap to show spoilers" : "Hide trailers & synopses (spoiler-safe)"}
               className={cn(
                 "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200",
                 spoilerSafe
-                  ? "bg-primary/16 text-primary"
-                  : "text-white/68 hover:bg-white/[0.06] hover:text-white",
+                  ? "bg-emerald-500/20 text-emerald-200"
+                  : "text-white/[0.68] hover:bg-white/[0.06] hover:text-white",
               )}
               onClick={(e) => {
                 e.stopPropagation()
@@ -796,8 +797,7 @@ export default function DiscoverPage() {
               }}
             >
               {spoilerSafe ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              <span className="whitespace-nowrap">{spoilerSafe ? "Spoiler Safe" : "Spoilers"}</span>
-              <span className="text-[10px] uppercase tracking-[0.18em] text-white/42">X</span>
+              <span className="whitespace-nowrap">Spoiler-safe{spoilerSafe ? ": On" : ""}</span>
             </button>
           </div>
         </div>

@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
-import { Navigation } from "@/components/Navigation"
-import { AnimeCard } from "@/components/AnimeCard"
-import { 
-  Search, Clock, Star, Play, Heart, Plus, ChevronRight, 
-  Sparkles, Flame, Calendar, Eye, Zap, ExternalLink, Compass
+import { Navigation } from "@/components/layout/Navigation"
+import { AnimeCard } from "@/components/media/AnimeCard"
+import {
+  Search, Clock, Star, Play, Heart, Plus, ChevronRight,
+  Sparkles, Flame, Calendar, Eye, Zap, ExternalLink, Compass, Puzzle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -325,11 +325,13 @@ export default function HomePage() {
 
       const { data, error } = await client
         .from("list_entries")
-        .select("id, media_id, status, progress, updated_at")
+        .select("id, media_id, status, progress, media_type, updated_at")
         .eq("user_id", user.id)
-        .in("status", ["watching", "rewatching", "on_hold"])
+        .eq("media_type", "ANIME")
+        .in("status", ["watching", "rewatching"])
+        .gt("progress", 0)
         .order("updated_at", { ascending: false })
-        .limit(6)
+        .limit(3)
 
       if (!active) return
 
@@ -352,7 +354,7 @@ export default function HomePage() {
         if (!active) return
 
         setContinueWatching(
-          data.slice(0, 3).map((entry: any) => {
+          data.map((entry: any) => {
             const media = mediaById.get(entry.media_id)
             const totalEp = getEpisodeCount(media)
             const currentEp = Number(entry?.progress || 0)
@@ -409,7 +411,7 @@ export default function HomePage() {
         <section className="relative min-h-[85vh] flex items-center overflow-hidden pt-20 md:pt-24">
           {/* Banner Background */}
           {featured ? (
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence mode="wait">
               <motion.div
                 key={featured.id}
                 initial={{ opacity: 0, scale: 1.1 }}
@@ -448,11 +450,18 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-card" />
           )}
 
+          {/* Decorative vertical kana accent */}
+          <div className="pointer-events-none absolute right-6 top-1/2 z-[1] hidden -translate-y-1/2 select-none xl:block">
+            <span className="writing-vertical font-jp text-[8rem] font-bold leading-none tracking-tight text-foreground/[0.05]">
+              ヒカリ
+            </span>
+          </div>
+
           {/* Hero Content */}
           <div className="container mx-auto px-4 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left Side - Info */}
-              <AnimatePresence mode="wait" initial={false}>
+              <AnimatePresence mode="wait">
                 <motion.div
                   key={featured?.id || "featured-empty"}
                   initial={{ opacity: 0, x: -50 }}
@@ -715,6 +724,7 @@ export default function HomePage() {
               <div className="flex items-center gap-3">
                 <Play className="w-6 h-6 text-primary" />
                 <div>
+                  <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">視聴中</p>
                   <h2 className="text-2xl font-bold text-foreground">Continue Watching</h2>
                   <p className="text-sm text-muted-foreground">Pick up where you actually left off</p>
                 </div>
@@ -821,6 +831,7 @@ export default function HomePage() {
               <div className="flex items-center gap-3">
                 <Flame className="w-6 h-6 text-orange-500" />
                 <div>
+                  <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">人気急上昇</p>
                   <h2 className="text-2xl font-bold text-foreground">Trending Now</h2>
                   <p className="text-sm text-muted-foreground">Popular titles people are watching right now</p>
                 </div>
@@ -871,6 +882,7 @@ export default function HomePage() {
               <div className="flex items-center gap-3">
                 <Calendar className="w-6 h-6 text-purple-500" />
                 <div>
+                  <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">放送予定</p>
                   <h2 className="text-2xl font-bold text-foreground">Airing Schedule</h2>
                   <p className="text-sm text-muted-foreground">Upcoming episodes from the current season</p>
                 </div>
@@ -941,6 +953,60 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* Discord + Extension promos */}
+        <section className="px-4 py-12">
+          <div className="mx-auto grid max-w-6xl gap-5 md:grid-cols-2">
+            {/* Discord */}
+            <div className="group relative overflow-hidden rounded-2xl border border-[#5865F2]/25 bg-gradient-to-br from-[#5865F2]/12 to-card p-6 transition-all hover:border-[#5865F2]/40">
+              <div className="flex items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/15 text-[#5865F2]">
+                  <svg viewBox="0 0 24 24" fill="currentColor" className="size-6">
+                    <path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                  </svg>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-jp text-xs tracking-[0.25em] text-[#5865F2]">コミュニティ</h3>
+                  <p className="mt-0.5 text-lg font-bold text-foreground">Hang out on Discord</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Get release alerts, talk anime, and help shape Hikari with other fans.
+                  </p>
+                  <Button asChild className="mt-4 gap-2 bg-[#5865F2] text-white hover:bg-[#4752c4]">
+                    <Link href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord/link"} target="_blank" rel="noreferrer">
+                      Join the server
+                      <ExternalLink className="size-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Browser extension */}
+            <div className="group relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/12 to-card p-6 transition-all hover:border-primary/40">
+              <span className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Coming soon
+              </span>
+              <div className="flex items-start gap-4">
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                  <Puzzle className="size-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-jp text-xs tracking-[0.25em] text-primary/80">拡張機能</h3>
+                  <p className="mt-0.5 text-lg font-bold text-foreground">Auto-track as you watch</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Our browser extension updates your progress automatically while you stream — no manual logging.
+                  </p>
+                  <Button asChild variant="outline" className="mt-4 gap-2">
+                    <Link href="/extension">
+                      Learn more
+                      <ChevronRight className="size-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* CTA Section - Fixed: No more "Get Started" confusion */}
         <section className="px-4 py-20 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20" />
@@ -978,11 +1044,13 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div className="col-span-2 md:col-span-1">
-              <Link href="/" className="flex items-center gap-2 mb-4">
-                <span className="text-xl font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              <Link href="/" className="mb-4 flex flex-col leading-none">
+                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-xl font-black text-transparent">
                   Hikari
                 </span>
+                <span className="font-jp text-[9px] tracking-[0.32em] text-muted-foreground/70">ひかり</span>
               </Link>
+              <p className="mb-2 font-jp text-xs tracking-wide text-muted-foreground/80">アニメをもっと楽しく</p>
               <p className="text-sm text-muted-foreground">
                 Your ultimate anime tracking companion. Discover, track, and share your anime journey.
               </p>
@@ -998,9 +1066,9 @@ export default function HomePage() {
             <div>
               <h4 className="font-semibold text-foreground mb-3">Community</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/social" className="hover:text-accent transition-colors">Social</Link></li>
-                <li><Link href="/ai-recommendations" className="hover:text-accent transition-colors">AI Recommendations</Link></li>
+                <li><Link href="/community" className="hover:text-accent transition-colors">Community</Link></li>
                 <li><Link href="/discord/link" className="hover:text-accent transition-colors flex items-center gap-1">Discord <ExternalLink className="w-3 h-3" /></Link></li>
+                <li><Link href="/feedback" className="hover:text-accent transition-colors">Feedback</Link></li>
               </ul>
             </div>
             <div>
@@ -1016,9 +1084,11 @@ export default function HomePage() {
             <p className="text-sm text-muted-foreground">
               Made with love for anime fans everywhere
             </p>
-            <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
+              <Link href="/terms" className="hover:text-accent transition-colors">Terms</Link>
+              <Link href="/privacy" className="hover:text-accent transition-colors">Privacy</Link>
+              <Link href="/feedback" className="hover:text-accent transition-colors">Feedback</Link>
               <Link href="/settings" className="hover:text-accent transition-colors">Settings</Link>
-              <Link href="/premium" className="hover:text-accent transition-colors">Premium</Link>
               <Link href="/lists" className="hover:text-accent transition-colors">My List</Link>
             </div>
           </div>

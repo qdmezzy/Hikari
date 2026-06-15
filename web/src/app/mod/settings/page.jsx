@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { ModNavigation } from "@/components/ModNavigation"
-import RequireAuth from "@/components/RequireAuth"
+import { ModNavigation } from "@/components/layout/ModNavigation"
+import RequireAuth from "@/components/common/RequireAuth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"

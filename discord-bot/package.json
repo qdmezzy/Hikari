@@ -1,0 +1,16 @@
+{
+  "name": "hikari-discord-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Discord bot for Hikari tracking, discovery, sharing, and watch parties.",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.90.1",
+    "discord.js": "^14.23.2",
+    "dotenv": "^16.6.1"
+  }
+}

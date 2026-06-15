@@ -21,11 +21,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import {
-  getNotifications,
+  fetchNotifications,
   markAllNotificationsRead,
   markNotificationRead,
-  subscribeNotifications,
-} from "@/lib/notifications-store"
+  subscribeToNotifications,
+} from "@/lib/notifications-service"
 import { scheduleEpisodeNotifications } from "@/lib/episode-notifications"
 
 type NotificationEntry = {
@@ -33,7 +33,8 @@ type NotificationEntry = {
   title: string
   message?: string
   created_at?: string
-  unread?: boolean
+  read?: boolean
+  href?: string | null
   type?: string
   metadata?: Record<string, any> | null
 }
@@ -41,6 +42,9 @@ type NotificationEntry = {
 type NotificationsMenuProps = {
   user?: any | null
 }
+
+const SESSION_SCHEDULE_KEY = (userId: string) => `hikari-notify-session-schedule:${userId}`
+const SESSION_SCHEDULE_INTERVAL_MS = 15 * 60 * 1000
 
 const formatRelativeTime = (value?: string) => {
   if (!value) return ""
@@ -65,6 +69,10 @@ const formatRelativeTime = (value?: string) => {
 
 const getNotificationHref = (notification: NotificationEntry) => {
   const metadata = notification?.metadata || {}
+
+  if (typeof notification?.href === "string" && notification.href.trim()) {
+    return notification.href
+  }
 
   if (typeof metadata.href === "string" && metadata.href.trim()) {
     return metadata.href
@@ -158,24 +166,35 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
       setNotifications([])
       return
     }
-    setNotifications(getNotifications(userId))
+    void fetchNotifications(userId).then((rows) => setNotifications(rows as NotificationEntry[]))
   }, [userId])
 
   React.useEffect(() => {
     loadNotifications()
-    return subscribeNotifications(loadNotifications)
-  }, [loadNotifications])
+    if (!userId) return
+    return subscribeToNotifications(userId, loadNotifications)
+  }, [loadNotifications, userId])
 
   React.useEffect(() => {
     if (!user) return
+    if (typeof window === "undefined") return
     const notifyEpisodes =
       preferences.pushNewEpisode ?? preferences.emailNewEpisode ?? user?.user_metadata?.notify_episode ?? true
     const notifyPreAir = preferences.pushAiring ?? user?.user_metadata?.notify_pre_air ?? true
     const notifyDigest = preferences.emailWeeklyDigest ?? user?.user_metadata?.notify_digest ?? false
     let cancelled = false
+    const browserWindow = window as Window & {
+      requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
+      cancelIdleCallback?: (handle: number) => void
+    }
 
     const runScheduling = () => {
       if (cancelled) return
+      const now = Date.now()
+      const sessionKey = SESSION_SCHEDULE_KEY(user.id)
+      const lastSessionCheck = Number(browserWindow.sessionStorage.getItem(sessionKey) || 0)
+      if (now - lastSessionCheck < SESSION_SCHEDULE_INTERVAL_MS) return
+      browserWindow.sessionStorage.setItem(sessionKey, String(now))
       void scheduleEpisodeNotifications({
         user,
         notifyEpisodes,
@@ -188,11 +207,19 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
       })
     }
 
-    const timeoutId = window.setTimeout(runScheduling, 250)
+    if (typeof browserWindow.requestIdleCallback === "function") {
+      const idleId = browserWindow.requestIdleCallback(runScheduling, { timeout: 3000 })
+      return () => {
+        cancelled = true
+        browserWindow.cancelIdleCallback?.(idleId)
+      }
+    }
+
+    const timeoutId = globalThis.setTimeout(runScheduling, 1500)
 
     return () => {
       cancelled = true
-      window.clearTimeout(timeoutId)
+      globalThis.clearTimeout(timeoutId)
     }
   }, [
     user,
@@ -204,19 +231,23 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
   ])
 
   const unreadCount = React.useMemo(
-    () => notifications.filter((item) => item?.unread).length,
+    () => notifications.filter((item) => !item?.read).length,
     [notifications],
   )
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     if (!userId) return
-    markAllNotificationsRead(userId)
+    setNotifications((current) => current.map((item) => ({ ...item, read: true })))
+    await markAllNotificationsRead(userId)
     loadNotifications()
   }
 
   const handleNotificationClick = (notification: NotificationEntry) => {
     if (!userId) return
-    markNotificationRead(userId, notification.id)
+    setNotifications((current) =>
+      current.map((item) => (item.id === notification.id ? { ...item, read: true } : item)),
+    )
+    void markNotificationRead(userId, notification.id)
     setOpen(false)
     router.push(getNotificationHref(notification))
   }
@@ -302,7 +333,7 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
                     onClick={() => handleNotificationClick(notification)}
                     className={cn(
                       "w-full rounded-2xl border border-white/8 bg-white/[0.035] p-3 text-left transition-all hover:border-white/15 hover:bg-white/[0.06]",
-                      notification.unread && "border-primary/20 bg-primary/[0.06]",
+                      !notification.read && "border-primary/20 bg-primary/[0.06]",
                     )}
                   >
                     <div className="flex items-start gap-3">
@@ -325,7 +356,7 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
                               </p>
                             ) : null}
                           </div>
-                          {notification.unread ? (
+                          {!notification.read ? (
                             <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
                           ) : null}
                         </div>

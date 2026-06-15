@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Navigation } from "@/components/Navigation"
-import RequireAuth from "@/components/RequireAuth"
+import { Navigation } from "@/components/layout/Navigation"
+import RequireAuth from "@/components/common/RequireAuth"
+import { EmptyState } from "@/components/common/EmptyState"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -217,17 +218,16 @@ export default function FavoritesPage() {
             )}
 
             {!loading && !loadError && sortedClips.length === 0 && (
-              <Card className="bg-card/50 border-border/50">
-                <CardContent className="py-16 text-center">
-                  <Bookmark className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                  <p className="text-muted-foreground">No saved clips yet</p>
-                  <Link href="/discover">
-                    <Button variant="outline" className="mt-4 bg-transparent">
-                      Discover trailers
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
+              <EmptyState
+                icon={Bookmark}
+                title="No saved clips yet"
+                description="Save trailers and clips from Discover to keep them here for later."
+                action={
+                  <Button asChild>
+                    <Link href="/discover">Discover trailers</Link>
+                  </Button>
+                }
+              />
             )}
 
             {!loading && !loadError && sortedClips.length > 0 && (

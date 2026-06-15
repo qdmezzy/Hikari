@@ -1,34 +1,39 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
-import Image from "next/image"
-import { useRouter, useSearchParams } from "next/navigation"
-import { motion } from "framer-motion"
-import { Navigation } from "@/components/Navigation"
-import { AnimeDecorations } from "@/components/anime-decorations"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  Search,
-  Grid,
-  List,
-  Star,
-  Heart,
-  Plus,
-  ChevronDown,
-  X,
-  SlidersHorizontal,
-  Loader2,
   Check,
+  ChevronDown,
+  LayoutGrid,
+  List,
+  Loader2,
+  Play,
+  Search,
+  SlidersHorizontal,
+  Star,
+  X,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  fetchAniList,
+  formatAniListStatus,
+  getEpisodeCount,
+  getMediaHref,
+  getMediaTitle,
+  getPreferredStreamingLink,
+  getPrimaryStudio,
+  
+} from "@/lib/anilist"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
+import { Navigation } from "@/components/layout/Navigation"
+import { AnimeCard } from "@/components/media/AnimeCard"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
-import { fetchAniList, formatAniListStatus, getEpisodeCount, getMediaHref, getMediaTitle, getPreferredStreamingLink, getPrimaryStudio } from "@/lib/anilist"
+import { logListActivity } from "@/lib/activity-service"
+
+function stripHtml(html: string) {
+  return html.replace(/<[^>]*>/g, "")
+}
 
 const genres = [
   "Action",
@@ -50,87 +55,101 @@ const sortOptions = {
   rating: ["SCORE_DESC", "POPULARITY_DESC"],
   newest: ["START_DATE_DESC", "POPULARITY_DESC"],
   alphabetical: ["TITLE_ROMAJI"],
+} as const
+
+type SortKey = keyof typeof sortOptions
+
+const sortLabels: Record<SortKey, string> = {
+  popularity: "Most popular",
+  rating: "Top rated",
+  newest: "Newest",
+  alphabetical: "A-Z",
 }
 
 const SEARCH_QUERY = `
 query ($search: String, $page: Int, $perPage: Int, $genres: [String], $sort: [MediaSort]) {
   Page(page: $page, perPage: $perPage) {
-    pageInfo {
-      currentPage
-      hasNextPage
-      total
-    }
+    pageInfo { currentPage hasNextPage total }
     media(type: ANIME, search: $search, genre_in: $genres, sort: $sort, isAdult: false) {
       id
       title { romaji english native }
-      coverImage { extraLarge large }
+      coverImage { extraLarge large color }
       averageScore
       episodes
       nextAiringEpisode { episode }
       status
       genres
+      description
       startDate { year }
       studios(isMain: true) { nodes { name } }
       externalLinks { site url type }
+      siteUrl
     }
   }
 }
 `
 
-const buildSearchUrl = (queryValue, selectedGenres, sortBy) => {
-  const params = new URLSearchParams()
-  if (queryValue) params.set("query", queryValue)
-  if (selectedGenres.length) params.set("genres", selectedGenres.join(","))
-  if (sortBy && sortBy !== "popularity") params.set("sort", sortBy)
-  const queryString = params.toString()
-  return queryString ? `/search?${queryString}` : "/search"
+type AniListMedia = {
+  id: number
+  title?: {
+    romaji?: string | null
+    english?: string | null
+    native?: string | null
+  } | null
+  coverImage?: {
+    extraLarge?: string | null
+    large?: string | null
+    color?: string | null
+  } | null
+  averageScore?: number | null
+  episodes?: number | null
+  nextAiringEpisode?: {
+    episode?: number | null
+  } | null
+  status?: string | null
+  genres?: string[] | null
+  description?: string | null
+  startDate?: {
+    year?: number | null
+  } | null
+  studios?: {
+    nodes?: Array<{ name?: string | null }> | null
+  } | null
+  externalLinks?: Array<{
+    site?: string | null
+    url?: string | null
+    type?: string | null
+  }> | null
+  siteUrl?: string | null
 }
 
-const parseGenres = (value) =>
-  String(value || "")
-    .split(",")
-    .map((genre) => genre.trim())
-    .filter((genre) => genres.includes(genre))
+type QuickState = Record<number, "adding" | "added">
 
 export default function BrowsePage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { user } = useAuth()
-
   const [searchQuery, setSearchQuery] = useState("")
   const [activeQuery, setActiveQuery] = useState("")
-  const [viewMode, setViewMode] = useState("grid")
-  const [selectedGenres, setSelectedGenres] = useState([])
-  const [sortBy, setSortBy] = useState("popularity")
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [results, setResults] = useState([])
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [selectedGenres, setSelectedGenres] = useState<string[]>([])
+  const [sortBy, setSortBy] = useState<SortKey>("popularity")
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  const [results, setResults] = useState<AniListMedia[]>([])
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState("")
-  const [quickAddState, setQuickAddState] = useState({})
+  const [quickState, setQuickState] = useState<QuickState>({})
 
-  useEffect(() => {
-    setIsLoaded(true)
-  }, [])
+  const requestId = useRef(0)
 
-  useEffect(() => {
-    const nextQuery = (searchParams.get("query") || "").trim()
-    const nextGenres = parseGenres(searchParams.get("genres"))
-    const nextSort = searchParams.get("sort") || "popularity"
-
-    setSearchQuery((current) => (current === nextQuery ? current : nextQuery))
-    setActiveQuery((current) => (current === nextQuery ? current : nextQuery))
-    setSelectedGenres((current) => (current.join("|") === nextGenres.join("|") ? current : nextGenres))
-    setSortBy((current) => (current === nextSort ? current : nextSort))
-  }, [searchParams])
-
-  const fetchPage = async (nextPage, append = false) => {
-    if (append) {
-      setLoadingMore(true)
-    } else {
+  const fetchPage = async (nextPage: number, append = false) => {
+    const id = ++requestId.current
+    if (append) setLoadingMore(true)
+    else {
       setLoading(true)
       setError("")
     }
@@ -141,484 +160,490 @@ export default function BrowsePage() {
         page: nextPage,
         perPage: 24,
         genres: selectedGenres.length ? selectedGenres : undefined,
-        sort: sortOptions[sortBy] || sortOptions.popularity,
+        sort: sortOptions[sortBy],
       })
-
-      const pageData = data?.Page
-      const nextResults = pageData?.media || []
-
+      if (id !== requestId.current) return
+      const pageData = (data as { Page?: any })?.Page
+      const nextResults: AniListMedia[] = pageData?.media || []
       setResults((current) => (append ? [...current, ...nextResults] : nextResults))
       setPage(pageData?.pageInfo?.currentPage || nextPage)
       setHasMore(Boolean(pageData?.pageInfo?.hasNextPage))
       setTotal(pageData?.pageInfo?.total || nextResults.length)
     } catch (loadError) {
-      console.error("Failed to load browse results:", loadError)
+      if (id !== requestId.current) return
+      console.log("[v0] Failed to load browse results:", loadError)
       if (!append) {
         setResults([])
         setHasMore(false)
         setTotal(0)
-        setError("Could not load anime right now.")
+        setError("Could not load anime right now. Try again in a moment.")
       }
     } finally {
-      if (append) {
-        setLoadingMore(false)
-      } else {
-        setLoading(false)
-      }
+      if (id !== requestId.current) return
+      if (append) setLoadingMore(false)
+      else setLoading(false)
     }
   }
 
   useEffect(() => {
     fetchPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQuery, selectedGenres, sortBy])
 
-  const applyFilters = (nextQuery, nextGenres, nextSort) => {
-    const trimmedQuery = (nextQuery || "").trim()
-    setSearchQuery(trimmedQuery)
-    setActiveQuery(trimmedQuery)
-    setSelectedGenres(nextGenres)
-    setSortBy(nextSort)
-    router.push(buildSearchUrl(trimmedQuery, nextGenres, nextSort))
+  const toggleGenre = (genre: string) => {
+    setSelectedGenres((current) =>
+      current.includes(genre) ? current.filter((value) => value !== genre) : [...current, genre],
+    )
   }
 
-  const toggleGenre = (genre) => {
-    const nextGenres = selectedGenres.includes(genre)
-      ? selectedGenres.filter((value) => value !== genre)
-      : [...selectedGenres, genre]
+  const handleSearchSubmit = () => setActiveQuery(searchQuery.trim())
 
-    applyFilters(searchQuery, nextGenres, sortBy)
+  const clearAll = () => {
+    setSelectedGenres([])
+    setSearchQuery("")
+    setActiveQuery("")
+    setSortBy("popularity")
   }
 
-  const handleSearchSubmit = () => {
-    applyFilters(searchQuery, selectedGenres, sortBy)
-  }
-
-  const handleSortChange = (value) => {
-    applyFilters(searchQuery, selectedGenres, value)
-  }
-
-  const handleQuickAdd = async (anime, event) => {
-    event.preventDefault()
-    event.stopPropagation()
-
+  const handleQuickAdd = async (anime: AniListMedia) => {
+    const mediaId = anime?.id
+    if (!mediaId || quickState[mediaId] === "adding") return
     if (!user) {
-      router.push(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`)
+      toast.info("Sign in to add anime to your list")
+      router.push("/login?next=/search")
       return
     }
 
-    const mediaId = anime?.id
-    if (!mediaId || quickAddState[mediaId] === "adding") return
+    setQuickState((current) => ({ ...current, [mediaId]: "adding" }))
 
-    setQuickAddState((current) => ({ ...current, [mediaId]: "adding" }))
+    // Add to Plan to Watch without clobbering an existing entry.
+    const { error } = await client
+      .from("list_entries")
+      .upsert(
+        { user_id: user.id, media_id: mediaId, media_type: "ANIME", status: "plan_to_watch", progress: 0 },
+        { onConflict: "user_id,media_id", ignoreDuplicates: true },
+      )
 
-    try {
-      const { data: existingEntry, error: existingError } = await client
-        .from("list_entries")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("media_id", mediaId)
-        .maybeSingle()
-
-      if (existingError && existingError.code !== "PGRST116") {
-        throw existingError
-      }
-
-      if (!existingEntry?.id) {
-        const { error: insertError } = await client.from("list_entries").insert({
-          user_id: user.id,
-          media_id: mediaId,
-          media_type: "ANIME",
-          status: "plan_to_watch",
-          progress: 0,
-        })
-
-        if (insertError) throw insertError
-      }
-
-      setQuickAddState((current) => ({ ...current, [mediaId]: "added" }))
-      window.setTimeout(() => {
-        setQuickAddState((current) => {
-          const next = { ...current }
-          delete next[mediaId]
-          return next
-        })
-      }, 1800)
-    } catch (addError) {
-      console.error("Failed to add anime to list:", addError)
-      setQuickAddState((current) => ({ ...current, [mediaId]: "error" }))
-      window.setTimeout(() => {
-        setQuickAddState((current) => {
-          const next = { ...current }
-          delete next[mediaId]
-          return next
-        })
-      }, 1800)
+    if (error) {
+      setQuickState((current) => {
+        const next = { ...current }
+        delete next[mediaId]
+        return next
+      })
+      toast.error("Couldn't add to your list. Please try again.")
+      return
     }
+
+    toast.success(`Added "${getMediaTitle(anime)}" to Plan to Watch`)
+
+    void logListActivity({
+      user,
+      media: anime,
+      mediaId,
+      mediaType: "ANIME",
+      status: "plan_to_watch",
+      progress: 0,
+    })
+
+    setQuickState((current) => ({ ...current, [mediaId]: "added" }))
+    window.setTimeout(() => {
+      setQuickState((current) => {
+        const next = { ...current }
+        delete next[mediaId]
+        return next
+      })
+    }, 1600)
   }
 
   const resultsLabel = useMemo(() => {
-    if (loading) return "Loading anime..."
+    if (loading) return "Searching the catalog..."
     if (!results.length) return "No anime found"
-    return total ? `Showing ${results.length} of ${total} anime` : `Showing ${results.length} anime`
-  }, [loading, results.length, total])
+    // AniList caps pageInfo.total at 5000, so it isn't a reliable match count for
+    // searches — only show "X of N" when N is a real (sub-cap) total.
+    if (total && total < 5000) return `${results.length} of ${total.toLocaleString()} titles`
+    return `${results.length}${hasMore ? "+" : ""} ${results.length === 1 ? "title" : "titles"}`
+  }, [loading, results.length, total, hasMore])
+
+  const hasActiveFilters = selectedGenres.length > 0 || activeQuery.length > 0
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimeDecorations variant="sparse" />
+    <div className="min-h-screen bg-background">
       <Navigation />
+      <main className="mx-auto max-w-7xl px-4 pb-8 pt-24 md:px-6 md:pb-10 lg:pt-28">
+        {/* Page header */}
+        <header className="animate-rise">
+          <p className="text-sm font-medium text-primary">Catalog</p>
+          <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">Browse anime</h1>
+          <p className="mt-2 max-w-2xl text-pretty text-muted-foreground">
+            Search across every studio and season, filter by genre, and line up your next watch.
+          </p>
+        </header>
 
-      <main className="relative z-10 pt-24 pb-12 px-4">
-        <div className="max-w-7xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
-            transition={{ duration: 0.5 }}
-            className="mb-8"
-          >
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">Browse Anime</h1>
-            <p className="text-muted-foreground">
-              Search for your next watch and explore top titles from across the catalog.
-            </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="glass-card p-4 mb-6"
-          >
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search anime..."
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") handleSearchSubmit()
-                  }}
-                  className="pl-10 bg-background/50"
-                />
-              </div>
-
-              <Button className="lg:w-auto" onClick={handleSearchSubmit}>
-                <Search className="w-4 h-4 mr-2" />
-                Search
-              </Button>
-
-              <Select value={sortBy} onValueChange={handleSortChange}>
-                <SelectTrigger className="w-full lg:w-48 bg-background/50">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="popularity">Popularity</SelectItem>
-                  <SelectItem value="rating">Rating</SelectItem>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="alphabetical">A-Z</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-2 p-1 bg-muted rounded-lg">
-                <Button
-                  size="sm"
-                  variant={viewMode === "grid" ? "default" : "ghost"}
-                  onClick={() => setViewMode("grid")}
-                  className="px-3"
-                >
-                  <Grid className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant={viewMode === "list" ? "default" : "ghost"}
-                  onClick={() => setViewMode("list")}
-                  className="px-3"
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" className="lg:hidden">
-                    <SlidersHorizontal className="w-4 h-4 mr-2" />
-                    Filters
-                    {selectedGenres.length > 0 && (
-                      <Badge className="ml-2 bg-accent">{selectedGenres.length}</Badge>
-                    )}
-                  </Button>
-                </SheetTrigger>
-                <SheetContent>
-                  <SheetHeader>
-                    <SheetTitle>Filters</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-6">
-                    <h4 className="font-medium mb-3">Genres</h4>
-                    <div className="space-y-2">
-                      {genres.map((genre) => (
-                        <div key={genre} className="flex items-center gap-2">
-                          <Checkbox
-                            id={`mobile-${genre}`}
-                            checked={selectedGenres.includes(genre)}
-                            onCheckedChange={() => toggleGenre(genre)}
-                          />
-                          <label htmlFor={`mobile-${genre}`} className="text-sm cursor-pointer">
-                            {genre}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
-            </div>
-
-            <div className="hidden lg:flex flex-wrap gap-2 mt-4">
-              {genres.map((genre) => (
+        {/* Prominent search bar */}
+        <div className="mt-6 animate-rise">
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search anime, studios, characters..."
+                value={searchQuery}
+                onChange={(event) => {
+                  const value = event.target.value
+                  setSearchQuery(value)
+                  // Emptying the field clears the active search filter/chip.
+                  if (!value.trim() && activeQuery) setActiveQuery("")
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleSearchSubmit()
+                }}
+                className="w-full rounded-2xl border border-border bg-card py-3.5 pl-12 pr-10 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10"
+              />
+              {searchQuery ? (
                 <button
-                  key={genre}
-                  onClick={() => toggleGenre(genre)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
-                    selectedGenres.includes(genre)
-                      ? "bg-accent text-accent-foreground"
-                      : "bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground"
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery("")
+                    setActiveQuery("")
+                  }}
+                  aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                >
+                  <X className="size-4" />
+                </button>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={handleSearchSubmit}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              <Search className="size-4" />
+              Search
+            </button>
+          </div>
+        </div>
+
+        {/* Two-column: filters + content */}
+        <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
+          {/* Mobile filter toggle */}
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            className="inline-flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-sm lg:hidden"
+          >
+            <span className="inline-flex items-center gap-2">
+              <SlidersHorizontal className="size-4" />
+              Filters
+              {selectedGenres.length ? (
+                <span className="rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground">
+                  {selectedGenres.length}
+                </span>
+              ) : null}
+            </span>
+            <ChevronDown className={`size-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {/* Sidebar */}
+          <aside className={`${filtersOpen ? "block" : "hidden"} lg:block`}>
+            <div className="lg:sticky lg:top-24 space-y-6">
+              {/* Sort */}
+              <div className="card-elevated p-4">
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sort by</h2>
+                <div className="mt-3 space-y-1">
+                  {(Object.keys(sortLabels) as SortKey[]).map((key) => {
+                    const active = sortBy === key
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSortBy(key)}
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                          active ? "bg-accent font-medium text-primary" : "text-foreground hover:bg-secondary"
+                        }`}
+                      >
+                        {sortLabels[key]}
+                        {active ? <Check className="size-4" /> : null}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Genres */}
+              <div className="card-elevated p-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Genres</h2>
+                  {selectedGenres.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedGenres([])}
+                      className="text-xs font-medium text-primary hover:underline"
+                    >
+                      Reset
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {genres.map((genre) => {
+                    const active = selectedGenres.includes(genre)
+                    return (
+                      <button
+                        key={genre}
+                        type="button"
+                        onClick={() => toggleGenre(genre)}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                        }`}
+                      >
+                        {genre}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="w-full rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary"
+                >
+                  Clear all filters
+                </button>
+              ) : null}
+            </div>
+          </aside>
+
+          {/* Content */}
+          <section>
+            {/* Results meta + view toggle */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">{resultsLabel}</p>
+                {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              </div>
+              <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  aria-label="Grid view"
+                  className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
+                    viewMode === "grid"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {genre}
+                  <LayoutGrid className="size-4" />
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  aria-label="List view"
+                  className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
+                    viewMode === "list"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <List className="size-4" />
+                </button>
+              </div>
             </div>
 
-            {selectedGenres.length > 0 && (
-              <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/50 flex-wrap">
-                <span className="text-sm text-muted-foreground">Active:</span>
+            {/* Active filter chips */}
+            {hasActiveFilters ? (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {activeQuery ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs text-foreground">
+                    &ldquo;{activeQuery}&rdquo;
+                  </span>
+                ) : null}
                 {selectedGenres.map((genre) => (
-                  <Badge
+                  <button
                     key={genre}
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-destructive hover:text-destructive-foreground transition-colors"
+                    type="button"
                     onClick={() => toggleGenre(genre)}
+                    className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
                     {genre}
-                    <X className="w-3 h-3 ml-1" />
-                  </Badge>
+                    <X className="size-3" />
+                  </button>
                 ))}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => applyFilters(searchQuery, [], sortBy)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Clear all
-                </Button>
               </div>
-            )}
-          </motion.div>
+            ) : null}
 
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <p className="text-sm text-muted-foreground">{resultsLabel}</p>
-            {error ? <p className="text-sm text-rose-400">{error}</p> : null}
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {Array.from({ length: 12 }).map((_, index) => (
-                <div key={index} className="aspect-[3/4] rounded-xl bg-white/5 animate-pulse border border-white/5" />
-              ))}
-            </div>
-          ) : !results.length ? (
-            <div className="glass-card p-12 text-center">
-              <h2 className="text-xl font-semibold text-foreground mb-2">Nothing matched that search</h2>
-              <p className="text-muted-foreground mb-6">
-                Try a different title, remove a genre filter, or switch the sort.
-              </p>
-              <Button variant="outline" onClick={() => applyFilters("", [], "popularity")}>
-                Reset Browse
-              </Button>
-            </div>
-          ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {results.map((anime, index) => {
-                const title = getMediaTitle(anime)
-                const rating = anime?.averageScore ? Number((anime.averageScore / 10).toFixed(1)) : null
-                const episodeCount = getEpisodeCount(anime)
-                const watchLink = getPreferredStreamingLink(anime)
-
-                return (
-                  <motion.div
-                    key={anime.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.9 }}
-                    transition={{ duration: 0.3, delay: index * 0.03 }}
-                    className="group cursor-pointer"
-                  >
-                    <div className="relative aspect-[3/4] overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,16,24,0.98)_0%,rgba(5,9,14,1)_100%)] shadow-[0_18px_44px_rgba(0,0,0,0.35)] transition-all duration-500 group-hover:-translate-y-1 group-hover:border-primary/30 group-hover:shadow-[0_28px_64px_rgba(4,14,24,0.55)]">
-                      <Link href={getMediaHref(anime)} className="absolute inset-0 z-10" aria-label={`Open ${title}`} />
-                      <Image
-                        src={anime?.coverImage?.extraLarge || anime?.coverImage?.large || "/placeholder.svg"}
-                        alt={title}
-                        fill
-                        className="object-cover group-hover:scale-110 transition-transform duration-500"
-                      />
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_42%),linear-gradient(180deg,rgba(4,10,18,0.08)_0%,rgba(4,10,18,0.34)_40%,rgba(3,6,10,0.95)_100%)]" />
-
-                      <div className="absolute inset-x-0 top-0 flex items-center justify-between p-3">
-                        <span className="rounded-full border border-white/10 bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white/80 backdrop-blur-md">
-                          {episodeCount ? `${episodeCount} eps` : formatAniListStatus(anime?.status)}
-                        </span>
-                        {rating ? (
-                          <div className="flex items-center gap-1 rounded-full border border-white/10 bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
-                            <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                            <span>{rating}</span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="absolute inset-x-0 bottom-0 p-4">
-                        <h3 className="line-clamp-2 text-sm font-semibold text-white drop-shadow-[0_6px_18px_rgba(0,0,0,0.9)] transition-colors duration-500 group-hover:text-primary">
-                          {title}
-                        </h3>
-                        <p className="mt-1 text-xs text-white/65 drop-shadow-[0_4px_12px_rgba(0,0,0,0.85)]">
-                          {[anime?.startDate?.year, getPrimaryStudio(anime)].filter(Boolean).join(" / ")}
-                        </p>
-                        {watchLink?.url ? (
-                          <a
-                            href={watchLink.url}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(event) => event.stopPropagation()}
-                            className="relative z-20 mt-3 inline-flex max-w-full items-center gap-1.5 rounded-full border border-white/12 bg-black/45 px-3 py-1.5 text-[11px] font-medium text-white/85 backdrop-blur-md transition-colors hover:border-primary/35 hover:text-primary"
-                          >
-                            <span className="truncate">Watch on {watchLink.site}</span>
-                          </a>
-                        ) : null}
-                      </div>
-
-                      <div className="absolute inset-x-4 bottom-0 overflow-hidden rounded-t-full">
-                        <div className="h-1.5 w-full rounded-full bg-white/10">
-                          <div className="h-full w-0 rounded-full bg-gradient-to-r from-primary via-cyan-300 to-accent transition-all duration-500 group-hover:w-full" />
-                        </div>
+            {/* Results */}
+            <div className="mt-5">
+              {loading ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {Array.from({ length: 15 }).map((_, index) => (
+                    <div key={index} className="card-elevated overflow-hidden">
+                      <div className="aspect-[3/4] animate-pulse bg-secondary" />
+                      <div className="space-y-2 p-3">
+                        <div className="h-3.5 w-3/4 animate-pulse rounded bg-secondary" />
+                        <div className="h-3 w-1/2 animate-pulse rounded bg-secondary" />
                       </div>
                     </div>
-                  </motion.div>
-                )
-              })}
+                  ))}
+                </div>
+              ) : !results.length ? (
+                <div className="card-elevated flex flex-col items-center p-12 text-center">
+                  <h2 className="text-xl font-semibold">Nothing matched that search</h2>
+                  <p className="mt-2 text-muted-foreground">
+                    Try a different title, remove a genre filter, or change the sort.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearAll}
+                    className="mt-6 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    Reset browse
+                  </button>
+                </div>
+              ) : viewMode === "grid" ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {results.map((anime, index) => (
+                    <AnimeCard
+                      key={anime.id}
+                      anime={anime}
+                      index={index}
+                      quickState={quickState[anime.id] || "idle"}
+                      onQuickAdd={handleQuickAdd}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {results.map((anime, index) => (
+                    <ListRow
+                      key={anime.id}
+                      anime={anime}
+                      index={index}
+                      quickState={quickState[anime.id] || "idle"}
+                      onQuickAdd={handleQuickAdd}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {results.map((anime, index) => {
-                const title = getMediaTitle(anime)
-                const rating = anime?.averageScore ? Number((anime.averageScore / 10).toFixed(1)) : null
-                const episodeCount = getEpisodeCount(anime)
-                const studio = getPrimaryStudio(anime)
-                const quickState = quickAddState[anime.id]
-                const watchLink = getPreferredStreamingLink(anime)
 
-                return (
-                  <Link key={anime.id} href={getMediaHref(anime)}>
-                    <motion.div
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: isLoaded ? 1 : 0, x: isLoaded ? 0 : -20 }}
-                      transition={{ duration: 0.3, delay: index * 0.03 }}
-                      className="glass-card p-4 flex gap-4 group cursor-pointer hover:border-accent/50 transition-all"
-                    >
-                      <div className="relative w-20 h-28 md:w-24 md:h-32 rounded-lg overflow-hidden flex-shrink-0">
-                        <Image
-                          src={anime?.coverImage?.extraLarge || anime?.coverImage?.large || "/placeholder.svg"}
-                          alt={title}
-                          fill
-                          className="object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
-                      </div>
-                      <div className="flex-1 flex flex-col justify-between py-1">
-                        <div>
-                          <h3 className="font-semibold text-foreground text-lg group-hover:text-accent transition-colors line-clamp-1">
-                            {title}
-                          </h3>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {[studio, anime?.startDate?.year, episodeCount ? `${episodeCount} episodes` : null]
-                              .filter(Boolean)
-                              .join(" · ")}
-                          </p>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {(anime?.genres || []).slice(0, 4).map((genre) => (
-                              <Badge key={genre} variant="outline" className="text-xs">
-                                {genre}
-                              </Badge>
-                            ))}
-                            <Badge variant="outline" className="text-xs">
-                              {formatAniListStatus(anime?.status)}
-                            </Badge>
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-2 gap-3">
-                          <div className="flex items-center gap-3">
-                            {rating ? (
-                              <div className="flex items-center gap-1">
-                                <Star className="w-4 h-4 text-yellow-400" fill="currentColor" />
-                                <span className="font-semibold text-foreground">{rating}</span>
-                              </div>
-                            ) : null}
-                            {watchLink?.url ? (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  window.open(watchLink.url, "_blank", "noopener,noreferrer")
-                                }}
-                                className="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:text-primary"
-                              >
-                                Watch on {watchLink.site}
-                              </button>
-                            ) : null}
-                          </div>
-                          <div className="flex gap-2">
-                            <Button size="sm" variant="outline">
-                              <Heart className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="bg-accent hover:bg-accent/90"
-                              onClick={(event) => handleQuickAdd(anime, event)}
-                            >
-                              {quickState === "adding" ? (
-                                <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                              ) : quickState === "added" ? (
-                                <Check className="w-4 h-4 mr-1" />
-                              ) : (
-                                <Plus className="w-4 h-4 mr-1" />
-                              )}
-                              {quickState === "added" ? "Added" : quickState === "error" ? "Retry" : "Add to List"}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-
-          {hasMore ? (
-            <div className="flex justify-center mt-12">
-              <Button
-                variant="outline"
-                size="lg"
-                className="px-8"
-                disabled={loadingMore}
-                onClick={() => fetchPage(page + 1, true)}
-              >
-                {loadingMore ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Load More
-                <ChevronDown className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          ) : null}
+            {hasMore && !loading ? (
+              <div className="mt-10 flex justify-center">
+                <button
+                  type="button"
+                  disabled={loadingMore}
+                  onClick={() => fetchPage(page + 1, true)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-8 py-3 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-secondary disabled:opacity-60"
+                >
+                  {loadingMore ? <Loader2 className="size-4 animate-spin" /> : <ChevronDown className="size-4" />}
+                  {loadingMore ? "Loading..." : "Load more"}
+                </button>
+              </div>
+            ) : null}
+          </section>
         </div>
       </main>
     </div>
   )
 }
 
+function ListRow({
+  anime,
+  index,
+  quickState,
+  onQuickAdd,
+}: {
+  anime: AniListMedia
+  index: number
+  quickState: "idle" | "adding" | "added"
+  onQuickAdd: (anime: AniListMedia) => void
+}) {
+  const title = getMediaTitle(anime)
+  const rating = anime?.averageScore ? Number((anime.averageScore / 10).toFixed(1)) : null
+  const episodeCount = getEpisodeCount(anime)
+  const studio = getPrimaryStudio(anime)
+  const watchLink = getPreferredStreamingLink(anime)
+  const description = stripHtml(anime?.description)
+
+  return (
+    <div
+      className="card-elevated group flex animate-rise gap-4 p-3 transition-colors hover:border-primary/30"
+      style={{ animationDelay: `${Math.min(index * 30, 360)}ms` }}
+    >
+      <a
+        href={getMediaHref(anime)}
+        target="_blank"
+        rel="noreferrer"
+        className="relative h-32 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-secondary"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={anime?.coverImage?.extraLarge || anime?.coverImage?.large || "/placeholder.svg"}
+          alt={title}
+          className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </a>
+      <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
+        <div>
+          <div className="flex items-start justify-between gap-3">
+            <a href={getMediaHref(anime)} target="_blank" rel="noreferrer" className="min-w-0">
+              <h3 className="truncate text-lg font-semibold transition-colors group-hover:text-primary">{title}</h3>
+            </a>
+            {rating ? (
+              <span className="inline-flex flex-shrink-0 items-center gap-1 text-sm font-semibold">
+                <Star className="size-4 fill-chart-3 text-chart-3" />
+                {rating}
+              </span>
+            ) : null}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {[studio, anime?.startDate?.year, episodeCount ? `${episodeCount} episodes` : null]
+              .filter(Boolean)
+              .join(" - ")}
+          </p>
+          {description ? (
+            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground/90">{description}</p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(anime?.genres || []).slice(0, 4).map((genre) => (
+              <span key={genre} className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+                {genre}
+              </span>
+            ))}
+            <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+              {formatAniListStatus(anime?.status)}
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          {watchLink?.url ? (
+            <a
+              href={watchLink.url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/60 px-3 py-1.5 text-xs font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+            >
+              <Play className="size-3.5 shrink-0 fill-primary text-primary" />
+              <span className="truncate">Watch on {watchLink.site}</span>
+            </a>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => onQuickAdd(anime)}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
+          >
+            {quickState === "adding" ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : quickState === "added" ? (
+              <Check className="size-3.5" />
+            ) : null}
+            {quickState === "added" ? "Added" : "Add to list"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
