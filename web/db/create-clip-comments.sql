@@ -92,12 +92,12 @@ ON public.clip_comments
 FOR UPDATE
 TO authenticated
 USING (
-  COALESCE((auth.jwt() -> 'user_metadata' ->> 'is_mod')::boolean, false)
-  OR COALESCE((auth.jwt() -> 'user_metadata' ->> 'isMod')::boolean, false)
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
 )
 WITH CHECK (
-  COALESCE((auth.jwt() -> 'user_metadata' ->> 'is_mod')::boolean, false)
-  OR COALESCE((auth.jwt() -> 'user_metadata' ->> 'isMod')::boolean, false)
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
 );
 
 -- Indexes for faster lookup

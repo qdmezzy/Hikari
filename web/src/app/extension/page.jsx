@@ -1,6 +1,6 @@
 "use client"
 
-import { Navigation } from "@/components/Navigation"
+import { Navigation } from "@/components/layout/Navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"

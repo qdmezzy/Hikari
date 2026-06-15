@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { ModNavigation } from "@/components/ModNavigation"
-import RequireAuth from "@/components/RequireAuth"
+import { ModNavigation } from "@/components/layout/ModNavigation"
+import RequireAuth from "@/components/common/RequireAuth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Clock, Flag, TrendingUp, Users } from "lucide-react"

@@ -4,10 +4,12 @@ import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useSearchParams } from "next/navigation"
+import { toast } from "sonner"
 import { motion } from "framer-motion"
-import { Navigation } from "@/components/Navigation"
-import { AnimeDecorations } from "@/components/anime-decorations"
-import RequireAuth from "@/components/RequireAuth"
+import { Navigation } from "@/components/layout/Navigation"
+import { AnimeDecorations } from "@/components/common/anime-decorations"
+import RequireAuth from "@/components/common/RequireAuth"
+import { EmptyState } from "@/components/common/EmptyState"
 import {
   Play,
   Pause,
@@ -37,6 +39,8 @@ import {
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import { fetchAniListMediaByIds, formatRelativeTime, getEpisodeCount, getMediaTitle } from "@/lib/anilist"
+import { logListActivity } from "@/lib/activity-service"
+import { CollectionsSection } from "@/components/lists/CollectionsSection"
 
 const statusToTab = {
   watching: "watching",
@@ -83,6 +87,14 @@ const tabMeta = {
   },
 }
 
+const emptyCopy = {
+  watching: { title: "Nothing in progress", desc: "Titles you're currently watching or reading will show up here." },
+  completed: { title: "No completed titles yet", desc: "Finish a title and it'll land here." },
+  planned: { title: "Your plan-to-watch is empty", desc: "Save titles you want to get to later." },
+  paused: { title: "Nothing on hold", desc: "Titles you've paused will appear here." },
+  dropped: { title: "Nothing dropped", desc: "Titles you've dropped will appear here." },
+}
+
 const getTabIdForStatus = (status) => statusToTab[status] || "watching"
 
 const isMangaEntry = (entry) => entry?.media_type === "MANGA" || entry?.media?.type === "MANGA"
@@ -116,6 +128,13 @@ const getMediaStatusLabel = (entry) => {
   if (status === "RELEASING") return isMangaEntry(entry) ? "Publishing" : "Airing"
   if (status === "NOT_YET_RELEASED") return "Coming Soon"
   return status.replaceAll("_", " ")
+}
+
+const formatEntryScore = (value) => {
+  const numeric = Number(value || 0)
+  if (!numeric) return null
+  if (numeric > 10) return (numeric / 10).toFixed(1)
+  return numeric.toFixed(numeric % 1 === 0 ? 0 : 1)
 }
 
 function ListPageContent() {
@@ -157,7 +176,7 @@ function ListPageContent() {
 
       const { data, error } = await client
         .from("list_entries")
-        .select("id, media_id, status, progress, media_type, updated_at")
+        .select("id, media_id, status, progress, score, media_type, updated_at")
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
 
@@ -252,6 +271,31 @@ function ListPageContent() {
     if (error) {
       console.error("Failed to update list entry:", error)
       setEntries((current) => current.map((item) => (item.id === entry.id ? previousEntry : item)))
+      toast.error("Couldn't update that entry. Please try again.")
+    } else {
+      void logListActivity({
+        user,
+        media: entry.media,
+        mediaId: entry.media_id,
+        mediaType: entry.media_type || entry.media?.type,
+        status: updates.status ?? entry.status,
+        progress: updates.progress ?? entry.progress,
+      })
+      const statusLabel = {
+        watching: "Watching",
+        rewatching: "Rewatching",
+        completed: "Completed",
+        plan_to_watch: "Plan to Watch",
+        on_hold: "On Hold",
+        dropped: "Dropped",
+      }
+      if (updates.progress !== undefined && updates.status !== "completed") {
+        toast.success("Progress updated")
+      } else if (updates.status) {
+        toast.success(`Moved to ${statusLabel[updates.status] || "your list"}`)
+      } else {
+        toast.success("List updated")
+      }
     }
 
     setPendingId(null)
@@ -273,21 +317,30 @@ function ListPageContent() {
 
     if (error) {
       console.error("Failed to remove list entry:", error)
+      toast.error("Couldn't remove that title. Please try again.")
       setPendingId(null)
       return
     }
 
     setEntries((current) => current.filter((item) => item.id !== entry.id))
+    toast.success("Removed from your list")
     setPendingId(null)
   }
 
   const AnimeCard = ({ entry, tabId }) => {
     const title = getMediaTitle(entry?.media)
     const cover = entry?.media?.coverImage?.extraLarge || entry?.media?.coverImage?.large || "/placeholder.svg"
-    const score = entry?.media?.averageScore ? Number((entry.media.averageScore / 10).toFixed(1)) : null
+    const score = formatEntryScore(entry?.score)
     const episodeCount = getEntryTotalUnits(entry)
-    const progress = Number(entry?.progress || 0)
-    const progressValue = episodeCount ? Math.min((progress / episodeCount) * 100, 100) : 0
+    const isCompletedEntry = tabId === "completed" || entry?.status === "completed"
+    const rawProgress = Number(entry?.progress || 0)
+    // Completed items always read as fully watched/read, never partial.
+    const progress = isCompletedEntry && episodeCount ? episodeCount : rawProgress
+    const progressValue = isCompletedEntry
+      ? 100
+      : episodeCount
+        ? Math.min((progress / episodeCount) * 100, 100)
+        : 0
     const updatedLabel = formatRelativeTime(entry?.updated_at)
     const meta = tabMeta[tabId]
     const Icon = meta.icon
@@ -351,7 +404,7 @@ function ListPageContent() {
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="ghost" className="flex-shrink-0 h-8 w-8 p-0" disabled={isPending}>
+                  <Button size="sm" variant="ghost" className="flex-shrink-0 h-8 w-8 p-0" disabled={isPending} aria-label="Entry actions">
                     {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreHorizontal className="w-4 h-4" />}
                   </Button>
                 </DropdownMenuTrigger>
@@ -469,6 +522,8 @@ function ListPageContent() {
             <p className="text-muted-foreground">Keep up with everything you're watching and reading.</p>
           </motion.div>
 
+          <CollectionsSection user={user} />
+
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
@@ -533,21 +588,21 @@ function ListPageContent() {
                   ) : tab.list.length > 0 ? (
                     tab.list.map((entry) => <AnimeCard key={entry.id} entry={entry} tabId={tab.id} />)
                   ) : (
-                    <div className="glass-card p-12 text-center">
-                      <div className={`w-16 h-16 rounded-full ${tabMeta[tab.id].badge} flex items-center justify-center mx-auto mb-4`}>
-                        {(() => {
-                          const Icon = tabMeta[tab.id].icon
-                          return <Icon className="w-6 h-6" />
-                        })()}
-                      </div>
-                      <h3 className="text-lg font-semibold text-foreground mb-2">Nothing here yet</h3>
-                      <p className="text-muted-foreground mb-4">
-                        This tab no longer shows demo rows. Add titles and it will fill with your real entries.
-                      </p>
-                      <Button asChild className="bg-accent hover:bg-accent/90">
-                        <Link href="/search">Browse Titles</Link>
-                      </Button>
-                    </div>
+                    <EmptyState
+                      icon={tabMeta[tab.id].icon}
+                      title={emptyCopy[tab.id]?.title || "Nothing here yet"}
+                      description={emptyCopy[tab.id]?.desc || "Add titles and they'll show up here."}
+                      action={
+                        <>
+                          <Button asChild>
+                            <Link href="/search">Browse titles</Link>
+                          </Button>
+                          <Button asChild variant="outline">
+                            <Link href="/onboarding">Import your list</Link>
+                          </Button>
+                        </>
+                      }
+                    />
                   )}
                 </motion.div>
               </TabsContent>

@@ -2,15 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { ModNavigation } from "@/components/ModNavigation"
-import RequireAuth from "@/components/RequireAuth"
+import { ModNavigation } from "@/components/layout/ModNavigation"
+import RequireAuth from "@/components/common/RequireAuth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { AlertTriangle, CheckCircle, EyeOff, ShieldAlert, Trash2 } from "lucide-react"
+import { AlertTriangle, Ban, CheckCircle, EyeOff, Gavel, ShieldAlert, Trash2, XCircle } from "lucide-react"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { fetchBanAppeals, reviewBanAppeal } from "@/lib/admin-service"
 
 const formatRelativeTime = (value) => {
   if (!value) return ""
@@ -48,6 +49,9 @@ export default function ModAppealsPage() {
   const [error, setError] = useState("")
   const [search, setSearch] = useState("")
   const [workingId, setWorkingId] = useState("")
+  const [banAppeals, setBanAppeals] = useState([])
+  const [appealsLoading, setAppealsLoading] = useState(true)
+  const [appealWorkingId, setAppealWorkingId] = useState("")
 
   const loadReports = useCallback(async () => {
     if (!user) return
@@ -100,6 +104,42 @@ export default function ModAppealsPage() {
   useEffect(() => {
     loadReports()
   }, [loadReports])
+
+  const loadBanAppeals = useCallback(async () => {
+    if (!user) return
+    setAppealsLoading(true)
+    try {
+      const data = await fetchBanAppeals()
+      setBanAppeals(data)
+    } catch (err) {
+      console.error("Failed to load ban appeals:", err)
+    } finally {
+      setAppealsLoading(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    loadBanAppeals()
+  }, [loadBanAppeals])
+
+  const handleReviewAppeal = async (appeal, approve) => {
+    setAppealWorkingId(appeal.id)
+    try {
+      let note = null
+      if (!approve && typeof window !== "undefined") {
+        note = window.prompt("Optional note to the user explaining the denial:") || null
+      }
+      await reviewBanAppeal(appeal.id, approve, note)
+      await loadBanAppeals()
+    } catch (err) {
+      console.error("Failed to review appeal:", err)
+      setError(err.message || "Could not review appeal.")
+    } finally {
+      setAppealWorkingId("")
+    }
+  }
+
+  const pendingBanAppeals = banAppeals.filter((a) => a.status === "pending")
 
   const filteredReports = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -242,6 +282,59 @@ export default function ModAppealsPage() {
           <div className="px-4 py-6 md:px-8">
             <div className="mx-auto max-w-6xl space-y-6">
               <Card className="bg-card/60 border-border/50">
+                <CardHeader className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Gavel className="h-5 w-5 text-primary" />
+                    <CardTitle className="text-2xl">Ban Appeals</CardTitle>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Suspended users requesting reinstatement. Approving an appeal lifts the ban.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {appealsLoading ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">Loading appeals…</p>
+                  ) : pendingBanAppeals.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-muted-foreground">No pending appeals.</p>
+                  ) : (
+                    pendingBanAppeals.map((appeal) => (
+                      <div key={appeal.id} className="rounded-2xl border border-border/50 bg-background/40 p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Ban className="h-4 w-4 text-destructive" />
+                              <span className="font-mono text-xs text-muted-foreground">{appeal.user_id.slice(0, 8)}…</span>
+                              <span className="text-xs text-muted-foreground">{formatRelativeTime(appeal.created_at)}</span>
+                            </div>
+                            <p className="text-sm text-foreground">{appeal.message}</p>
+                          </div>
+                          <div className="flex flex-shrink-0 gap-2">
+                            <Button
+                              size="sm"
+                              disabled={appealWorkingId === appeal.id}
+                              onClick={() => handleReviewAppeal(appeal, true)}
+                            >
+                              <CheckCircle className="mr-1.5 h-4 w-4" />
+                              Approve &amp; unban
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={appealWorkingId === appeal.id}
+                              onClick={() => handleReviewAppeal(appeal, false)}
+                            >
+                              <XCircle className="mr-1.5 h-4 w-4" />
+                              Deny
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 border-border/50">
                 <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <CardTitle className="text-2xl">Escalated Reports</CardTitle>
@@ -294,7 +387,7 @@ export default function ModAppealsPage() {
                       post.user_handle ||
                       post.user_display_name ||
                       "Unknown"
-                    const targetUrl = report.target_url || (report.post_id ? `/social/${report.post_id}` : "")
+                    const targetUrl = report.target_url || (report.post_id ? `/community/${report.post_id}` : "")
                     const canSpoiler = targetType === "social_post" && !!report.post_id
                     const canRemove = ["social_post", "review", "clip_comment", "clip"].includes(targetType) && !!targetKey
                     const removeLabel =

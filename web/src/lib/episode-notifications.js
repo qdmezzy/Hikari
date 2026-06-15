@@ -1,5 +1,5 @@
 import client from "@/lib/client"
-import { addNotification, getNotifications } from "@/lib/notifications-store"
+import { insertOwnNotification } from "@/lib/notifications-service"
 
 const CHECK_KEY = (userId) => `hikari-notify-last-check:${userId}`
 const DIGEST_KEY = (userId, dateKey) => `hikari-notify-digest:${userId}:${dateKey}`
@@ -84,8 +84,6 @@ export const scheduleEpisodeNotifications = async ({
   }
 
   const nowSeconds = Math.floor(now / 1000)
-  const existing = getNotifications(user.id)
-  const existingIds = new Set(existing.map((item) => item.id))
 
   const upcoming = ids
     .map((id) => mediaById.get(id))
@@ -104,37 +102,31 @@ export const scheduleEpisodeNotifications = async ({
     })
 
   if (notifyEpisodes) {
-    upcoming
-      .filter((item) => item.deltaSeconds <= 0 && item.deltaSeconds >= -RECENT_WINDOW_SECONDS)
-      .forEach((item) => {
-        const id = `episode-${item.id}-${item.episode}`
-        if (existingIds.has(id)) return
-        addNotification(user.id, {
-          id,
-          title: `${item.title} • Episode ${item.episode} aired`,
-          message: "Tap to open your calendar or update progress.",
-          type: "episode",
-          metadata: { mediaId: item.id, episode: item.episode },
-        })
-        existingIds.add(id)
+    for (const item of upcoming.filter(
+      (entry) => entry.deltaSeconds <= 0 && entry.deltaSeconds >= -RECENT_WINDOW_SECONDS,
+    )) {
+      void insertOwnNotification(user.id, {
+        dedupeKey: `episode-${item.id}-${item.episode}`,
+        title: `${item.title} • Episode ${item.episode} aired`,
+        message: "Tap to open your calendar or update progress.",
+        type: "episode",
+        metadata: { mediaId: item.id, episode: item.episode },
       })
+    }
   }
 
   if (notifyPreAir) {
-    upcoming
-      .filter((item) => item.deltaSeconds > 0 && item.deltaSeconds <= PRE_AIR_WINDOW_SECONDS)
-      .forEach((item) => {
-        const id = `preair-${item.id}-${item.episode}`
-        if (existingIds.has(id)) return
-        addNotification(user.id, {
-          id,
-          title: `${item.title} • Episode ${item.episode} soon`,
-          message: "Airing in under 30 minutes.",
-          type: "preair",
-          metadata: { mediaId: item.id, episode: item.episode },
-        })
-        existingIds.add(id)
+    for (const item of upcoming.filter(
+      (entry) => entry.deltaSeconds > 0 && entry.deltaSeconds <= PRE_AIR_WINDOW_SECONDS,
+    )) {
+      void insertOwnNotification(user.id, {
+        dedupeKey: `preair-${item.id}-${item.episode}`,
+        title: `${item.title} • Episode ${item.episode} soon`,
+        message: "Airing in under 30 minutes.",
+        type: "preair",
+        metadata: { mediaId: item.id, episode: item.episode },
       })
+    }
   }
 
   if (notifyDigest) {
@@ -143,17 +135,13 @@ export const scheduleEpisodeNotifications = async ({
     if (!window.localStorage.getItem(digestKey)) {
       const dayAhead = upcoming.filter((item) => item.deltaSeconds > 0 && item.deltaSeconds <= 24 * 60 * 60)
       if (dayAhead.length) {
-        const id = `digest-${dateKey}`
-        if (!existingIds.has(id)) {
-          addNotification(user.id, {
-            id,
-            title: "Today’s airing digest",
-            message: buildDigestMessage(dayAhead),
-            type: "digest",
-            metadata: { count: dayAhead.length },
-          })
-          existingIds.add(id)
-        }
+        void insertOwnNotification(user.id, {
+          dedupeKey: `digest-${dateKey}`,
+          title: "Today’s airing digest",
+          message: buildDigestMessage(dayAhead),
+          type: "digest",
+          metadata: { count: dayAhead.length },
+        })
         window.localStorage.setItem(digestKey, "sent")
       }
     }

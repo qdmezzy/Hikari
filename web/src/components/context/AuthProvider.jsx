@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import { createContext, useState, useEffect, useMemo, useCallback } from "react";
 import client from "@/lib/client";
 
@@ -30,18 +30,40 @@ const writeCachedUser = (nextUser) => {
 };
 
 const AuthProvider = ({children}) => {
-    const [user, setUser] = useState(() => readCachedUser());
+    const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        client.auth.getSession().then(({data}) => {
-            const nextUser = data?.session?.user || null;
-            setUser(nextUser);
-            writeCachedUser(nextUser);
-            setLoading(false);
-        }) 
+        let isMounted = true;
+        const cachedUser = readCachedUser();
+        if (cachedUser) {
+            setUser(cachedUser);
+        }
+
+        const loadSession = async () => {
+            try {
+                const { data, error } = await client.auth.getSession();
+                if (error) {
+                    console.warn("Unable to load auth session.", error);
+                }
+
+                if (!isMounted) return;
+                const nextUser = data?.session?.user || null;
+                setUser(nextUser);
+                writeCachedUser(nextUser);
+            } catch (error) {
+                console.warn("Unable to load auth session.", error);
+            } finally {
+                if (isMounted) {
+                    setLoading(false);
+                }
+            }
+        };
+
+        loadSession();
 
         const { data: listener } = client.auth.onAuthStateChange((e, session) => {
+            if (!isMounted) return;
             const nextUser = session?.user || null;
             setUser(nextUser)
             writeCachedUser(nextUser)
@@ -49,7 +71,8 @@ const AuthProvider = ({children}) => {
         })
 
         return () => {
-            listener.subscription.unsubscribe();
+            isMounted = false;
+            listener?.subscription?.unsubscribe();
         }
     }, [])
 

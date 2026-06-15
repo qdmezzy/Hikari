@@ -26,6 +26,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import client from "@/lib/client"
+import useAuth from "@/hooks/useAuth"
+import { toast } from "sonner"
+import { fetchFollowingIds, toggleFollow } from "@/lib/social-service"
 import { fetchPublicProfileByHandle, normalizeHandle } from "@/lib/public-profile"
 import { fetchAniListMediaByIds, formatCompactNumber, getMediaHref, getMediaTitle } from "@/lib/anilist"
 
@@ -82,6 +85,12 @@ const formatEntryScore = (value) => {
   if (!numeric) return null
   if (numeric > 10) return (numeric / 10).toFixed(1)
   return numeric.toFixed(numeric % 1 === 0 ? 0 : 1)
+}
+
+const normalizeEntryScore = (value) => {
+  const numeric = Number(value || 0)
+  if (!numeric) return null
+  return numeric > 10 ? Number((numeric / 10).toFixed(1)) : Number(numeric.toFixed(numeric % 1 === 0 ? 0 : 1))
 }
 
 const isMangaEntry = (entry) => entry?.media_type === "MANGA" || entry?.media?.type === "MANGA"
@@ -163,6 +172,8 @@ const getBannerFallback = (entries) =>
   entries.find((entry) => entry?.media?.bannerImage)?.media?.bannerImage ||
   entries.find((entry) => entry?.media?.coverImage?.extraLarge)?.media?.coverImage?.extraLarge ||
   ""
+
+const PUBLIC_PROFILE_BUILD = "2026-04-10-public-profile-refresh"
 
 function ImageFallback({ title, className = "" }) {
   return (
@@ -253,6 +264,7 @@ function MediaListView({ listType, items }) {
 
 export default function PublicProfilePage() {
   const params = useParams()
+  const { user: authUser } = useAuth()
   const handle = React.useMemo(() => normalizeHandle(params?.handle), [params])
   const [isLoaded, setIsLoaded] = React.useState(false)
   const [activeTab, setActiveTab] = React.useState("overview")
@@ -260,6 +272,42 @@ export default function PublicProfilePage() {
   const [error, setError] = React.useState("")
   const [profile, setProfile] = React.useState(null)
   const [entries, setEntries] = React.useState([])
+  const [favoriteEntries, setFavoriteEntries] = React.useState([])
+  const [isFollowing, setIsFollowing] = React.useState(false)
+  const [followBusy, setFollowBusy] = React.useState(false)
+
+  const ownUserId = authUser?.id || null
+  const profileUserId = profile?.user_id || null
+  const canFollow = Boolean(ownUserId && profileUserId && ownUserId !== profileUserId)
+
+  React.useEffect(() => {
+    let active = true
+    if (!canFollow) {
+      setIsFollowing(false)
+      return
+    }
+    fetchFollowingIds(ownUserId)
+      .then((ids) => active && setIsFollowing(ids.includes(profileUserId)))
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [canFollow, ownUserId, profileUserId])
+
+  const handleToggleFollow = async () => {
+    if (!canFollow || followBusy) return
+    const wasFollowing = isFollowing
+    setFollowBusy(true)
+    setIsFollowing(!wasFollowing)
+    try {
+      await toggleFollow({ followerId: ownUserId, followingId: profileUserId, isFollowing: wasFollowing })
+    } catch {
+      setIsFollowing(wasFollowing)
+      toast.error("Couldn't update follow. Please try again.")
+    } finally {
+      setFollowBusy(false)
+    }
+  }
 
   React.useEffect(() => {
     setIsLoaded(true)
@@ -320,14 +368,34 @@ export default function PublicProfilePage() {
       }))
       const visibleEntries = rawEntries.filter((entry) => !entry.hide_from_profile)
 
-      if (!visibleEntries.length) {
+      // Real favorites this user saved (AniList media ids), exposed via the share profile.
+      // Fall back to the owner's own auth metadata when viewing their own profile
+      // (covers the case where favorites haven't synced to public_profiles yet).
+      const isOwnProfile = authUser?.id && String(authUser.id) === String(profileData.user_id)
+      const ownFavoriteIds =
+        isOwnProfile && Array.isArray(authUser?.user_metadata?.favorite_media_ids)
+          ? authUser.user_metadata.favorite_media_ids
+          : []
+      const sourceFavoriteIds = Array.isArray(profileData.favorite_media_ids) && profileData.favorite_media_ids.length
+        ? profileData.favorite_media_ids
+        : ownFavoriteIds
+      const favoriteIds = sourceFavoriteIds.map((id) => Number(id)).filter(Number.isFinite)
+
+      const mediaIdsToFetch = Array.from(
+        new Set(
+          [...visibleEntries.map((entry) => Number(entry.media_id)), ...favoriteIds].filter(Number.isFinite),
+        ),
+      )
+
+      if (!mediaIdsToFetch.length) {
         setEntries([])
+        setFavoriteEntries([])
         setLoading(false)
         return
       }
 
       try {
-        const mediaById = await fetchAniListMediaByIds(visibleEntries.map((entry) => entry.media_id))
+        const mediaById = await fetchAniListMediaByIds(mediaIdsToFetch)
         if (!active) return
 
         setEntries(
@@ -336,10 +404,23 @@ export default function PublicProfilePage() {
             media: mediaById.get(entry.media_id) || null,
           })),
         )
+
+        const scoreByMediaId = new Map(visibleEntries.map((entry) => [Number(entry.media_id), entry.score]))
+        setFavoriteEntries(
+          favoriteIds
+            .map((id) => ({
+              id: `fav-${id}`,
+              media_id: id,
+              media: mediaById.get(id) || null,
+              score: scoreByMediaId.get(id) ?? null,
+            }))
+            .filter((fav) => fav.media),
+        )
       } catch (mediaError) {
         console.error("Failed to hydrate public media:", mediaError)
         if (!active) return
         setEntries(visibleEntries.map((entry) => ({ ...entry, media: null })))
+        setFavoriteEntries([])
       } finally {
         if (active) setLoading(false)
       }
@@ -350,7 +431,7 @@ export default function PublicProfilePage() {
     return () => {
       active = false
     }
-  }, [handle])
+  }, [handle, authUser?.id])
 
   const groupedLists = React.useMemo(() => getListItems(entries), [entries])
 
@@ -384,9 +465,9 @@ export default function PublicProfilePage() {
       (sum, entry) => sum + (entry.media_type === "ANIME" ? getEntryDisplayProgress(entry) : 0),
       0,
     )
-    const scoreValues = entries.map((entry) => entry?.media?.averageScore).filter(Boolean)
+    const scoreValues = entries.map((entry) => normalizeEntryScore(entry?.score)).filter((score) => score !== null)
     const meanScore = scoreValues.length
-      ? Number((scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length / 10).toFixed(1))
+      ? Number((scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length).toFixed(1))
       : 0
 
     const daysSet = new Set()
@@ -437,18 +518,11 @@ export default function PublicProfilePage() {
     }
   }, [entries])
 
-  const overviewFavorites = React.useMemo(() => {
-    return [...entries]
-      .filter((entry) => entry?.media)
-      .sort((left, right) => {
-        const leftScore = Number(left?.score || 0)
-        const rightScore = Number(right?.score || 0)
-        if (rightScore !== leftScore) return rightScore - leftScore
-
-        return Number(right?.media?.popularity || 0) - Number(left?.media?.popularity || 0)
-      })
-      .slice(0, 4)
-  }, [entries])
+  // Only the user's real saved favorites (max 4 shown).
+  const overviewFavorites = React.useMemo(
+    () => favoriteEntries.filter((entry) => entry?.media).slice(0, 4),
+    [favoriteEntries],
+  )
 
   const recentActivity = React.useMemo(() => {
     return entries.slice(0, 4).map((entry) => ({
@@ -542,7 +616,7 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background" data-profile-build={PUBLIC_PROFILE_BUILD}>
       <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4">
           <Link href="/" className="bg-gradient-to-r from-primary to-accent bg-clip-text text-xl font-black text-transparent">
@@ -610,7 +684,20 @@ export default function PublicProfilePage() {
                   ) : null}
                 </div>
 
-                <p className="mb-4 text-lg text-muted-foreground">@{userData.username}</p>
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <p className="text-lg text-muted-foreground">@{userData.username}</p>
+                  {canFollow ? (
+                    <Button
+                      size="sm"
+                      variant={isFollowing ? "outline" : "default"}
+                      disabled={followBusy}
+                      onClick={handleToggleFollow}
+                      className="rounded-full"
+                    >
+                      {isFollowing ? "Following" : "Follow"}
+                    </Button>
+                  ) : null}
+                </div>
 
                 <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                   {userData.location ? (
@@ -676,7 +763,7 @@ export default function PublicProfilePage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: isLoaded ? 1 : 0 }}
               transition={{ duration: 0.45, delay: 0.15 }}
-              className="mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground"
+              className="selectable mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground"
             >
               {userData.bio}
             </motion.p>

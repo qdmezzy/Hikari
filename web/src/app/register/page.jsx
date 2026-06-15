@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { FloatingDecorations, Sparkle, GlowOrb } from "@/components/anime-decorations"
+import { FloatingDecorations, Sparkle, GlowOrb } from "@/components/common/anime-decorations"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import {
@@ -206,7 +206,7 @@ export default function RegisterPage() {
           console.warn("Failed to create public profile during signup:", profileError)
         }
 
-        router.push("/")
+        router.push("/onboarding")
         return
       }
 

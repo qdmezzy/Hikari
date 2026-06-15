@@ -263,8 +263,8 @@ ON public.social_reports
 FOR SELECT
 TO authenticated
 USING (
-  COALESCE((auth.jwt() -> 'user_metadata' ->> 'is_mod')::boolean, false)
-  OR COALESCE((auth.jwt() -> 'user_metadata' ->> 'isMod')::boolean, false)
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
 );
 
 DROP POLICY IF EXISTS "Mods can update social reports" ON public.social_reports;
@@ -273,12 +273,12 @@ ON public.social_reports
 FOR UPDATE
 TO authenticated
 USING (
-  COALESCE((auth.jwt() -> 'user_metadata' ->> 'is_mod')::boolean, false)
-  OR COALESCE((auth.jwt() -> 'user_metadata' ->> 'isMod')::boolean, false)
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
 )
 WITH CHECK (
-  COALESCE((auth.jwt() -> 'user_metadata' ->> 'is_mod')::boolean, false)
-  OR COALESCE((auth.jwt() -> 'user_metadata' ->> 'isMod')::boolean, false)
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
 );
 
 DROP POLICY IF EXISTS "Mods can update social posts" ON public.social_posts;
@@ -287,10 +287,10 @@ ON public.social_posts
 FOR UPDATE
 TO authenticated
 USING (
-  COALESCE((auth.jwt() -> 'user_metadata' ->> 'is_mod')::boolean, false)
-  OR COALESCE((auth.jwt() -> 'user_metadata' ->> 'isMod')::boolean, false)
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
 )
 WITH CHECK (
-  COALESCE((auth.jwt() -> 'user_metadata' ->> 'is_mod')::boolean, false)
-  OR COALESCE((auth.jwt() -> 'user_metadata' ->> 'isMod')::boolean, false)
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
 );

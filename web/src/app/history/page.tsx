@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Navigation } from "@/components/Navigation"
-import RequireAuth from "@/components/RequireAuth"
+import { Navigation } from "@/components/layout/Navigation"
+import RequireAuth from "@/components/common/RequireAuth"
+import { EmptyState } from "@/components/common/EmptyState"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -331,12 +332,16 @@ export default function WatchHistoryPage() {
                     </CardContent>
                   </Card>
                 ) : groupedEntries.length === 0 ? (
-                  <Card className="bg-card/50 border-border/50">
-                    <CardContent className="py-12 text-center text-muted-foreground">
-                      <History className="h-12 w-12 mx-auto mb-4 text-muted-foreground/50" />
-                      <p>No watch history yet.</p>
-                    </CardContent>
-                  </Card>
+                  <EmptyState
+                    icon={History}
+                    title="No watch history yet"
+                    description="As you update progress on titles, your activity will show up here."
+                    action={
+                      <Button asChild>
+                        <Link href="/search">Browse titles</Link>
+                      </Button>
+                    }
+                  />
                 ) : (
                   groupedEntries.map((group, groupIndex) => (
                     <div

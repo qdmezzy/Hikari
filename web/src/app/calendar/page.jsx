@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Navigation } from "@/components/Navigation"
-import RequireAuth from "@/components/RequireAuth"
+import Link from "next/link"
+import { Navigation } from "@/components/layout/Navigation"
+import RequireAuth from "@/components/common/RequireAuth"
+import { EmptyState } from "@/components/common/EmptyState"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -233,67 +235,73 @@ export default function CalendarPage() {
       <div className="min-h-screen bg-background">
         <Navigation />
 
-      <main className="pb-24 pt-20 md:pb-8">
-        <div className="mx-auto max-w-6xl px-4 py-8">
+      <main className="pb-16 pt-24 lg:pt-28">
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-primary/50 rounded-2xl blur-lg" />
-                <div className="relative h-14 w-14 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <CalendarIcon className="h-7 w-7 text-white" />
+          <header className="animate-rise">
+            <p className="font-jp text-sm font-medium tracking-[0.3em] text-primary/70">放送予定</p>
+            <div className="mt-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">Airing schedule</h1>
+                <p className="mt-2 text-pretty text-muted-foreground">Upcoming episodes from the titles on your list.</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("calendar")}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                      viewMode === "calendar"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Calendar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode("list")}
+                    className={cn(
+                      "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                      viewMode === "list"
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    List
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm">
+                  {notificationsEnabled ? (
+                    <Bell className="h-4 w-4 text-primary" />
+                  ) : (
+                    <BellOff className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <Switch
+                    checked={notificationsEnabled}
+                    onCheckedChange={setNotificationsEnabled}
+                    aria-label={notificationsEnabled ? "Disable notifications" : "Enable notifications"}
+                  />
                 </div>
               </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold">Anime Calendar</h1>
-                <p className="text-muted-foreground">Your personalized airing schedule</p>
-              </div>
             </div>
+          </header>
 
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-secondary/50 rounded-xl p-1">
-                <button
-                  onClick={() => setViewMode("calendar")}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                    viewMode === "calendar" ? "bg-background shadow-sm" : "text-muted-foreground",
-                  )}
-                >
-                  Calendar
-                </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={cn(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-all",
-                    viewMode === "list" ? "bg-background shadow-sm" : "text-muted-foreground",
-                  )}
-                >
-                  List
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-secondary/50">
-                {notificationsEnabled ? (
-                  <Bell className="h-4 w-4 text-primary" />
-                ) : (
-                  <BellOff className="h-4 w-4 text-muted-foreground" />
-                )}
-                <Switch checked={notificationsEnabled} onCheckedChange={setNotificationsEnabled} />
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">Show:</span>
+          <div className="mb-6 mt-8 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">Show</span>
             {STATUS_OPTIONS.map((status) => (
               <button
                 key={status.id}
+                type="button"
                 onClick={() => toggleStatusFilter(status.id)}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+                  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
                   statusFilters.includes(status.id)
-                    ? "border-primary/60 bg-primary/10 text-primary"
-                    : "border-border bg-secondary/30 text-muted-foreground hover:border-primary/40",
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
                 )}
               >
                 {status.label}
@@ -302,25 +310,35 @@ export default function CalendarPage() {
           </div>
 
           {loading || loadingSchedule ? (
-            <Card className="bg-card/50 border-border/50">
-              <CardContent className="py-16 text-center text-muted-foreground">Loading schedule...</CardContent>
-            </Card>
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="card-elevated h-24 animate-pulse" />
+              ))}
+            </div>
           ) : !user ? (
-            <Card className="bg-card/50 border-border/50">
-              <CardContent className="py-16 text-center text-muted-foreground">
-                Log in to see your upcoming episodes.
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={CalendarIcon}
+              title="Sign in to see your schedule"
+              description="Your upcoming episodes appear here once you're signed in."
+              action={
+                <Button asChild>
+                  <Link href="/login">Sign in</Link>
+                </Button>
+              }
+            />
           ) : scheduleError ? (
-            <Card className="bg-card/50 border-border/50">
-              <CardContent className="py-16 text-center text-muted-foreground">{scheduleError}</CardContent>
-            </Card>
+            <EmptyState icon={CalendarIcon} title="Couldn't load your schedule" description={scheduleError} />
           ) : schedule.length === 0 ? (
-            <Card className="bg-card/50 border-border/50">
-              <CardContent className="py-16 text-center text-muted-foreground">
-                No upcoming episodes yet. Add some anime to your watching list.
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={CalendarIcon}
+              title="No upcoming episodes"
+              description="Add currently-airing titles to your list and their next episodes will show up here."
+              action={
+                <Button asChild>
+                  <Link href="/search">Browse titles</Link>
+                </Button>
+              }
+            />
           ) : viewMode === "list" ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
@@ -338,47 +356,57 @@ export default function CalendarPage() {
                 })
                 const timeLabel = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
                 const isNotified = notifySet.has(item.id)
+                const hours = Math.round(item.timeUntilAiring / 3600)
+                const countdown = hours >= 24 ? `${Math.round(hours / 24)}d` : `${Math.max(hours, 0)}h`
                 return (
-                  <Card key={item.id} className="bg-card/50 border-border/50">
-                    <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center">
+                  <div
+                    key={item.id}
+                    className="card-elevated group flex flex-col gap-4 p-3 transition-all hover:-translate-y-0.5 hover:border-primary/30 sm:flex-row sm:items-center"
+                  >
+                    <Link
+                      href={`/media/${item.mediaId || item.id}`}
+                      className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-secondary"
+                    >
                       <img
                         src={item.cover || "/placeholder.svg"}
                         alt={item.title}
-                        className="h-20 w-14 rounded-lg object-cover"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{item.title}</h3>
-                        <p className="text-sm text-muted-foreground">Episode {item.episode}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <CalendarIcon className="h-4 w-4" />
-                            {dateLabel}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {timeLabel}
-                          </span>
-                        </div>
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/media/${item.mediaId || item.id}`} className="min-w-0">
+                        <h3 className="truncate font-semibold text-foreground transition-colors group-hover:text-primary">
+                          {item.title}
+                        </h3>
+                      </Link>
+                      <p className="mt-0.5 text-sm font-medium text-primary">Episode {item.episode}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <CalendarIcon className="h-3.5 w-3.5" />
+                          {dateLabel}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5" />
+                          {timeLabel}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 self-start md:self-auto">
-                        <Button
-                          variant={isNotified ? "secondary" : "ghost"}
-                          size="sm"
-                          className="gap-1"
-                          disabled={!notificationsEnabled}
-                          onClick={() => toggleNotify(item.id)}
-                        >
-                          {isNotified ? (
-                            <Bell className="h-3.5 w-3.5" />
-                          ) : (
-                            <BellOff className="h-3.5 w-3.5" />
-                          )}
-                          {isNotified ? "Notifying" : "Notify"}
-                        </Button>
-                        <Badge variant="outline">{Math.round(item.timeUntilAiring / 3600)}h</Badge>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <div className="flex items-center gap-2 self-start sm:self-auto">
+                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                        in {countdown}
+                      </span>
+                      <Button
+                        variant={isNotified ? "secondary" : "outline"}
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={!notificationsEnabled}
+                        onClick={() => toggleNotify(item.id)}
+                      >
+                        {isNotified ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+                        {isNotified ? "Notifying" : "Notify"}
+                      </Button>
+                    </div>
+                  </div>
                 )
               })}
             </div>
@@ -390,46 +418,57 @@ export default function CalendarPage() {
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 {groupedSchedule.map(([dateLabel, items]) => (
-                  <Card key={dateLabel} className="bg-card/50 border-border/50">
-                    <CardContent className="p-4 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold text-foreground">{dateLabel}</p>
-                        <Badge variant="outline">{items.length} eps</Badge>
-                      </div>
+                  <div key={dateLabel} className="card-elevated p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="font-semibold text-foreground">{dateLabel}</p>
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                        {items.length} {items.length === 1 ? "episode" : "episodes"}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
                       {items.map((item) => {
                         const isNotified = notifySet.has(item.id)
                         return (
-                        <div key={item.id} className="flex items-center gap-3">
-                          <img
-                            src={item.cover || "/placeholder.svg"}
-                            alt={item.title}
-                            className="h-14 w-10 rounded-lg object-cover"
-                          />
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-foreground">{item.title}</p>
-                            <p className="text-xs text-muted-foreground">Episode {item.episode}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              variant={isNotified ? "secondary" : "ghost"}
-                              size="icon"
-                              disabled={!notificationsEnabled}
-                              onClick={() => toggleNotify(item.id)}
+                          <div
+                            key={item.id}
+                            className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted/40"
+                          >
+                            <Link
+                              href={`/media/${item.mediaId || item.id}`}
+                              className="relative h-16 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-secondary"
                             >
-                              {isNotified ? (
-                                <Bell className="h-4 w-4" />
-                              ) : (
-                                <BellOff className="h-4 w-4" />
-                              )}
-                            </Button>
-                            <Badge variant="secondary">
-                              {item.date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                            </Badge>
+                              <img
+                                src={item.cover || "/placeholder.svg"}
+                                alt={item.title}
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                            </Link>
+                            <Link href={`/media/${item.mediaId || item.id}`} className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
+                                {item.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">Episode {item.episode}</p>
+                            </Link>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-muted-foreground">
+                                {item.date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                              </span>
+                              <Button
+                                variant={isNotified ? "secondary" : "ghost"}
+                                size="icon"
+                                className="size-8"
+                                aria-label={isNotified ? "Stop notifying" : "Notify me"}
+                                disabled={!notificationsEnabled}
+                                onClick={() => toggleNotify(item.id)}
+                              >
+                                {isNotified ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      )})}
-                    </CardContent>
-                  </Card>
+                        )
+                      })}
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

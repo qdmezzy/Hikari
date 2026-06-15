@@ -8,6 +8,7 @@ import { SocialPost } from "./SocialPost"
 import { Sparkles, Users, Clock, TrendingUp, Film } from "lucide-react"
 import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
+import { toast } from "sonner"
 import { addNotification } from "@/lib/notifications-store"
 import client from "@/lib/client"
 import {
@@ -170,6 +171,10 @@ export function SocialFeed() {
 
   const handleCreatePost = async (payload) => {
     if (!user) return
+    if (!user.email_confirmed_at && !user.confirmed_at) {
+      toast.error("Verify your email to post. Check the banner at the top of the page.")
+      return
+    }
     const profile = buildUserProfile(user)
     const postType =
       payload.postType ||

@@ -29,8 +29,8 @@ import {
   User,
   Volume2,
 } from "lucide-react"
-import { Navigation } from "@/components/Navigation"
-import RequireAuth from "@/components/RequireAuth"
+import { Navigation } from "@/components/layout/Navigation"
+import RequireAuth from "@/components/common/RequireAuth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -41,7 +41,9 @@ import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
 import { useTheme } from "next-themes"
 import client from "@/lib/client"
+import { toast } from "sonner"
 import { checkHandleAvailability, isHandleTakenError, normalizeHandle, upsertPublicProfile } from "@/lib/public-profile"
+import { AccountCredentials } from "@/components/settings/AccountCredentials"
 
 const sections = [
   { id: "profile", label: "Profile", icon: User },
@@ -786,103 +788,106 @@ export default function SettingsPage() {
     if (activeSection === "profile") {
       return (
         <div className="space-y-6">
-          <SettingsPanel
-            title="Profile Header"
-            description="Use the revamped profile header while keeping your live Hikari data underneath it."
-          >
-            <div className="overflow-hidden rounded-[28px] border border-border/60 bg-card/50">
-              <div
-                className="relative h-44 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.22),_transparent_55%),linear-gradient(180deg,rgba(14,23,38,0.74),rgba(7,12,22,0.96))]"
-                style={
-                  profile.bannerImage
-                    ? {
-                        backgroundImage: `linear-gradient(180deg, rgba(8,12,22,0.3), rgba(8,12,22,0.88)), url(${profile.bannerImage})`,
-                        backgroundSize: "cover",
-                        backgroundPosition: "center",
-                      }
-                    : undefined
-                }
+          <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60 backdrop-blur-sm">
+            {/* Banner */}
+            <div
+              className="relative h-32 bg-gradient-to-br from-primary/25 via-accent/15 to-card sm:h-44"
+              style={
+                profile.bannerImage
+                  ? {
+                      backgroundImage: `linear-gradient(180deg, rgba(8,12,22,0.15), rgba(8,12,22,0.65)), url(${profile.bannerImage})`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }
+                  : undefined
+              }
+            >
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="absolute right-3 top-3 gap-1.5 bg-background/70 backdrop-blur hover:bg-background/90"
+                onClick={handleBannerPrompt}
               >
-                <div className="absolute right-4 top-4 flex flex-wrap gap-2">
-                  <Button
+                <Camera className="h-3.5 w-3.5" />
+                Change banner
+              </Button>
+            </div>
+
+            {/* Identity + avatar actions */}
+            <div className="flex flex-col gap-4 px-5 pb-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex items-end gap-4">
+                <div className="relative -mt-12 shrink-0">
+                  <div className="size-24 overflow-hidden rounded-2xl border-4 border-card bg-muted shadow-lg">
+                    {avatarUrl ? (
+                      <img
+                        src={avatarUrl}
+                        alt={profile.displayName || "Profile avatar"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20 text-3xl font-bold text-primary">
+                        {(profile.displayName || user?.email || "H").charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <button
                     type="button"
-                    variant="secondary"
-                    className="rounded-full bg-background/80 px-4 text-foreground backdrop-blur"
-                    onClick={handleBannerPrompt}
+                    aria-label="Change avatar"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute -bottom-1.5 -right-1.5 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-2 ring-card transition hover:scale-105"
                   >
-                    <Camera className="h-4 w-4" />
-                    Change Banner
-                  </Button>
+                    <Camera className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                <div className="min-w-0 pb-1">
+                  <h2 className="truncate text-xl font-bold tracking-tight text-foreground">
+                    {profile.displayName || "Your profile"}
+                  </h2>
+                  <p className="truncate text-sm text-muted-foreground">
+                    @{normalizeHandle(profile.username || "user") || "user"}
+                  </p>
                 </div>
               </div>
 
-              <div className="px-6 pb-6">
-                <div className="flex flex-col gap-5 md:flex-row md:items-end">
-                  <div className="-mt-14 flex items-end gap-4">
-                    <div className="relative">
-                      <div className="h-28 w-28 overflow-hidden rounded-[28px] border-4 border-background bg-muted shadow-[0_0_40px_rgba(34,211,238,0.28)]">
-                        {avatarUrl ? (
-                          <img src={avatarUrl} alt={profile.displayName || "Profile avatar"} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.24),_transparent_55%),linear-gradient(180deg,rgba(14,23,38,0.9),rgba(7,12,22,0.96))] text-3xl font-black text-white">
-                            {(profile.displayName || user?.email || "H").charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="absolute -bottom-2 -right-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition hover:scale-105"
-                      >
-                        <Camera className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    <div className="pb-1">
-                      <h2 className="text-2xl font-black tracking-tight text-foreground">
-                        {profile.displayName || "Your profile"}
-                      </h2>
-                      <p className="mt-1 text-sm text-muted-foreground">@{normalizeHandle(profile.username || "user") || "user"}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-3 md:ml-auto">
-                    <Button
-                      type="button"
-                      className="rounded-full bg-primary px-5 text-primary-foreground shadow-[0_12px_35px_rgba(34,211,238,0.28)]"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={avatarUploading}
-                    >
-                      <Upload className="h-4 w-4" />
-                      {avatarUploading ? "Uploading..." : "Upload Avatar"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-full border-border/60 bg-background/40 px-5"
-                      onClick={handleRemoveAvatar}
-                      disabled={!avatarUrl && !avatarPath}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarSelected}
-                />
-
-                {avatarError ? <p className="mt-4 text-sm text-destructive">{avatarError}</p> : null}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={avatarUploading}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {avatarUploading ? "Uploading…" : "Upload avatar"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={handleRemoveAvatar}
+                  disabled={!avatarUrl && !avatarPath}
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Remove
+                </Button>
               </div>
             </div>
-          </SettingsPanel>
 
-          <SettingsPanel title="Basic Information" description="These fields sync to your profile and public share page.">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarSelected}
+            />
+
+            {avatarError ? <p className="px-5 pb-4 text-sm text-destructive">{avatarError}</p> : null}
+          </div>
+
+          <SettingsPanel title="Basic information" description="This appears on your public profile.">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="display-name">Display name</Label>
@@ -1730,6 +1735,8 @@ export default function SettingsPage() {
           </div>
         </SettingsPanel>
 
+        <AccountCredentials currentEmail={user?.email} />
+
         <SettingsPanel title="Connected Providers" description="Link or unlink the providers you use to sign in.">
           <div className="space-y-3">
             {providerOptions.map((provider) => {
@@ -1801,12 +1808,57 @@ export default function SettingsPage() {
             <Button
               type="button"
               variant="outline"
-              className="w-full justify-start rounded-2xl border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10"
+              className="w-full justify-start rounded-2xl"
               onClick={logout}
             >
-              <AlertTriangle className="h-4 w-4" />
+              <Lock className="h-4 w-4" />
               Sign out
             </Button>
+
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+              <p className="text-sm font-semibold text-destructive">Delete account</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Permanently delete your account, profile, lists, reviews, and posts. This cannot be undone.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 border-destructive/40 bg-transparent text-destructive hover:bg-destructive/10"
+                onClick={async () => {
+                  if (typeof window === "undefined") return
+                  const confirmed = window.confirm(
+                    "Delete your Hikari account and all your data permanently? This cannot be undone.",
+                  )
+                  if (!confirmed) return
+                  try {
+                    const { data } = await client.auth.getSession()
+                    const accessToken = data?.session?.access_token
+                    if (!accessToken) {
+                      toast.error("Please sign in again, then retry.")
+                      return
+                    }
+                    const res = await fetch("/api/account/delete", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ access_token: accessToken }),
+                    })
+                    const json = await res.json().catch(() => ({}))
+                    if (!res.ok || !json?.ok) {
+                      toast.error(json?.error || "Couldn't delete your account.")
+                      return
+                    }
+                    toast.success("Your account has been deleted.")
+                    await client.auth.signOut().catch(() => {})
+                    window.location.assign("/")
+                  } catch (err) {
+                    toast.error(err?.message || "Couldn't delete your account.")
+                  }
+                }}
+              >
+                <AlertTriangle className="h-4 w-4" />
+                Delete my account
+              </Button>
+            </div>
           </div>
         </SettingsPanel>
       </div>
@@ -1815,7 +1867,7 @@ export default function SettingsPage() {
 
   return (
     <RequireAuth>
-      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.08),_transparent_35%),linear-gradient(180deg,rgba(4,8,16,0.98),rgba(3,7,14,1))] text-foreground">
+      <div className="min-h-screen bg-background text-foreground">
         <Navigation />
 
         {hasChanges ? (
@@ -1849,13 +1901,13 @@ export default function SettingsPage() {
         ) : null}
 
         <main className="container mx-auto px-4 pb-16 pt-24">
-          <div className="mb-8">
-            <p className="text-sm uppercase tracking-[0.3em] text-primary/70">Account Settings</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">Manage your profile and preferences</h1>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:text-base">
-              This is the new settings surface wired to your real Hikari account, public profile, notifications, and theme.
+          <header className="mb-8 animate-rise">
+            <p className="font-jp text-sm font-medium tracking-[0.3em] text-primary/70">設定</p>
+            <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">Settings</h1>
+            <p className="mt-2 max-w-2xl text-pretty text-muted-foreground">
+              Manage your account, public profile, notifications, and appearance.
             </p>
-          </div>
+          </header>
 
           {saveError ? (
             <div className="mb-6 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -1871,30 +1923,33 @@ export default function SettingsPage() {
 
           <div className="grid gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
             <aside className="lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-[28px] border border-border/60 bg-card/40 p-3 backdrop-blur-sm">
-                {sections.map((section) => (
-                  <button
-                    key={section.id}
-                    type="button"
-                    onClick={() => setActiveSection(section.id)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition",
-                      activeSection === section.id
-                        ? "bg-primary/12 text-foreground"
-                        : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
-                    )}
-                  >
-                    <section.icon className="h-4 w-4" />
-                    <span className="font-medium">{section.label}</span>
-                    <ChevronRight
+              <nav className="space-y-1 rounded-2xl border border-border/50 bg-card/60 p-2 backdrop-blur-sm">
+                {sections.map((section) => {
+                  const active = activeSection === section.id
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      onClick={() => setActiveSection(section.id)}
                       className={cn(
-                        "ml-auto h-4 w-4 transition-transform",
-                        activeSection === section.id ? "translate-x-0.5 text-primary" : "",
+                        "relative flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-left text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
                       )}
-                    />
-                  </button>
-                ))}
-              </div>
+                    >
+                      <span
+                        className={cn(
+                          "absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary transition-opacity",
+                          active ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      <section.icon className="size-4 shrink-0" />
+                      {section.label}
+                    </button>
+                  )
+                })}
+              </nav>
             </aside>
 
             <motion.div

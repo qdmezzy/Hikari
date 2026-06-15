@@ -27,6 +27,8 @@ ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS website TEXT;
 ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS joined_at TIMESTAMPTZ;
 ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS show_online_status BOOLEAN DEFAULT TRUE;
 ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS show_watch_activity BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS show_favorites BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS favorite_media_ids BIGINT[] DEFAULT '{}';
 ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 ALTER TABLE public.public_profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
 

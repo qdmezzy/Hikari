@@ -61,19 +61,65 @@ export const fetchAniList = async (query, variables = {}) => {
   return json?.data
 }
 
+// Media metadata (covers/titles/etc.) is stable, so cache it per session to
+// avoid refetching the same titles on every navigation.
+const mediaCache = new Map()
+const MEDIA_CACHE_KEY = "hikari:media-cache:v1"
+const MEDIA_CACHE_CAP = 400
+let mediaCacheHydrated = false
+
+const hydrateMediaCache = () => {
+  if (mediaCacheHydrated || typeof window === "undefined") return
+  mediaCacheHydrated = true
+  try {
+    const raw = window.sessionStorage.getItem(MEDIA_CACHE_KEY)
+    if (raw) {
+      const obj = JSON.parse(raw)
+      Object.entries(obj).forEach(([id, media]) => mediaCache.set(Number(id), media))
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+const persistMediaCache = () => {
+  if (typeof window === "undefined") return
+  try {
+    const entries = Array.from(mediaCache.entries()).slice(-MEDIA_CACHE_CAP)
+    const obj = {}
+    entries.forEach(([id, media]) => {
+      obj[id] = media
+    })
+    window.sessionStorage.setItem(MEDIA_CACHE_KEY, JSON.stringify(obj))
+  } catch {
+    /* sessionStorage full / unavailable — non-fatal */
+  }
+}
+
 export const fetchAniListMediaByIds = async (ids = []) => {
+  hydrateMediaCache()
   const uniqueIds = Array.from(new Set((ids || []).map((value) => Number(value)).filter(Number.isFinite)))
   const mediaById = new Map()
+  const missing = []
 
-  for (const batch of chunkIds(uniqueIds, 50)) {
-    const data = await fetchAniList(MEDIA_BY_IDS_QUERY, {
-      ids: batch,
-      perPage: batch.length,
-    })
-    const mediaList = data?.Page?.media || []
-    mediaList.forEach((media) => {
-      mediaById.set(media.id, media)
-    })
+  uniqueIds.forEach((id) => {
+    if (mediaCache.has(id)) mediaById.set(id, mediaCache.get(id))
+    else missing.push(id)
+  })
+
+  if (missing.length) {
+    for (const batch of chunkIds(missing, 50)) {
+      const data = await fetchAniList(MEDIA_BY_IDS_QUERY, {
+        ids: batch,
+        perPage: batch.length,
+      })
+      const mediaList = data?.Page?.media || []
+      mediaList.forEach((media) => {
+        mediaCache.set(media.id, media)
+        mediaById.set(media.id, media)
+      })
+    }
+    persistMediaCache()
   }
 
   return mediaById

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation"
 
-export default function AnimeRedirectPage({ params }: { params: { id: string } }) {
-  redirect(`/media/${params.id}`)
+export default async function AnimeRedirectPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  redirect(`/media/${id}`)
 }
