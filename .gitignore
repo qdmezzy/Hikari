@@ -16,3 +16,6 @@ discord-bot/bot.log
 .env
 .env.*
 !.env.example
+
+# Local tooling binaries
+.local-tools/
