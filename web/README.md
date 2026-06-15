@@ -58,3 +58,16 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Troubleshooting
+
+### Vercel Deployment Blocked (Unrecognized Author)
+If your deployment fails on Vercel due to an unrecognized commit author, ensure your Git email matches your GitHub account email:
+
+```bash
+git config user.email "your-email@example.com"
+git commit --amend --reset-author --no-edit
+git push origin master --force
+```
+
+Vercel may block builds from placeholder emails (like `example.com`) for security.
