@@ -255,6 +255,16 @@ function ListPageContent() {
       groups[getTabIdForStatus(entry.status)].push(entry)
     })
 
+    const ts = (value) => (value ? new Date(value).getTime() : 0)
+    // Plan to Watch: oldest added first.
+    groups.planned.sort((a, b) => ts(a.created_at) - ts(b.created_at))
+    // Completed: most recent activity first (last episode added / updated).
+    groups.completed.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
+    // Watching / on-hold / dropped: most recent activity first.
+    ;[groups.watching, groups.paused, groups.dropped].forEach((list) =>
+      list.sort((a, b) => ts(b.updated_at) - ts(a.updated_at)),
+    )
+
     return groups
   }, [entries])
 
@@ -363,7 +373,8 @@ function ListPageContent() {
     const toDate = (value: string | null | undefined) =>
       value ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : null
     const finishedOn = toDate(entry?.finished_at)
-    const startedOn = toDate(entry?.started_at)
+    const lastWatchedOn = toDate(entry?.updated_at)
+    const addedOn = toDate(entry?.created_at)
     const addedLabel = formatRelativeTime(entry?.created_at)
     const meta = tabMeta[tabId]
     const Icon = meta.icon
@@ -381,10 +392,12 @@ function ListPageContent() {
             ? "Read"
             : "Completed"
         : tabId === "watching"
-          ? startedOn
-            ? `Started ${startedOn}`
+          ? lastWatchedOn
+            ? `Last watched ${lastWatchedOn}`
             : `Added ${addedLabel || "recently"}`
-          : `Added ${addedLabel || "recently"}`
+          : addedOn
+            ? `Added ${addedOn}`
+            : `Added ${addedLabel || "recently"}`
 
     return (
       <motion.div
@@ -514,6 +527,12 @@ function ListPageContent() {
               {tabId === "planned" ? <Calendar className="w-3 h-3 inline mr-1" /> : <Clock className="w-3 h-3 inline mr-1" />}
               {detailText}
             </p>
+            {tabId === "completed" && lastWatchedOn ? (
+              <p className="text-xs text-muted-foreground/70 mt-0.5">
+                <Clock className="w-3 h-3 inline mr-1" />
+                Last watched {lastWatchedOn}
+              </p>
+            ) : null}
           </div>
 
           {(tabId === "watching" || tabId === "paused") && episodeCount ? (
