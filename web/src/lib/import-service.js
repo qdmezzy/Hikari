@@ -207,12 +207,13 @@ const upsertEntries = async (userId, entries, onProgress) => {
   const normalized = dedupe(entries)
   if (!normalized.length) return { total: 0, anime: 0, manga: 0 }
 
-  // Non-destructive merge: re-importing should never lose in-app progress or
-  // wipe a real finish/start date. Pull existing entries and reconcile, so a
-  // re-sync is always safe (and can backfill missing fields without harm).
+  // Non-destructive merge: for entries you ALREADY have on Hikari, a re-import
+  // only fills gaps and advances progress — it never overwrites changes you made
+  // here. New entries (only on the source) are imported in full. Nothing is
+  // ever deleted, so titles you added only on Hikari are untouched.
   const { data: existingRows } = await client
     .from("list_entries")
-    .select("media_id, progress, score, started_at, finished_at")
+    .select("media_id, status, progress, score, started_at, finished_at")
     .eq("user_id", userId)
   const existingByMedia = new Map((existingRows || []).map((row) => [Number(row.media_id), row]))
 
@@ -224,12 +225,14 @@ const upsertEntries = async (userId, entries, onProgress) => {
       user_id: userId,
       media_id: e.mediaId,
       media_type: e.mediaType,
-      status: normalizeStatus(e.status || "plan_to_watch"),
+      // Keep your Hikari status; only set it for brand-new entries.
+      status: existing ? existing.status : normalizeStatus(e.status || "plan_to_watch"),
       // Never move progress backwards.
       progress: Math.max(importedProgress, Number(existing?.progress) || 0),
-      // Prefer a real source score, but keep an existing one if the source has none.
-      score: importedScore ?? existing?.score ?? null,
-      // Prefer a real source date; otherwise keep whatever we already had.
+      // Keep your Hikari rating; only fill it in if you hadn't rated it here.
+      score: existing ? existing.score ?? importedScore : importedScore,
+      // Backfill real start/finish dates from the source (the whole point of a
+      // re-sync), but keep an existing date if the source doesn't have one.
       started_at: e.startedAt || existing?.started_at || null,
       finished_at: e.finishedAt || existing?.finished_at || null,
     }
