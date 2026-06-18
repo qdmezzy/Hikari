@@ -1061,6 +1061,7 @@ export default function HomePage() {
                 <li><Link href="/search" className="hover:text-accent transition-colors">Browse Anime</Link></li>
                 <li><Link href="/calendar" className="hover:text-accent transition-colors">Schedule</Link></li>
                 <li><Link href="/discover" className="hover:text-accent transition-colors">Discover Feed</Link></li>
+                <li><Link href="/wrapped" className="hover:text-accent transition-colors">Your Wrapped</Link></li>
               </ul>
             </div>
             <div>

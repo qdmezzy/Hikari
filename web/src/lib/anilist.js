@@ -8,6 +8,7 @@ query ($ids: [Int], $perPage: Int) {
       coverImage { extraLarge large color }
       bannerImage
       episodes
+      duration
       chapters
       nextAiringEpisode { episode airingAt }
       averageScore

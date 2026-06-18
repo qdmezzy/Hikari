@@ -1316,6 +1316,22 @@ export default function ProfilePage() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
+                <Link
+                  href="/wrapped"
+                  className="mb-6 flex items-center justify-between gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.12),rgba(168,85,247,0.12))] p-5 transition-all hover:border-primary/40"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-jp text-[11px] tracking-[0.3em] text-primary/70">まとめ</p>
+                      <p className="font-bold text-foreground">Your {new Date().getFullYear()} Wrapped is ready</p>
+                      <p className="text-sm text-muted-foreground">See your year in anime &amp; manga →</p>
+                    </div>
+                  </div>
+                </Link>
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   {[
                     { label: "Total Anime", value: (mockUser.stats.completed + mockUser.stats.watching).toString(), icon: List, color: "text-blue-500" },
