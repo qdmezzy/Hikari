@@ -373,7 +373,11 @@ function ListPageContent() {
 
     const detailText =
       tabId === "completed"
-        ? `${isMangaEntry(entry) ? "Read" : "Finished"} ${finishedOn || updatedLabel || "recently"}`
+        ? finishedOn
+          ? `${isMangaEntry(entry) ? "Read" : "Finished"} ${finishedOn}`
+          : isMangaEntry(entry)
+            ? "Read"
+            : "Completed"
         : tabId === "planned"
           ? `Added ${updatedLabel || "recently"}`
           : tabId === "paused"

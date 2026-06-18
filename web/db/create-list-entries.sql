@@ -86,15 +86,16 @@ CREATE TRIGGER update_list_entries_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Stamp finished_at the first time an entry becomes "completed" (in-app).
--- Imports set finished_at to the real date up front, so the IS NULL guard
--- preserves it. This keeps "Finished" labels accurate (not the last-edit time).
+-- Stamp finished_at when an entry transitions to "completed" in-app (e.g. you
+-- mark a show finished). Only fires on UPDATE status-changes, NOT on INSERT, so
+-- bulk imports of already-completed titles don't get a fake "finished now" date
+-- — they keep the real date from the source (or stay NULL if the source had none).
 CREATE OR REPLACE FUNCTION set_list_entry_finished_at()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.status = 'completed'
        AND NEW.finished_at IS NULL
-       AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'completed') THEN
+       AND OLD.status IS DISTINCT FROM 'completed' THEN
         NEW.finished_at = NOW();
     END IF;
     RETURN NEW;
@@ -103,6 +104,6 @@ $$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS set_list_entries_finished_at ON public.list_entries;
 CREATE TRIGGER set_list_entries_finished_at
-    BEFORE INSERT OR UPDATE ON public.list_entries
+    BEFORE UPDATE ON public.list_entries
     FOR EACH ROW
     EXECUTE FUNCTION set_list_entry_finished_at();

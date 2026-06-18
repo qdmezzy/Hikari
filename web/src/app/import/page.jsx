@@ -93,6 +93,8 @@ query ($userName: String, $type: MediaType) {
         status
         progress
         score
+        startedAt { year month day }
+        completedAt { year month day }
         media {
           id
           type
@@ -102,6 +104,19 @@ query ($userName: String, $type: MediaType) {
   }
 }
 `
+
+// AniList fuzzy date {year,month,day} -> "YYYY-MM-DD" (or null if incomplete).
+const fuzzyDateToISO = (date) => {
+  if (!date?.year || !date?.month || !date?.day) return null
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`
+}
+
+// MAL "YYYY-MM-DD" (XML or API) -> ISO date, ignoring empty "0000-00-00".
+const malDateToISO = (value) => {
+  if (!value || typeof value !== "string") return null
+  if (!/^\d{4}-\d{2}-\d{2}/.test(value) || value.startsWith("0000")) return null
+  return value.slice(0, 10)
+}
 
 const MAL_MAPPING_QUERY = `
 query ($ids: [Int], $type: MediaType) {
@@ -174,6 +189,8 @@ const extractAniListEntries = (payload, typeOverride) => {
         status: mapStatus(entry?.status || list?.status),
         progress: Number(entry?.progress) || 0,
         score: Number(entry?.score) || null,
+        startedAt: fuzzyDateToISO(entry?.startedAt),
+        finishedAt: fuzzyDateToISO(entry?.completedAt),
       })
     })
   })
@@ -189,6 +206,8 @@ const extractAniListEntries = (payload, typeOverride) => {
         status: mapStatus(entry?.status),
         progress: Number(entry?.progress) || 0,
         score: Number(entry?.score) || null,
+        startedAt: fuzzyDateToISO(entry?.startedAt),
+        finishedAt: fuzzyDateToISO(entry?.completedAt),
       })
     })
   }
@@ -216,6 +235,8 @@ const parseMalXml = (xmlText) => {
     status: mapStatus(getText(node, "my_status")),
     progress: Number(getText(node, "my_watched_episodes")) || 0,
     score: Number(getText(node, "my_score")) || null,
+    startedAt: malDateToISO(getText(node, "my_start_date")),
+    finishedAt: malDateToISO(getText(node, "my_finish_date")),
   }))
 
   const mangaEntries = mangaNodes.map((node) => ({
@@ -225,6 +246,8 @@ const parseMalXml = (xmlText) => {
     status: mapStatus(getText(node, "my_status")),
     progress: Number(getText(node, "my_read_chapters")) || 0,
     score: Number(getText(node, "my_score")) || null,
+    startedAt: malDateToISO(getText(node, "my_start_date")),
+    finishedAt: malDateToISO(getText(node, "my_finish_date")),
   }))
 
   return [...animeEntries, ...mangaEntries].filter((entry) => Number.isFinite(entry.sourceId))
@@ -247,6 +270,8 @@ const parseKitsuJson = (payload) => {
       status: mapStatus(attrs?.status),
       progress: Number(attrs?.progress) || 0,
       score: Number(attrs?.rating) || Number(attrs?.ratingTwenty) || null,
+      startedAt: malDateToISO(attrs?.startedAt || attrs?.started_at),
+      finishedAt: malDateToISO(attrs?.finishedAt || attrs?.finished_at),
     })
   })
 
@@ -346,12 +371,17 @@ export default function ImportPage() {
   }
 
   const upsertEntries = async (entries) => {
+    const stripDates = (rows) => rows.map(({ started_at, finished_at, ...rest }) => rest)
     const batches = chunk(entries, 100)
     let processed = 0
     for (const batch of batches) {
-      const { error } = await client
-        .from("list_entries")
-        .upsert(batch, { onConflict: "user_id,media_id" })
+      let { error } = await client.from("list_entries").upsert(batch, { onConflict: "user_id,media_id" })
+      // Fall back if started_at/finished_at aren't migrated yet.
+      if (error && /started_at|finished_at|column/i.test(error.message || "")) {
+        ;({ error } = await client
+          .from("list_entries")
+          .upsert(stripDates(batch), { onConflict: "user_id,media_id" }))
+      }
       if (error) {
         throw error
       }
@@ -360,15 +390,30 @@ export default function ImportPage() {
     }
   }
 
-  const buildImportPayload = (entries) =>
-    entries.map((entry) => ({
-      user_id: user.id,
-      media_id: entry.mediaId,
-      media_type: entry.mediaType,
-      status: normalizeStatus(entry.status || "plan_to_watch"),
-      progress: Number(entry.progress) || 0,
-      score: normalizeScore(Number(entry.score)),
-    }))
+  // Non-destructive: for entries you already have on Hikari, only fill gaps and
+  // advance progress — never overwrite your Hikari status/score, never delete.
+  const buildImportPayload = async (entries) => {
+    const { data: existingRows } = await client
+      .from("list_entries")
+      .select("media_id, status, progress, score, started_at, finished_at")
+      .eq("user_id", user.id)
+    const existingByMedia = new Map((existingRows || []).map((row) => [Number(row.media_id), row]))
+
+    return entries.map((entry) => {
+      const existing = existingByMedia.get(Number(entry.mediaId))
+      const importedScore = normalizeScore(Number(entry.score))
+      return {
+        user_id: user.id,
+        media_id: entry.mediaId,
+        media_type: entry.mediaType,
+        status: existing ? existing.status : normalizeStatus(entry.status || "plan_to_watch"),
+        progress: Math.max(Number(entry.progress) || 0, Number(existing?.progress) || 0),
+        score: existing ? existing.score ?? importedScore : importedScore,
+        started_at: entry.startedAt || existing?.started_at || null,
+        finished_at: entry.finishedAt || existing?.finished_at || null,
+      }
+    })
+  }
 
   const resolveMalEntries = async (entries) => {
     const grouped = entries.reduce(
@@ -396,6 +441,8 @@ export default function ImportPage() {
             status: mapStatus(entry.status),
             progress: entry.progress,
             score: entry.score,
+            startedAt: entry.startedAt,
+            finishedAt: entry.finishedAt,
           })
         } else {
           unmatchedCount += 1
@@ -414,7 +461,7 @@ export default function ImportPage() {
       return
     }
 
-    const payload = buildImportPayload(normalized)
+    const payload = await buildImportPayload(normalized)
     await upsertEntries(payload)
 
     const animeCount = normalized.filter((entry) => entry.mediaType === "ANIME").length
@@ -501,6 +548,8 @@ export default function ImportPage() {
         status: mapStatus(entry.status),
         progress: entry.progress,
         score: entry.score,
+        startedAt: malDateToISO(entry.startDate),
+        finishedAt: malDateToISO(entry.finishDate),
       }))
 
       const { resolved, unmatchedCount } = await resolveMalEntries(entries)
