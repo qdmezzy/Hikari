@@ -574,8 +574,12 @@ export default function ProfilePage() {
 
     const daysSet = new Set<string>()
     entries.forEach((entry) => {
-      if (!entry?.updated_at) return
-      const date = new Date(entry.updated_at)
+      // Use the meaningful date per status, not updated_at (which imports bump).
+      const raw = entry?.status === "completed"
+        ? entry?.finished_at || entry?.created_at || entry?.updated_at
+        : entry?.created_at || entry?.updated_at
+      if (!raw) return
+      const date = new Date(raw)
       if (Number.isNaN(date.getTime())) return
       daysSet.add(date.toISOString().slice(0, 10))
     })
@@ -618,10 +622,13 @@ export default function ProfilePage() {
   const monthlyStats = React.useMemo(() => {
     const now = new Date()
     const monthEntries = entries.filter((entry) => {
-      const updatedAt = new Date(entry?.updated_at)
-      return !Number.isNaN(updatedAt.getTime()) &&
-        updatedAt.getMonth() === now.getMonth() &&
-        updatedAt.getFullYear() === now.getFullYear()
+      const raw = entry?.status === "completed"
+        ? entry?.finished_at || entry?.created_at || entry?.updated_at
+        : entry?.created_at || entry?.updated_at
+      const refDate = new Date(raw)
+      return !Number.isNaN(refDate.getTime()) &&
+        refDate.getMonth() === now.getMonth() &&
+        refDate.getFullYear() === now.getFullYear()
     })
 
     const completed = monthEntries.filter((entry) => entry.status === "completed").length
@@ -670,33 +677,36 @@ export default function ProfilePage() {
   }, [entries])
 
   const recentActivity = React.useMemo(() => {
-    const ts = (entry: any) => {
+    // Use the most meaningful timestamp per status — updated_at is unreliable
+    // because the DB trigger bumps it on every import write, even for rows that
+    // didn't change. So:
+    //   completed  → finished_at (when you actually finished it)
+    //   planned    → created_at  (when you added it to your list)
+    //   everything else → created_at (when you started tracking it here)
+    const activityTs = (entry: any) => {
       const value = entry?.status === "completed"
-        ? entry?.finished_at || entry?.updated_at
-        : entry?.status === "plan_to_watch"
-          ? entry?.created_at || entry?.updated_at
-          : entry?.updated_at
+        ? entry?.finished_at || entry?.created_at || entry?.updated_at
+        : entry?.created_at || entry?.updated_at
       return value ? new Date(value).getTime() : 0
     }
 
     return entries
       .filter((entry) => entry?.media)
-      .sort((left, right) => ts(right) - ts(left))
+      .sort((left, right) => activityTs(right) - activityTs(left))
       .slice(0, 5)
-      .map((entry) => ({
-        anime: getMediaTitle(entry.media),
-        episode: getEntryDisplayProgress(entry),
-        status: entry.status,
-        image: entry?.media?.coverImage?.large || "",
-        score: normalizeEntryScore(entry?.score),
-        time: formatRelativeTime(
-          entry?.status === "completed"
-            ? entry?.finished_at || entry?.updated_at
-            : entry?.status === "plan_to_watch"
-              ? entry?.created_at || entry?.updated_at
-              : entry?.updated_at
-        ),
-      }))
+      .map((entry) => {
+        const ts = entry?.status === "completed"
+          ? entry?.finished_at || entry?.created_at || entry?.updated_at
+          : entry?.created_at || entry?.updated_at
+        return {
+          anime: getMediaTitle(entry.media),
+          episode: getEntryDisplayProgress(entry),
+          status: entry.status,
+          image: entry?.media?.coverImage?.large || "",
+          score: normalizeEntryScore(entry?.score),
+          time: formatRelativeTime(ts),
+        }
+      })
   }, [entries])
 
   const achievementList = React.useMemo(() => {

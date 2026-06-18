@@ -141,7 +141,13 @@ const buildActivityText = (entry) => {
 }
 
 const getListTimestamp = (entry, listType) => {
-  const relative = formatRelativeTime(entry?.updated_at)
+  // Use the most meaningful date per list type — updated_at gets bumped on
+  // every import, so it's not reliable for "when did this happen".
+  const raw =
+    listType === "completed"
+      ? entry?.finished_at || entry?.created_at || entry?.updated_at
+      : entry?.created_at || entry?.updated_at
+  const relative = formatRelativeTime(raw)
   if (!relative) return ""
 
   switch (listType) {
@@ -485,8 +491,11 @@ export default function PublicProfilePage() {
 
     const daysSet = new Set()
     entries.forEach((entry) => {
-      if (!entry?.updated_at) return
-      const date = new Date(entry.updated_at)
+      const raw = entry?.status === "completed"
+        ? entry?.finished_at || entry?.created_at || entry?.updated_at
+        : entry?.created_at || entry?.updated_at
+      if (!raw) return
+      const date = new Date(raw)
       if (Number.isNaN(date.getTime())) return
       daysSet.add(date.toISOString().slice(0, 10))
     })
@@ -538,32 +547,32 @@ export default function PublicProfilePage() {
   )
 
   const recentActivity = React.useMemo(() => {
-    const ts = (entry) => {
+    // Use the most meaningful timestamp per status — updated_at is unreliable
+    // because the DB trigger bumps it on every import write, even for rows that
+    // didn't change.
+    const activityTs = (entry) => {
       const value = entry?.status === "completed"
-        ? entry?.finished_at || entry?.updated_at
-        : entry?.status === "plan_to_watch"
-          ? entry?.created_at || entry?.updated_at
-          : entry?.updated_at
+        ? entry?.finished_at || entry?.created_at || entry?.updated_at
+        : entry?.created_at || entry?.updated_at
       return value ? new Date(value).getTime() : 0
     }
 
     return [...entries]
-      .sort((left, right) => ts(right) - ts(left))
+      .sort((left, right) => activityTs(right) - activityTs(left))
       .slice(0, 4)
-      .map((entry) => ({
-        id: entry.id,
-        anime: getMediaTitle(entry?.media),
-        action: buildActivityText(entry),
-        time: formatRelativeTime(
-          entry?.status === "completed"
-            ? entry?.finished_at || entry?.updated_at
-            : entry?.status === "plan_to_watch"
-              ? entry?.created_at || entry?.updated_at
-              : entry?.updated_at
-        ),
-        image: entry?.media?.coverImage?.large || entry?.media?.coverImage?.extraLarge || "",
-        href: entry?.media ? getMediaHref(entry.media) : `/media/${entry.media_id}`,
-      }))
+      .map((entry) => {
+        const ts = entry?.status === "completed"
+          ? entry?.finished_at || entry?.created_at || entry?.updated_at
+          : entry?.created_at || entry?.updated_at
+        return {
+          id: entry.id,
+          anime: getMediaTitle(entry?.media),
+          action: buildActivityText(entry),
+          time: formatRelativeTime(ts),
+          image: entry?.media?.coverImage?.large || entry?.media?.coverImage?.extraLarge || "",
+          href: entry?.media ? getMediaHref(entry.media) : `/media/${entry.media_id}`,
+        }
+      })
   }, [entries])
 
   const userData = React.useMemo(() => {

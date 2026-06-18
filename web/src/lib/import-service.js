@@ -211,32 +211,70 @@ const upsertEntries = async (userId, entries, onProgress) => {
   // only fills gaps and advances progress — it never overwrites changes you made
   // here. New entries (only on the source) are imported in full. Nothing is
   // ever deleted, so titles you added only on Hikari are untouched.
+  //
+  // Crucially, we skip writing rows that haven't changed. The DB trigger on
+  // list_entries auto-bumps updated_at to now() on every write, so an upsert
+  // that touches unchanged rows would make every entry look like it was just
+  // updated — wrecking the "Recent Activity" feed and list ordering.
   const { data: existingRows } = await client
     .from("list_entries")
     .select("media_id, status, progress, score, started_at, finished_at")
     .eq("user_id", userId)
   const existingByMedia = new Map((existingRows || []).map((row) => [Number(row.media_id), row]))
 
-  const payload = normalized.map((e) => {
+  const payload = []
+  for (const e of normalized) {
     const existing = existingByMedia.get(Number(e.mediaId))
     const importedProgress = Number(e.progress) || 0
     const importedScore = normalizeScore(Number(e.score))
-    return {
-      user_id: userId,
-      media_id: e.mediaId,
-      media_type: e.mediaType,
-      // Keep your Hikari status; only set it for brand-new entries.
-      status: existing ? existing.status : normalizeStatus(e.status || "plan_to_watch"),
-      // Never move progress backwards.
-      progress: Math.max(importedProgress, Number(existing?.progress) || 0),
-      // Keep your Hikari rating; only fill it in if you hadn't rated it here.
-      score: existing ? existing.score ?? importedScore : importedScore,
-      // Backfill real start/finish dates from the source (the whole point of a
-      // re-sync), but keep an existing date if the source doesn't have one.
-      started_at: e.startedAt || existing?.started_at || null,
-      finished_at: e.finishedAt || existing?.finished_at || null,
+    const nextStartedAt = e.startedAt || existing?.started_at || null
+    const nextFinishedAt = e.finishedAt || existing?.finished_at || null
+    const nextProgress = Math.max(importedProgress, Number(existing?.progress) || 0)
+    const nextScore = existing ? existing.score ?? importedScore : importedScore
+    const nextStatus = existing ? existing.status : normalizeStatus(e.status || "plan_to_watch")
+
+    // Brand-new entry — always write.
+    if (!existing) {
+      payload.push({
+        user_id: userId,
+        media_id: e.mediaId,
+        media_type: e.mediaType,
+        status: nextStatus,
+        progress: nextProgress,
+        score: nextScore,
+        started_at: nextStartedAt,
+        finished_at: nextFinishedAt,
+      })
+      continue
     }
-  })
+
+    // Existing entry — only write if something actually changed.
+    const progressChanged = nextProgress !== Number(existing.progress)
+    const scoreChanged = nextScore !== existing.score && nextScore !== null
+    const startedChanged = nextStartedAt !== (existing.started_at || null)
+    const finishedChanged = nextFinishedAt !== (existing.finished_at || null)
+
+    if (progressChanged || scoreChanged || startedChanged || finishedChanged) {
+      payload.push({
+        user_id: userId,
+        media_id: e.mediaId,
+        media_type: e.mediaType,
+        status: nextStatus,
+        progress: nextProgress,
+        score: nextScore,
+        started_at: nextStartedAt,
+        finished_at: nextFinishedAt,
+      })
+    }
+  }
+
+  if (!payload.length) {
+    return {
+      total: normalized.length,
+      anime: normalized.filter((e) => e.mediaType === "ANIME").length,
+      manga: normalized.filter((e) => e.mediaType === "MANGA").length,
+    }
+  }
 
   // If started_at/finished_at aren't migrated yet, retry without them rather
   // than failing the whole import.
