@@ -472,19 +472,35 @@ export default function DiscoverPage() {
         setSaved(savedMap)
       }
 
-      // Compute top genres from the anime they track.
-      const animeIds = data
-        .filter((e: any) => (e.media_type || "ANIME") === "ANIME")
-        .map((e: any) => e.media_id)
+      // Build a rating-aware taste profile: weight each title's genres by how
+      // the user engaged with it (status), how recently, and how they rated it.
+      const animeEntries = data.filter((e: any) => (e.media_type || "ANIME") === "ANIME")
       personalExcludeRef.current = Array.from(new Set(data.map((e: any) => e.media_id)))
 
       try {
-        const mediaById = await fetchAniListMediaByIds(animeIds.slice(0, 120))
-        const genreCounts = new Map<string, number>()
-        mediaById.forEach((media: any) => {
-          ;(media?.genres || []).forEach((g: string) => genreCounts.set(g, (genreCounts.get(g) || 0) + 1))
+        const mediaById = await fetchAniListMediaByIds(animeEntries.map((e: any) => e.media_id).slice(0, 120))
+        const STATUS_WEIGHT: Record<string, number> = {
+          completed: 1.2,
+          watching: 1,
+          rewatching: 1.1,
+          plan_to_watch: 0.4,
+          on_hold: 0.3,
+          dropped: 0.1,
+        }
+        const genreWeights = new Map<string, number>()
+        animeEntries.forEach((entry: any) => {
+          const media = mediaById.get(entry.media_id)
+          if (!media?.genres?.length) return
+          const sw = STATUS_WEIGHT[entry.status] ?? 0.6
+          const days = entry.updated_at ? (Date.now() - new Date(entry.updated_at).getTime()) / 86400000 : 999
+          const recency = Math.max(0.4, 1 - days / 180)
+          const score = Number(entry.score) || 0
+          const rating = score > 0 ? Math.max(-0.2, 1 + (score - 7) * 0.18) : 1
+          const weight = sw * recency * rating
+          media.genres.forEach((g: string) => genreWeights.set(g, (genreWeights.get(g) || 0) + weight))
         })
-        const topGenres = Array.from(genreCounts.entries())
+        const topGenres = Array.from(genreWeights.entries())
+          .filter(([, w]) => w > 0)
           .sort((a, b) => b[1] - a[1])
           .slice(0, 3)
           .map(([name]) => name)

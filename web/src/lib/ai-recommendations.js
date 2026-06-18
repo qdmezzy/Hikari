@@ -194,7 +194,13 @@ const buildTasteProfile = (entries, mediaById) => {
     const daysAgo = updatedAt ? (Date.now() - updatedAt) / (1000 * 60 * 60 * 24) : 999
     const recencyBoost = Math.max(0.4, 1 - daysAgo / 180)
 
-    const weight = statusWeight * recencyBoost
+    // Personal rating signal: titles scored highly amplify their genres/tags;
+    // poorly-rated ones dampen (and very low scores push slightly negative).
+    // Centered on 7/10 as "good". No rating = neutral (1.0).
+    const score = Number(entry.score) || 0
+    const ratingMultiplier = score > 0 ? Math.max(-0.2, 1 + (score - 7) * 0.18) : 1
+
+    const weight = statusWeight * recencyBoost * ratingMultiplier
 
     ;(media.genres || []).forEach((genre) => {
       const key = normalizeToken(genre)
