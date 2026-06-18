@@ -178,11 +178,13 @@ function ListPageContent() {
         "id, media_id, status, progress, score, media_type, updated_at, started_at, finished_at"
       const SELECT_FALLBACK = "id, media_id, status, progress, score, media_type, updated_at"
 
-      let { data, error } = await client
+      let data: any[] | null = null
+      let error: any = null
+      ;({ data, error } = await client
         .from("list_entries")
         .select(SELECT_FULL)
         .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
+        .order("updated_at", { ascending: false }))
 
       // The started_at/finished_at columns may not be migrated yet — fall back
       // to the core columns instead of breaking the whole list.
