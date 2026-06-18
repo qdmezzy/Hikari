@@ -91,11 +91,31 @@ export function computeWrapped(entries, year) {
   })
   const busiestMonthIndex = months.indexOf(Math.max(...months))
 
+  // First title you touched this year (proxy: earliest updated_at).
+  const firstWatch =
+    [...yearEntries].sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at))[0] || null
+
+  // Longest run of consecutive days with any tracking activity this year.
+  const dayKeys = Array.from(
+    new Set(yearEntries.map((entry) => new Date(entry.updated_at).toISOString().slice(0, 10))),
+  ).sort()
+  let longestStreak = dayKeys.length ? 1 : 0
+  let run = dayKeys.length ? 1 : 0
+  for (let i = 1; i < dayKeys.length; i += 1) {
+    const prev = new Date(dayKeys[i - 1])
+    const cur = new Date(dayKeys[i])
+    const diffDays = Math.round((cur - prev) / 86400000)
+    run = diffDays === 1 ? run + 1 : 1
+    if (run > longestStreak) longestStreak = run
+  }
+
   const personality = getWrappedPersonality(topGenres[0]?.name)
 
   return {
     year,
     hasData: yearEntries.length > 0,
+    firstWatch,
+    longestStreak,
     totals: {
       titles: yearEntries.length,
       completed: completed.length,

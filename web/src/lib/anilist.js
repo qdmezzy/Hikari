@@ -14,6 +14,7 @@ query ($ids: [Int], $perPage: Int) {
       averageScore
       status
       genres
+      trailer { id site }
       popularity
       favourites
       description(asHtml: false)
