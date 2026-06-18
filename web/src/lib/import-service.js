@@ -37,10 +37,34 @@ const ANILIST_LIST_QUERY = `
 query ($userName: String, $type: MediaType) {
   MediaListCollection(userName: $userName, type: $type) {
     user { mediaListOptions { scoreFormat } }
-    lists { status entries { status progress score media { id type } } }
+    lists {
+      status
+      entries {
+        status
+        progress
+        score
+        startedAt { year month day }
+        completedAt { year month day }
+        media { id type }
+      }
+    }
   }
 }
 `
+
+// AniList fuzzy dates → ISO date string (or null if incomplete).
+const fuzzyDateToISO = (date) => {
+  if (!date?.year || !date?.month || !date?.day) return null
+  const mm = String(date.month).padStart(2, "0")
+  const dd = String(date.day).padStart(2, "0")
+  return `${date.year}-${mm}-${dd}`
+}
+
+// "YYYY-MM-DD" (MAL) → ISO date string, else null.
+const malDateToISO = (value) => {
+  if (!value || typeof value !== "string") return null
+  return /^\d{4}-\d{2}-\d{2}/.test(value) ? value.slice(0, 10) : null
+}
 
 // AniList returns scores in the user's chosen format; normalize everything to 1-10.
 const aniListScoreTo10 = (score, format) => {
@@ -128,6 +152,8 @@ const extractAniListEntries = (payload, typeOverride) => {
         status: mapStatus(entry?.status || list?.status),
         progress: Number(entry?.progress) || 0,
         score: aniListScoreTo10(entry?.score, scoreFormat),
+        startedAt: fuzzyDateToISO(entry?.startedAt),
+        finishedAt: fuzzyDateToISO(entry?.completedAt),
       })
     })
   })
@@ -160,7 +186,15 @@ const resolveMalEntries = async (entries) => {
     list.forEach((e) => {
       const mediaId = idMap.get(e.sourceId)
       if (mediaId) {
-        resolved.push({ mediaId, mediaType: e.mediaType, status: mapStatus(e.status), progress: e.progress, score: e.score })
+        resolved.push({
+          mediaId,
+          mediaType: e.mediaType,
+          status: mapStatus(e.status),
+          progress: e.progress,
+          score: e.score,
+          startedAt: e.startedAt,
+          finishedAt: e.finishedAt,
+        })
       } else {
         unmatched += 1
       }
@@ -180,6 +214,8 @@ const upsertEntries = async (userId, entries, onProgress) => {
     status: normalizeStatus(e.status || "plan_to_watch"),
     progress: Number(e.progress) || 0,
     score: normalizeScore(Number(e.score)),
+    started_at: e.startedAt || null,
+    finished_at: e.finishedAt || null,
   }))
 
   let processed = 0
@@ -231,6 +267,8 @@ export const importFromMal = async ({ userId, onProgress }) => {
     status: entry.status,
     progress: entry.progress,
     score: entry.score,
+    startedAt: malDateToISO(entry.startDate),
+    finishedAt: malDateToISO(entry.finishDate),
   }))
   if (!entries.length) throw new Error("Your MAL list looks empty.")
 

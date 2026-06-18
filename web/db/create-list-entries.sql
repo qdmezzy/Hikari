@@ -11,6 +11,12 @@ CREATE TABLE IF NOT EXISTS public.list_entries (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Real start/finish dates (from imports, or set when an entry is completed in-app).
+-- These are NOT auto-bumped by the updated_at trigger, so "Finished" labels stay
+-- accurate instead of tracking the last edit/import time.
+ALTER TABLE public.list_entries ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+ALTER TABLE public.list_entries ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
+
 -- Add unique constraint to prevent duplicates (same user can't add same media twice)
 ALTER TABLE public.list_entries 
 ADD CONSTRAINT list_entries_user_media_unique UNIQUE (user_id, media_id);
@@ -67,3 +73,24 @@ CREATE TRIGGER update_list_entries_updated_at
     BEFORE UPDATE ON public.list_entries
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Stamp finished_at the first time an entry becomes "completed" (in-app).
+-- Imports set finished_at to the real date up front, so the IS NULL guard
+-- preserves it. This keeps "Finished" labels accurate (not the last-edit time).
+CREATE OR REPLACE FUNCTION set_list_entry_finished_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 'completed'
+       AND NEW.finished_at IS NULL
+       AND (TG_OP = 'INSERT' OR OLD.status IS DISTINCT FROM 'completed') THEN
+        NEW.finished_at = NOW();
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_list_entries_finished_at ON public.list_entries;
+CREATE TRIGGER set_list_entries_finished_at
+    BEFORE INSERT OR UPDATE ON public.list_entries
+    FOR EACH ROW
+    EXECUTE FUNCTION set_list_entry_finished_at();

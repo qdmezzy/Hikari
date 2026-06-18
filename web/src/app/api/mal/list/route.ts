@@ -14,6 +14,8 @@ const buildEntries = (items: any[], mediaType: "ANIME" | "MANGA") =>
         ? Number(item?.list_status?.num_episodes_watched) || 0
         : Number(item?.list_status?.num_chapters_read) || 0,
     score: Number(item?.list_status?.score) || null,
+    startDate: item?.list_status?.start_date || null,
+    finishDate: item?.list_status?.finish_date || null,
   }))
 
 const fetchList = async (token: string, mediaType: "ANIME" | "MANGA") => {
@@ -22,7 +24,9 @@ const fetchList = async (token: string, mediaType: "ANIME" | "MANGA") => {
       ? "https://api.myanimelist.net/v2/users/@me/animelist"
       : "https://api.myanimelist.net/v2/users/@me/mangalist"
 
-  let url = `${base}?fields=list_status&limit=1000`
+  const progressField = mediaType === "ANIME" ? "num_episodes_watched" : "num_chapters_read"
+  const listStatusFields = `list_status{status,score,${progressField},start_date,finish_date,updated_at}`
+  let url = `${base}?fields=${listStatusFields}&limit=1000`
   const results: any[] = []
 
   while (url) {
