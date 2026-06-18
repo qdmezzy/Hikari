@@ -174,11 +174,25 @@ function ListPageContent() {
       setLoadingEntries(true)
       setEntriesError("")
 
-      const { data, error } = await client
+      const SELECT_FULL =
+        "id, media_id, status, progress, score, media_type, updated_at, started_at, finished_at"
+      const SELECT_FALLBACK = "id, media_id, status, progress, score, media_type, updated_at"
+
+      let { data, error } = await client
         .from("list_entries")
-        .select("id, media_id, status, progress, score, media_type, updated_at, started_at, finished_at")
+        .select(SELECT_FULL)
         .eq("user_id", user.id)
         .order("updated_at", { ascending: false })
+
+      // The started_at/finished_at columns may not be migrated yet — fall back
+      // to the core columns instead of breaking the whole list.
+      if (error && /started_at|finished_at|column/i.test(error.message || "")) {
+        ;({ data, error } = await client
+          .from("list_entries")
+          .select(SELECT_FALLBACK)
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false }))
+      }
 
       if (!isActive) return
 

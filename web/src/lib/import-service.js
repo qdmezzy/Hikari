@@ -235,9 +235,19 @@ const upsertEntries = async (userId, entries, onProgress) => {
     }
   })
 
+  // If started_at/finished_at aren't migrated yet, retry without them rather
+  // than failing the whole import.
+  const stripDates = (rows) =>
+    rows.map(({ started_at, finished_at, ...rest }) => rest)
+
   let processed = 0
   for (const batch of chunk(payload, 100)) {
-    const { error } = await client.from("list_entries").upsert(batch, { onConflict: "user_id,media_id" })
+    let { error } = await client.from("list_entries").upsert(batch, { onConflict: "user_id,media_id" })
+    if (error && /started_at|finished_at|column/i.test(error.message || "")) {
+      ;({ error } = await client
+        .from("list_entries")
+        .upsert(stripDates(batch), { onConflict: "user_id,media_id" }))
+    }
     if (error) throw new Error(error.message || "Could not save imported entries.")
     processed += batch.length
     onProgress?.(Math.round((processed / payload.length) * 100))
