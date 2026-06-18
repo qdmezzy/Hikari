@@ -35,11 +35,14 @@ export function RecommendedForYou() {
       }
       try {
         const excludeIds = new Set(data.map((entry) => Number(entry.media_id)))
+        // Seed with the user + today's date so the lineup stays stable while you
+        // browse, but refreshes to a new set each day (and whenever your list changes).
+        const dayKey = new Date().toISOString().slice(0, 10)
         const result = await buildAiRecommendations({
           listEntries: data,
           excludeIds,
           limit: 12,
-          sessionSeed: user.id,
+          sessionSeed: `${user.id}:${dayKey}`,
         })
         if (!active) return
         setItems(result?.items || [])
@@ -65,10 +68,9 @@ export function RecommendedForYou() {
     <section className="px-4 py-16 relative">
       <div className="max-w-7xl mx-auto relative">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 text-primary">
-            <Sparkles className="h-5 w-5" />
-          </div>
+          <Sparkles className="h-6 w-6 text-primary" />
           <div>
+            <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">おすすめ</p>
             <h2 className="text-2xl font-bold text-foreground">Recommended for you</h2>
             <p className="text-sm text-muted-foreground">
               {loading ? "Reading your taste…" : subtitle || "Picked from your ratings & watch history"}
