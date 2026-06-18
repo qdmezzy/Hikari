@@ -207,16 +207,33 @@ const upsertEntries = async (userId, entries, onProgress) => {
   const normalized = dedupe(entries)
   if (!normalized.length) return { total: 0, anime: 0, manga: 0 }
 
-  const payload = normalized.map((e) => ({
-    user_id: userId,
-    media_id: e.mediaId,
-    media_type: e.mediaType,
-    status: normalizeStatus(e.status || "plan_to_watch"),
-    progress: Number(e.progress) || 0,
-    score: normalizeScore(Number(e.score)),
-    started_at: e.startedAt || null,
-    finished_at: e.finishedAt || null,
-  }))
+  // Non-destructive merge: re-importing should never lose in-app progress or
+  // wipe a real finish/start date. Pull existing entries and reconcile, so a
+  // re-sync is always safe (and can backfill missing fields without harm).
+  const { data: existingRows } = await client
+    .from("list_entries")
+    .select("media_id, progress, score, started_at, finished_at")
+    .eq("user_id", userId)
+  const existingByMedia = new Map((existingRows || []).map((row) => [Number(row.media_id), row]))
+
+  const payload = normalized.map((e) => {
+    const existing = existingByMedia.get(Number(e.mediaId))
+    const importedProgress = Number(e.progress) || 0
+    const importedScore = normalizeScore(Number(e.score))
+    return {
+      user_id: userId,
+      media_id: e.mediaId,
+      media_type: e.mediaType,
+      status: normalizeStatus(e.status || "plan_to_watch"),
+      // Never move progress backwards.
+      progress: Math.max(importedProgress, Number(existing?.progress) || 0),
+      // Prefer a real source score, but keep an existing one if the source has none.
+      score: importedScore ?? existing?.score ?? null,
+      // Prefer a real source date; otherwise keep whatever we already had.
+      started_at: e.startedAt || existing?.started_at || null,
+      finished_at: e.finishedAt || existing?.finished_at || null,
+    }
+  })
 
   let processed = 0
   for (const batch of chunk(payload, 100)) {
