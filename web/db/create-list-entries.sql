@@ -18,13 +18,21 @@ ALTER TABLE public.list_entries ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE public.list_entries ADD COLUMN IF NOT EXISTS finished_at TIMESTAMPTZ;
 
 -- Add unique constraint to prevent duplicates (same user can't add same media twice)
-ALTER TABLE public.list_entries 
-ADD CONSTRAINT list_entries_user_media_unique UNIQUE (user_id, media_id);
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'list_entries_user_media_unique'
+    ) THEN
+        ALTER TABLE public.list_entries
+        ADD CONSTRAINT list_entries_user_media_unique UNIQUE (user_id, media_id);
+    END IF;
+END $$;
 
 -- Enable Row Level Security
 ALTER TABLE public.list_entries ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can only see their own list entries
+DROP POLICY IF EXISTS "Users can view their own list entries" ON public.list_entries;
 CREATE POLICY "Users can view their own list entries"
 ON public.list_entries
 FOR SELECT
@@ -32,6 +40,7 @@ TO authenticated
 USING (auth.uid() = user_id);
 
 -- Policy: Users can insert their own list entries
+DROP POLICY IF EXISTS "Users can insert their own list entries" ON public.list_entries;
 CREATE POLICY "Users can insert their own list entries"
 ON public.list_entries
 FOR INSERT
@@ -39,6 +48,7 @@ TO authenticated
 WITH CHECK (auth.uid() = user_id);
 
 -- Policy: Users can update their own list entries
+DROP POLICY IF EXISTS "Users can update their own list entries" ON public.list_entries;
 CREATE POLICY "Users can update their own list entries"
 ON public.list_entries
 FOR UPDATE
@@ -47,6 +57,7 @@ USING (auth.uid() = user_id)
 WITH CHECK (auth.uid() = user_id);
 
 -- Policy: Users can delete their own list entries
+DROP POLICY IF EXISTS "Users can delete their own list entries" ON public.list_entries;
 CREATE POLICY "Users can delete their own list entries"
 ON public.list_entries
 FOR DELETE
@@ -69,6 +80,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger to automatically update updated_at when a row is updated
+DROP TRIGGER IF EXISTS update_list_entries_updated_at ON public.list_entries;
 CREATE TRIGGER update_list_entries_updated_at
     BEFORE UPDATE ON public.list_entries
     FOR EACH ROW
