@@ -16,6 +16,7 @@ import Link from "next/link"
 import Image from "next/image"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { RecommendedForYou } from "@/components/home/RecommendedForYou"
 import {
   fetchAniList,
   fetchAniListMediaByIds,
@@ -820,6 +821,9 @@ export default function HomePage() {
             )}
           </div>
         </section>
+
+        {/* Recommended For You (personalized, signed-in only) */}
+        <RecommendedForYou />
 
         {/* Trending Section */}
         <section className="px-4 py-16 relative">
