@@ -42,6 +42,7 @@ import { addNotification } from '@/lib/notifications-store'
 import { reportContent } from '@/lib/reporting'
 import { logListActivity } from '@/lib/activity-service'
 import { AddToCollection } from '@/components/lists/AddToCollection'
+import { StarRating } from '@/components/media/StarRating'
 import { syncPublicFavorites } from '@/lib/public-profile'
 import { toast } from 'sonner'
 
@@ -836,6 +837,45 @@ export default function MediaPage() {
     }
   }
 
+  // Inline rating: persists the score immediately. If the title isn't on the
+  // user's list yet, rating adds it (default status "completed").
+  const handleRate = async (nextScore) => {
+    if (!user) {
+      toast.error('Sign in to rate this title.')
+      return
+    }
+    if (!Number.isFinite(mediaId) || !media) return
+
+    const previousScore = entryScore
+    setEntryScore(nextScore)
+    const nextStatus = status || 'completed'
+
+    const { error: rateError } = await client
+      .from('list_entries')
+      .upsert(
+        {
+          user_id: user.id,
+          media_id: mediaId,
+          media_type: media.type,
+          status: nextStatus,
+          progress: progress,
+          score: nextScore > 0 ? nextScore : null,
+        },
+        { onConflict: 'user_id,media_id' },
+      )
+
+    if (rateError) {
+      console.error('Error saving rating:', rateError)
+      setEntryScore(previousScore)
+      toast.error("Couldn't save your rating. Please try again.")
+      return
+    }
+
+    if (!status) setStatus(nextStatus)
+    if (!hasEntry) setHasEntry(true)
+    toast.success(nextScore > 0 ? `Rated ${nextScore}/10` : 'Rating cleared')
+  }
+
   if (loading) return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -1220,6 +1260,13 @@ export default function MediaPage() {
                   <AddToCollection user={user} mediaId={mediaId} mediaType={media?.type} />
 
                 </div>
+
+                {user ? (
+                  <div className="mt-4 rounded-2xl border border-border/60 bg-secondary/30 p-4">
+                    <p className="mb-2 text-sm font-medium text-foreground">Your rating</p>
+                    <StarRating value={entryScore} onChange={handleRate} />
+                  </div>
+                ) : null}
 
                 <div className="mt-6 space-y-3 text-sm">
                   <div className="flex justify-between text-muted-foreground">
