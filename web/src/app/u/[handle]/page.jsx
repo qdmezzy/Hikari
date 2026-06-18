@@ -42,9 +42,9 @@ const publicTabs = [
 ]
 
 const LIST_SELECT =
-  "id, media_id, status, progress, score, media_type, updated_at, hide_from_profile"
+  "id, media_id, status, progress, score, media_type, updated_at, created_at, finished_at, hide_from_profile"
 
-const LIST_SELECT_FALLBACK = "id, media_id, status, progress, score, media_type, updated_at"
+const LIST_SELECT_FALLBACK = "id, media_id, status, progress, score, media_type, updated_at, created_at"
 
 const isHideFromProfileSchemaError = (error) => {
   const code = String(error?.code || "")
@@ -160,13 +160,26 @@ const getListTimestamp = (entry, listType) => {
   }
 }
 
-const getListItems = (entries) => ({
-  watching: entries.filter((entry) => ["watching", "rewatching"].includes(entry?.status)),
-  completed: entries.filter((entry) => entry?.status === "completed"),
-  planned: entries.filter((entry) => entry?.status === "plan_to_watch"),
-  onhold: entries.filter((entry) => entry?.status === "on_hold"),
-  dropped: entries.filter((entry) => entry?.status === "dropped"),
-})
+const getListItems = (entries) => {
+  const ts = (value) => (value ? new Date(value).getTime() : 0)
+
+  const watching = entries.filter((entry) => ["watching", "rewatching"].includes(entry?.status))
+  const completed = entries.filter((entry) => entry?.status === "completed")
+  const planned = entries.filter((entry) => entry?.status === "plan_to_watch")
+  const onhold = entries.filter((entry) => entry?.status === "on_hold")
+  const dropped = entries.filter((entry) => entry?.status === "dropped")
+
+  // Plan to Watch: oldest added first.
+  planned.sort((a, b) => ts(a.created_at) - ts(b.created_at))
+  // Completed: most recently finished first (fall back to updated_at).
+  completed.sort((a, b) => ts(b.finished_at || b.updated_at) - ts(a.finished_at || a.updated_at))
+  // Watching / on-hold / dropped: most recent activity first.
+  watching.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
+  onhold.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
+  dropped.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
+
+  return { watching, completed, planned, onhold, dropped }
+}
 
 const getBannerFallback = (entries) =>
   entries.find((entry) => entry?.media?.bannerImage)?.media?.bannerImage ||
@@ -525,14 +538,32 @@ export default function PublicProfilePage() {
   )
 
   const recentActivity = React.useMemo(() => {
-    return entries.slice(0, 4).map((entry) => ({
-      id: entry.id,
-      anime: getMediaTitle(entry?.media),
-      action: buildActivityText(entry),
-      time: formatRelativeTime(entry?.updated_at),
-      image: entry?.media?.coverImage?.large || entry?.media?.coverImage?.extraLarge || "",
-      href: entry?.media ? getMediaHref(entry.media) : `/media/${entry.media_id}`,
-    }))
+    const ts = (entry) => {
+      const value = entry?.status === "completed"
+        ? entry?.finished_at || entry?.updated_at
+        : entry?.status === "plan_to_watch"
+          ? entry?.created_at || entry?.updated_at
+          : entry?.updated_at
+      return value ? new Date(value).getTime() : 0
+    }
+
+    return [...entries]
+      .sort((left, right) => ts(right) - ts(left))
+      .slice(0, 4)
+      .map((entry) => ({
+        id: entry.id,
+        anime: getMediaTitle(entry?.media),
+        action: buildActivityText(entry),
+        time: formatRelativeTime(
+          entry?.status === "completed"
+            ? entry?.finished_at || entry?.updated_at
+            : entry?.status === "plan_to_watch"
+              ? entry?.created_at || entry?.updated_at
+              : entry?.updated_at
+        ),
+        image: entry?.media?.coverImage?.large || entry?.media?.coverImage?.extraLarge || "",
+        href: entry?.media ? getMediaHref(entry.media) : `/media/${entry.media_id}`,
+      }))
   }, [entries])
 
   const userData = React.useMemo(() => {

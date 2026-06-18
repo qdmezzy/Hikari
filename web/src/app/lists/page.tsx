@@ -258,8 +258,10 @@ function ListPageContent() {
     const ts = (value) => (value ? new Date(value).getTime() : 0)
     // Plan to Watch: oldest added first.
     groups.planned.sort((a, b) => ts(a.created_at) - ts(b.created_at))
-    // Completed: most recent activity first (last episode added / updated).
-    groups.completed.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
+    // Completed: most recently finished first (fall back to updated_at).
+    groups.completed.sort(
+      (a, b) => ts(b.finished_at || b.updated_at) - ts(a.finished_at || a.updated_at),
+    )
     // Watching / on-hold / dropped: most recent activity first.
     ;[groups.watching, groups.paused, groups.dropped].forEach((list) =>
       list.sort((a, b) => ts(b.updated_at) - ts(a.updated_at)),
@@ -375,6 +377,7 @@ function ListPageContent() {
     const finishedOn = toDate(entry?.finished_at)
     const lastWatchedOn = toDate(entry?.updated_at)
     const addedOn = toDate(entry?.created_at)
+    // lastWatchedOn is used for the Watching tab; completed entries only show finishedAt.
     const addedLabel = formatRelativeTime(entry?.created_at)
     const meta = tabMeta[tabId]
     const Icon = meta.icon
@@ -527,12 +530,6 @@ function ListPageContent() {
               {tabId === "planned" ? <Calendar className="w-3 h-3 inline mr-1" /> : <Clock className="w-3 h-3 inline mr-1" />}
               {detailText}
             </p>
-            {tabId === "completed" && lastWatchedOn ? (
-              <p className="text-xs text-muted-foreground/70 mt-0.5">
-                <Clock className="w-3 h-3 inline mr-1" />
-                Last watched {lastWatchedOn}
-              </p>
-            ) : null}
           </div>
 
           {(tabId === "watching" || tabId === "paused") && episodeCount ? (

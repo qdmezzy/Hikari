@@ -263,11 +263,27 @@ export default function ProfilePage() {
       }
 
       setEntriesLoading(true)
-      const { data, error } = await client
+      const SELECT_FULL =
+        "id, media_id, status, progress, score, media_type, updated_at, created_at, started_at, finished_at"
+      const SELECT_FALLBACK = "id, media_id, status, progress, score, media_type, updated_at, created_at"
+
+      let data: any[] | null = null
+      let error: any = null
+      ;({ data, error } = await client
         .from("list_entries")
-        .select("id, media_id, status, progress, score, media_type, updated_at")
+        .select(SELECT_FULL)
         .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
+        .order("updated_at", { ascending: false }))
+
+      // The started_at/finished_at columns may not be migrated yet — fall back
+      // to the core columns instead of breaking the whole list.
+      if (error && /started_at|finished_at|column/i.test(error.message || "")) {
+        ;({ data, error } = await client
+          .from("list_entries")
+          .select(SELECT_FALLBACK)
+          .eq("user_id", user.id)
+          .order("updated_at", { ascending: false }))
+      }
 
       if (!active) return
 
@@ -654,17 +670,32 @@ export default function ProfilePage() {
   }, [entries])
 
   const recentActivity = React.useMemo(() => {
+    const ts = (entry: any) => {
+      const value = entry?.status === "completed"
+        ? entry?.finished_at || entry?.updated_at
+        : entry?.status === "plan_to_watch"
+          ? entry?.created_at || entry?.updated_at
+          : entry?.updated_at
+      return value ? new Date(value).getTime() : 0
+    }
+
     return entries
       .filter((entry) => entry?.media)
-      .sort((left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime())
-      .slice(0, 3)
+      .sort((left, right) => ts(right) - ts(left))
+      .slice(0, 5)
       .map((entry) => ({
         anime: getMediaTitle(entry.media),
         episode: getEntryDisplayProgress(entry),
         status: entry.status,
         image: entry?.media?.coverImage?.large || "",
         score: normalizeEntryScore(entry?.score),
-        time: formatRelativeTime(entry.updated_at),
+        time: formatRelativeTime(
+          entry?.status === "completed"
+            ? entry?.finished_at || entry?.updated_at
+            : entry?.status === "plan_to_watch"
+              ? entry?.created_at || entry?.updated_at
+              : entry?.updated_at
+        ),
       }))
   }, [entries])
 
