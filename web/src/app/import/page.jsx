@@ -371,6 +371,10 @@ export default function ImportPage() {
   }
 
   const upsertEntries = async (entries) => {
+    if (!entries.length) {
+      setProgress(100)
+      return
+    }
     const stripDates = (rows) => rows.map(({ started_at, finished_at, ...rest }) => rest)
     const batches = chunk(entries, 100)
     let processed = 0
@@ -392,6 +396,10 @@ export default function ImportPage() {
 
   // Non-destructive: for entries you already have on Hikari, only fill gaps and
   // advance progress — never overwrite your Hikari status/score, never delete.
+  // Rows that wouldn't actually change are skipped, so re-importing doesn't bump
+  // every entry's updated_at (which would make everything read "just now").
+  const dateOnly = (value) => (value ? String(value).slice(0, 10) : null)
+
   const buildImportPayload = async (entries) => {
     const { data: existingRows } = await client
       .from("list_entries")
@@ -399,20 +407,33 @@ export default function ImportPage() {
       .eq("user_id", user.id)
     const existingByMedia = new Map((existingRows || []).map((row) => [Number(row.media_id), row]))
 
-    return entries.map((entry) => {
+    const rows = []
+    entries.forEach((entry) => {
       const existing = existingByMedia.get(Number(entry.mediaId))
       const importedScore = normalizeScore(Number(entry.score))
-      return {
+      const merged = {
         user_id: user.id,
         media_id: entry.mediaId,
         media_type: entry.mediaType,
         status: existing ? existing.status : normalizeStatus(entry.status || "plan_to_watch"),
         progress: Math.max(Number(entry.progress) || 0, Number(existing?.progress) || 0),
         score: existing ? existing.score ?? importedScore : importedScore,
-        started_at: entry.startedAt || existing?.started_at || null,
-        finished_at: entry.finishedAt || existing?.finished_at || null,
+        started_at: entry.startedAt || dateOnly(existing?.started_at) || null,
+        finished_at: entry.finishedAt || dateOnly(existing?.finished_at) || null,
       }
+
+      // Skip rows that wouldn't change anything (avoids touching updated_at).
+      if (existing) {
+        const unchanged =
+          merged.progress === (Number(existing.progress) || 0) &&
+          (merged.score ?? null) === (existing.score ?? null) &&
+          dateOnly(merged.started_at) === dateOnly(existing.started_at) &&
+          dateOnly(merged.finished_at) === dateOnly(existing.finished_at)
+        if (unchanged) return
+      }
+      rows.push(merged)
     })
+    return rows
   }
 
   const resolveMalEntries = async (entries) => {
