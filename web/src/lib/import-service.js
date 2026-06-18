@@ -36,10 +36,29 @@ const ALLOWED_STATUSES = new Set([
 const ANILIST_LIST_QUERY = `
 query ($userName: String, $type: MediaType) {
   MediaListCollection(userName: $userName, type: $type) {
+    user { mediaListOptions { scoreFormat } }
     lists { status entries { status progress score media { id type } } }
   }
 }
 `
+
+// AniList returns scores in the user's chosen format; normalize everything to 1-10.
+const aniListScoreTo10 = (score, format) => {
+  const value = Number(score)
+  if (!Number.isFinite(value) || value <= 0) return null
+  switch (format) {
+    case "POINT_100":
+      return Math.round(value / 10)
+    case "POINT_5":
+      return Math.round(value * 2)
+    case "POINT_3":
+      return value >= 3 ? 10 : value === 2 ? 7 : 3
+    case "POINT_10_DECIMAL":
+    case "POINT_10":
+    default:
+      return Math.round(value)
+  }
+}
 
 const MAL_MAPPING_QUERY = `
 query ($ids: [Int], $type: MediaType) {
@@ -94,6 +113,7 @@ const anilistRequest = async (query, variables) => {
 }
 
 const extractAniListEntries = (payload, typeOverride) => {
+  const scoreFormat = payload?.MediaListCollection?.user?.mediaListOptions?.scoreFormat || "POINT_10"
   const lists = payload?.MediaListCollection?.lists || []
   const entries = []
   lists.forEach((list) => {
@@ -107,7 +127,7 @@ const extractAniListEntries = (payload, typeOverride) => {
         mediaType,
         status: mapStatus(entry?.status || list?.status),
         progress: Number(entry?.progress) || 0,
-        score: Number(entry?.score) || null,
+        score: aniListScoreTo10(entry?.score, scoreFormat),
       })
     })
   })
