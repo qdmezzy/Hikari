@@ -175,8 +175,8 @@ function ListPageContent() {
       setEntriesError("")
 
       const SELECT_FULL =
-        "id, media_id, status, progress, score, media_type, updated_at, started_at, finished_at"
-      const SELECT_FALLBACK = "id, media_id, status, progress, score, media_type, updated_at"
+        "id, media_id, status, progress, score, media_type, updated_at, created_at, started_at, finished_at"
+      const SELECT_FALLBACK = "id, media_id, status, progress, score, media_type, updated_at, created_at"
 
       let data: any[] | null = null
       let error: any = null
@@ -357,12 +357,14 @@ function ListPageContent() {
       : episodeCount
         ? Math.min((progress / episodeCount) * 100, 100)
         : 0
-    const updatedLabel = formatRelativeTime(entry?.updated_at)
-    // Real finish date (from import or completion stamp) shown as an absolute,
-    // stable date so it doesn't read as "X minutes ago" for everything.
-    const finishedOn = entry?.finished_at
-      ? new Date(entry.finished_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
-      : null
+    // Stable dates that imports don't bump: created_at (when added to Hikari),
+    // started_at / finished_at (real dates from the source). updated_at is the
+    // last-edit time, which a re-import touches — so we avoid it on these labels.
+    const toDate = (value: string | null | undefined) =>
+      value ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : null
+    const finishedOn = toDate(entry?.finished_at)
+    const startedOn = toDate(entry?.started_at)
+    const addedLabel = formatRelativeTime(entry?.created_at)
     const meta = tabMeta[tabId]
     const Icon = meta.icon
     const isPending = pendingId === entry.id
@@ -378,13 +380,11 @@ function ListPageContent() {
           : isMangaEntry(entry)
             ? "Read"
             : "Completed"
-        : tabId === "planned"
-          ? `Added ${updatedLabel || "recently"}`
-          : tabId === "paused"
-            ? `Paused ${updatedLabel || "recently"}`
-            : tabId === "dropped"
-              ? `Dropped ${updatedLabel || "recently"}`
-              : `Updated ${updatedLabel || "recently"}`
+        : tabId === "watching"
+          ? startedOn
+            ? `Started ${startedOn}`
+            : `Added ${addedLabel || "recently"}`
+          : `Added ${addedLabel || "recently"}`
 
     return (
       <motion.div
