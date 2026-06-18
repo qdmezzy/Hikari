@@ -190,6 +190,20 @@ export default function BrowsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQuery, selectedGenres, sortBy])
 
+  // Pick up a search term passed in the URL (e.g. from the header search box,
+  // which routes here as /search?query=...). Without this, those searches just
+  // land on the default browse view and appear to "do nothing".
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const incoming = (params.get("query") || params.get("q") || "").trim()
+    if (incoming) {
+      setSearchQuery(incoming)
+      setActiveQuery(incoming)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const toggleGenre = (genre: string) => {
     setSelectedGenres((current) =>
       current.includes(genre) ? current.filter((value) => value !== genre) : [...current, genre],

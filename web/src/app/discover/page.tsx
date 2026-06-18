@@ -21,9 +21,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Navigation } from "@/components/layout/Navigation"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { getMediaHref } from "@/lib/anilist"
+import { getMediaHref, fetchAniListMediaByIds } from "@/lib/anilist"
 import useAuth from "@/hooks/useAuth"
+import client from "@/lib/client"
 
 // Vibe filters
 const vibeFilters = [
@@ -59,10 +61,10 @@ const DISCOVER_SORT_PRESETS = [
 ]
 
 const DISCOVER_QUERY = `
-query ($page: Int, $perPage: Int, $sort: [MediaSort]) {
+query ($page: Int, $perPage: Int, $sort: [MediaSort], $genreIn: [String], $idNotIn: [Int]) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { currentPage hasNextPage lastPage }
-    media(type: ANIME, sort: $sort, isAdult: false) {
+    media(type: ANIME, sort: $sort, isAdult: false, genre_in: $genreIn, id_not_in: $idNotIn) {
       id
       title { romaji english }
       coverImage { extraLarge large }
@@ -176,8 +178,20 @@ export default function DiscoverPage() {
   const discoverStartPageRef = useRef(
     Math.floor(Math.random() * (DISCOVER_INITIAL_PAGE_MAX - DISCOVER_INITIAL_PAGE_MIN + 1)) + DISCOVER_INITIAL_PAGE_MIN
   )
+  // Personalization: top genres from the user's list + ids to exclude (already tracked).
+  const activeVibeRef = useRef("all")
+  const personalGenresRef = useRef<string[]>([])
+  const personalExcludeRef = useRef<number[]>([])
+  const [personalizedReady, setPersonalizedReady] = useState(false)
+  // Which media are already on the user's list (id -> status), to reflect the save button.
+  const [savedStatus, setSavedStatus] = useState<Record<number, string>>({})
+  const savingRef = useRef<Set<number>>(new Set())
 
-  const filteredFeed = activeVibe === "all" 
+  useEffect(() => {
+    activeVibeRef.current = activeVibe
+  }, [activeVibe])
+
+  const filteredFeed = activeVibe === "all"
     ? discoverFeed 
     : discoverFeed.filter(item => item.vibes.includes(activeVibe))
 
@@ -216,9 +230,58 @@ export default function DiscoverPage() {
     setLiked(prev => ({ ...prev, [id]: !prev[id] }))
   }
 
-  const toggleSave = (id: number) => {
-    if (!ensureSignedIn()) return
-    setSaved(prev => ({ ...prev, [id]: !prev[id] }))
+  const STATUS_LABELS: Record<string, string> = {
+    watching: "Watching",
+    completed: "Completed",
+    plan_to_watch: "Plan to Watch",
+    on_hold: "On Hold",
+    dropped: "Dropped",
+    rewatching: "Rewatching",
+  }
+
+  const toggleSave = async (id: number) => {
+    if (!ensureSignedIn() || !user) return
+    if (savingRef.current.has(id)) return
+    const isSaved = Boolean(saved[id])
+    const status = savedStatus[id]
+    savingRef.current.add(id)
+    try {
+      if (!isSaved) {
+        const { error } = await client.from("list_entries").upsert(
+          { user_id: user.id, media_id: id, media_type: "ANIME", status: "plan_to_watch", progress: 0 },
+          { onConflict: "user_id,media_id" },
+        )
+        if (error) throw error
+        setSaved((prev) => ({ ...prev, [id]: true }))
+        setSavedStatus((prev) => ({ ...prev, [id]: "plan_to_watch" }))
+        toast.success("Added to Plan to Watch")
+      } else if (status && status !== "plan_to_watch") {
+        // Already tracked under another status — don't clobber it.
+        toast.info(`Already in your ${STATUS_LABELS[status] || "list"}`)
+      } else {
+        const { error } = await client
+          .from("list_entries")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("media_id", id)
+        if (error) throw error
+        setSaved((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        setSavedStatus((prev) => {
+          const next = { ...prev }
+          delete next[id]
+          return next
+        })
+        toast.success("Removed from your list")
+      }
+    } catch {
+      toast.error("Couldn't update your list. Please try again.")
+    } finally {
+      savingRef.current.delete(id)
+    }
   }
 
   const toggleMute = () => {
@@ -236,6 +299,7 @@ export default function DiscoverPage() {
 
     try {
       const requestPage = async (pageNumber: number) => {
+        const usePersonal = activeVibeRef.current === "all" && personalGenresRef.current.length > 0
         const response = await fetch("/api/anilist", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -245,6 +309,8 @@ export default function DiscoverPage() {
               page: pageNumber,
               perPage: DISCOVER_PAGE_SIZE,
               sort: discoverSortRef.current,
+              genreIn: usePersonal ? personalGenresRef.current : null,
+              idNotIn: usePersonal ? personalExcludeRef.current.slice(0, 100) : null,
             },
           }),
         })
@@ -373,6 +439,75 @@ export default function DiscoverPage() {
   useEffect(() => {
     loadFeedPage(discoverStartPageRef.current)
   }, [loadFeedPage])
+
+  // Build a taste profile from the user's list: top genres (to bias the feed)
+  // and the ids they already track (to exclude). Then refresh "For You".
+  useEffect(() => {
+    let active = true
+    if (!user) {
+      personalGenresRef.current = []
+      personalExcludeRef.current = []
+      setPersonalizedReady(false)
+      setSavedStatus({})
+      setSaved({})
+      return
+    }
+
+    const loadTaste = async () => {
+      const { data, error } = await client
+        .from("list_entries")
+        .select("media_id, status, media_type")
+        .eq("user_id", user.id)
+      if (!active || error || !data?.length) return
+
+      // Reflect which titles are already tracked on the save buttons.
+      const statusMap: Record<number, string> = {}
+      const savedMap: Record<number, boolean> = {}
+      data.forEach((entry: any) => {
+        statusMap[entry.media_id] = entry.status
+        savedMap[entry.media_id] = true
+      })
+      if (active) {
+        setSavedStatus(statusMap)
+        setSaved(savedMap)
+      }
+
+      // Compute top genres from the anime they track.
+      const animeIds = data
+        .filter((e: any) => (e.media_type || "ANIME") === "ANIME")
+        .map((e: any) => e.media_id)
+      personalExcludeRef.current = Array.from(new Set(data.map((e: any) => e.media_id)))
+
+      try {
+        const mediaById = await fetchAniListMediaByIds(animeIds.slice(0, 120))
+        const genreCounts = new Map<string, number>()
+        mediaById.forEach((media: any) => {
+          ;(media?.genres || []).forEach((g: string) => genreCounts.set(g, (genreCounts.get(g) || 0) + 1))
+        })
+        const topGenres = Array.from(genreCounts.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 3)
+          .map(([name]) => name)
+        if (!active) return
+        personalGenresRef.current = topGenres
+        if (topGenres.length) {
+          setPersonalizedReady(true)
+          // Refresh the "For You" feed with the personalized query.
+          if (activeVibeRef.current === "all") {
+            loadFeedPage(discoverStartPageRef.current)
+          }
+        }
+      } catch {
+        /* ignore — fall back to the generic feed */
+      }
+    }
+
+    loadTaste()
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loadFeedPage])
 
   useEffect(() => {
     if (!hasMore || loadingMore) return
