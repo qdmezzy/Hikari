@@ -95,7 +95,7 @@ const setupCommand = {
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    // The interaction is already deferred by the bot's command handler.
 
     // Make sure caches are fresh so idempotency works.
     await guild.channels.fetch().catch(() => {});
@@ -272,7 +272,7 @@ const secureCommand = {
       return;
     }
 
-    await interaction.deferReply({ ephemeral: true });
+    // The interaction is already deferred by the bot's command handler.
 
     const everyoneId = guild.roles.everyone.id;
 
