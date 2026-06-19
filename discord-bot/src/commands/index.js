@@ -5,6 +5,7 @@ import { shareCommands } from "./share.js";
 import { statsCommands } from "./stats.js";
 import { adminCommands } from "./admin.js";
 import { favoritesCommands } from "./favorites.js";
+import { setupCommands } from "./setup.js";
 import { handleHelpComponent, isHelpComponent } from "../ui/helpMenu.js";
 
 export const commands = [
@@ -15,6 +16,7 @@ export const commands = [
   ...statsCommands,
   ...favoritesCommands,
   ...adminCommands,
+  ...setupCommands,
 ];
 
 export const handleComponentInteraction = async (interaction) => {
