@@ -574,10 +574,13 @@ export default function ProfilePage() {
 
     const daysSet = new Set<string>()
     entries.forEach((entry) => {
-      // Use the meaningful date per status, not updated_at (which imports bump).
-      const raw = entry?.status === "completed"
-        ? entry?.finished_at || entry?.created_at || entry?.updated_at
-        : entry?.created_at || entry?.updated_at
+      // Match the lists page: completed→finished_at, planned→created_at, else→updated_at
+      const raw =
+        entry?.status === "completed"
+          ? entry?.finished_at || entry?.updated_at
+          : entry?.status === "plan_to_watch"
+            ? entry?.created_at || entry?.updated_at
+            : entry?.updated_at || entry?.created_at
       if (!raw) return
       const date = new Date(raw)
       if (Number.isNaN(date.getTime())) return
@@ -622,9 +625,12 @@ export default function ProfilePage() {
   const monthlyStats = React.useMemo(() => {
     const now = new Date()
     const monthEntries = entries.filter((entry) => {
-      const raw = entry?.status === "completed"
-        ? entry?.finished_at || entry?.created_at || entry?.updated_at
-        : entry?.created_at || entry?.updated_at
+      const raw =
+        entry?.status === "completed"
+          ? entry?.finished_at || entry?.updated_at
+          : entry?.status === "plan_to_watch"
+            ? entry?.created_at || entry?.updated_at
+            : entry?.updated_at || entry?.created_at
       const refDate = new Date(raw)
       return !Number.isNaN(refDate.getTime()) &&
         refDate.getMonth() === now.getMonth() &&
@@ -677,34 +683,41 @@ export default function ProfilePage() {
   }, [entries])
 
   const recentActivity = React.useMemo(() => {
-    // Use the most meaningful timestamp per status — updated_at is unreliable
-    // because the DB trigger bumps it on every import write, even for rows that
-    // didn't change. So:
-    //   completed  → finished_at (when you actually finished it)
-    //   planned    → created_at  (when you added it to your list)
-    //   everything else → created_at (when you started tracking it here)
+    // Match the lists page exactly:
+    //   completed → finished_at,  watching → updated_at,  planned → created_at
     const activityTs = (entry: any) => {
-      const value = entry?.status === "completed"
-        ? entry?.finished_at || entry?.created_at || entry?.updated_at
-        : entry?.created_at || entry?.updated_at
+      const value =
+        entry?.status === "completed"
+          ? entry?.finished_at || entry?.updated_at
+          : entry?.status === "plan_to_watch"
+            ? entry?.created_at || entry?.updated_at
+            : entry?.updated_at || entry?.created_at
       return value ? new Date(value).getTime() : 0
     }
+
+    const toDateShort = (value: string | null | undefined) =>
+      value
+        ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+        : ""
 
     return entries
       .filter((entry) => entry?.media)
       .sort((left, right) => activityTs(right) - activityTs(left))
       .slice(0, 5)
       .map((entry) => {
-        const ts = entry?.status === "completed"
-          ? entry?.finished_at || entry?.created_at || entry?.updated_at
-          : entry?.created_at || entry?.updated_at
+        const ts =
+          entry?.status === "completed"
+            ? entry?.finished_at || entry?.updated_at
+            : entry?.status === "plan_to_watch"
+              ? entry?.created_at || entry?.updated_at
+              : entry?.updated_at || entry?.created_at
         return {
           anime: getMediaTitle(entry.media),
           episode: getEntryDisplayProgress(entry),
           status: entry.status,
           image: entry?.media?.coverImage?.large || "",
           score: normalizeEntryScore(entry?.score),
-          time: formatRelativeTime(ts),
+          time: toDateShort(ts),
         }
       })
   }, [entries])

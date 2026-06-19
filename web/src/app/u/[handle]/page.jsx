@@ -141,12 +141,14 @@ const buildActivityText = (entry) => {
 }
 
 const getListTimestamp = (entry, listType) => {
-  // Use the most meaningful date per list type — updated_at gets bumped on
-  // every import, so it's not reliable for "when did this happen".
+  // Match the lists page exactly:
+  //   completed → finished_at,  watching → updated_at,  planned → created_at
   const raw =
     listType === "completed"
-      ? entry?.finished_at || entry?.created_at || entry?.updated_at
-      : entry?.created_at || entry?.updated_at
+      ? entry?.finished_at || entry?.updated_at
+      : listType === "planned"
+        ? entry?.created_at || entry?.updated_at
+        : entry?.updated_at || entry?.created_at
   const relative = formatRelativeTime(raw)
   if (!relative) return ""
 
@@ -491,9 +493,13 @@ export default function PublicProfilePage() {
 
     const daysSet = new Set()
     entries.forEach((entry) => {
-      const raw = entry?.status === "completed"
-        ? entry?.finished_at || entry?.created_at || entry?.updated_at
-        : entry?.created_at || entry?.updated_at
+      // Match the lists page: completed→finished_at, planned→created_at, else→updated_at
+      const raw =
+        entry?.status === "completed"
+          ? entry?.finished_at || entry?.updated_at
+          : entry?.status === "plan_to_watch"
+            ? entry?.created_at || entry?.updated_at
+            : entry?.updated_at || entry?.created_at
       if (!raw) return
       const date = new Date(raw)
       if (Number.isNaN(date.getTime())) return
@@ -547,28 +553,38 @@ export default function PublicProfilePage() {
   )
 
   const recentActivity = React.useMemo(() => {
-    // Use the most meaningful timestamp per status — updated_at is unreliable
-    // because the DB trigger bumps it on every import write, even for rows that
-    // didn't change.
+    // Match the lists page exactly:
+    //   completed → finished_at,  watching → updated_at,  planned → created_at
     const activityTs = (entry) => {
-      const value = entry?.status === "completed"
-        ? entry?.finished_at || entry?.created_at || entry?.updated_at
-        : entry?.created_at || entry?.updated_at
+      const value =
+        entry?.status === "completed"
+          ? entry?.finished_at || entry?.updated_at
+          : entry?.status === "plan_to_watch"
+            ? entry?.created_at || entry?.updated_at
+            : entry?.updated_at || entry?.created_at
       return value ? new Date(value).getTime() : 0
     }
+
+    const toDateShort = (value) =>
+      value
+        ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+        : ""
 
     return [...entries]
       .sort((left, right) => activityTs(right) - activityTs(left))
       .slice(0, 4)
       .map((entry) => {
-        const ts = entry?.status === "completed"
-          ? entry?.finished_at || entry?.created_at || entry?.updated_at
-          : entry?.created_at || entry?.updated_at
+        const ts =
+          entry?.status === "completed"
+            ? entry?.finished_at || entry?.updated_at
+            : entry?.status === "plan_to_watch"
+              ? entry?.created_at || entry?.updated_at
+              : entry?.updated_at || entry?.created_at
         return {
           id: entry.id,
           anime: getMediaTitle(entry?.media),
           action: buildActivityText(entry),
-          time: formatRelativeTime(ts),
+          time: toDateShort(ts),
           image: entry?.media?.coverImage?.large || entry?.media?.coverImage?.extraLarge || "",
           href: entry?.media ? getMediaHref(entry.media) : `/media/${entry.media_id}`,
         }
