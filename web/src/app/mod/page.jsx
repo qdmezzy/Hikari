@@ -24,6 +24,10 @@ import {
   ShieldCheck,
   UserCog,
   Ban,
+  Inbox,
+  Bug,
+  Lightbulb,
+  MessageCircle,
 } from "lucide-react"
 import RequireAuth from "@/components/common/RequireAuth"
 import useAuth from "@/hooks/useAuth"
@@ -48,6 +52,8 @@ import {
   fetchModStats,
   banUserAccount,
   unbanUserAccount,
+  fetchFeedback,
+  setFeedbackResolved,
 } from "@/lib/admin-service"
 import {
   fetchAnnouncements,
@@ -66,6 +72,7 @@ const NAV = [
   { id: "forms", label: "Forms", icon: MessagesSquare },
   { id: "announcements", label: "Announcements", icon: Megaphone },
   { id: "reports", label: "Reports", icon: Flag },
+  { id: "feedback", label: "Feedback", icon: Inbox },
 ]
 
 function formatRelativeTime(value) {
@@ -842,6 +849,161 @@ function ReportsSection({ user }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Feedback                                                           */
+/* ------------------------------------------------------------------ */
+const FEEDBACK_META = {
+  bug: { label: "Bug", icon: Bug, color: "bg-rose-500/15 text-rose-400" },
+  idea: { label: "Idea", icon: Lightbulb, color: "bg-amber-500/15 text-amber-400" },
+  general: { label: "General", icon: MessageCircle, color: "bg-cyan-500/15 text-cyan-400" },
+}
+
+function FeedbackSection() {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [filter, setFilter] = useState("open")
+  const [workingId, setWorkingId] = useState("")
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError("")
+    try {
+      setItems(await fetchFeedback())
+    } catch (e) {
+      setError(e?.message || "Could not load feedback.")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const toggleResolved = async (item) => {
+    setWorkingId(item.id)
+    try {
+      await setFeedbackResolved(item.id, !item.resolved)
+      setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, resolved: !x.resolved } : x)))
+    } catch (e) {
+      setError(e?.message || "Could not update feedback.")
+    } finally {
+      setWorkingId("")
+    }
+  }
+
+  const filtered = useMemo(() => {
+    if (filter === "open") return items.filter((i) => !i.resolved)
+    if (filter === "resolved") return items.filter((i) => i.resolved)
+    return items
+  }, [items, filter])
+
+  const counts = useMemo(
+    () => ({
+      bug: items.filter((i) => i.category === "bug" && !i.resolved).length,
+      idea: items.filter((i) => i.category === "idea" && !i.resolved).length,
+      open: items.filter((i) => !i.resolved).length,
+    }),
+    [items],
+  )
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard icon={Inbox} label="Open" value={counts.open} tone="primary" />
+        <StatCard icon={Bug} label="Open bugs" value={counts.bug} tone="danger" />
+        <StatCard icon={Lightbulb} label="Open ideas" value={counts.idea} tone="warning" />
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-card/60 p-1">
+          {[
+            { id: "open", label: "Open" },
+            { id: "resolved", label: "Resolved" },
+            { id: "all", label: "All" },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setFilter(t.id)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+                filter === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          {loading ? <Loader2 className="size-4 animate-spin" /> : "Refresh"}
+        </Button>
+      </div>
+
+      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60">
+        {loading ? (
+          <div className="p-10 text-center text-sm text-muted-foreground">
+            <Loader2 className="mx-auto mb-2 size-5 animate-spin" />
+            Loading feedback…
+          </div>
+        ) : error ? (
+          <div className="p-10 text-center text-sm text-destructive">{error}</div>
+        ) : filtered.length === 0 ? (
+          <div className="p-10 text-center text-sm text-muted-foreground">No {filter === "all" ? "" : filter} feedback.</div>
+        ) : (
+          filtered.map((item) => {
+            const meta = FEEDBACK_META[item.category] || FEEDBACK_META.general
+            const MetaIcon = meta.icon
+            return (
+              <div key={item.id} className="flex flex-col gap-3 border-b border-border/30 p-4 last:border-0 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex min-w-0 gap-3">
+                  <div className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", meta.color)}>
+                    <MetaIcon className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="text-xs">{meta.label}</Badge>
+                      {item.resolved ? (
+                        <Badge className="gap-1 bg-emerald-500/15 text-emerald-500 text-xs">
+                          <CheckCircle className="size-3" /> Resolved
+                        </Badge>
+                      ) : null}
+                      <span className="text-xs text-muted-foreground">{formatRelativeTime(item.created_at)}</span>
+                    </div>
+                    <p className="mt-1.5 whitespace-pre-wrap text-sm text-foreground">{item.message}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      {item.email ? <span>✉️ {item.email}</span> : item.user_id ? <span>👤 {shortId(item.user_id)}</span> : <span>Anonymous</span>}
+                      {item.page_url ? (
+                        <a href={item.page_url} target="_blank" rel="noreferrer" className="truncate text-primary hover:underline">
+                          {item.page_url.replace(/^https?:\/\/[^/]+/, "") || "page"}
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant={item.resolved ? "outline" : "secondary"}
+                  size="sm"
+                  className="shrink-0"
+                  disabled={workingId === item.id}
+                  onClick={() => toggleResolved(item)}
+                >
+                  {workingId === item.id ? (
+                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle className="mr-1.5 size-3.5" />
+                  )}
+                  {item.resolved ? "Reopen" : "Resolve"}
+                </Button>
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /* Shell                                                              */
 /* ------------------------------------------------------------------ */
 function Dashboard({ user }) {
@@ -955,6 +1117,7 @@ function Dashboard({ user }) {
           {active === "forms" && <FormsSection user={user} />}
           {active === "announcements" && <AnnouncementsSection user={user} />}
           {active === "reports" && <ReportsSection user={user} />}
+          {active === "feedback" && <FeedbackSection />}
         </main>
       </div>
     </div>

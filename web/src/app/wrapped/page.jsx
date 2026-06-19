@@ -688,7 +688,26 @@ function WrappedLoader() {
   return <WrappedStory data={view} year={year} years={years} onYearChange={setYear} onClose={close} />
 }
 
+// Wrapped is currently moderator-only — everyone else is redirected away.
 export default function WrappedPage() {
+  const { user, loading } = useAuth()
+  const isMod = user?.app_metadata?.is_mod === true || user?.app_metadata?.isMod === true
+
+  useEffect(() => {
+    if (!loading && !isMod && typeof window !== "undefined") {
+      window.location.replace("/profile")
+    }
+  }, [loading, isMod])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    )
+  }
+  if (!isMod) return null
+
   return (
     <RequireAuth>
       <WrappedLoader />

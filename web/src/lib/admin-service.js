@@ -83,6 +83,24 @@ export const reviewBanAppeal = async (appealId, approve, note) => {
   if (error) throw new Error(error.message || "Could not review appeal.")
 }
 
+// ---------------------------------------------------------------------------
+// Feedback / bug reports (mod-readable via RLS)
+// ---------------------------------------------------------------------------
+export const fetchFeedback = async () => {
+  const { data, error } = await client
+    .from("feedback")
+    .select("id, user_id, email, category, message, page_url, resolved, created_at")
+    .order("created_at", { ascending: false })
+    .limit(300)
+  if (error) throw new Error(error.message || "Could not load feedback.")
+  return data || []
+}
+
+export const setFeedbackResolved = async (id, resolved) => {
+  const { error } = await client.from("feedback").update({ resolved: Boolean(resolved) }).eq("id", id)
+  if (error) throw new Error(error.message || "Could not update feedback.")
+}
+
 export const setUserMod = async (userId, makeMod) => {
   const { error } = await client.rpc("admin_set_user_mod", {
     target_user_id: userId,

@@ -20,7 +20,34 @@ FOR INSERT
 TO anon, authenticated
 WITH CHECK (true);
 
--- No SELECT/UPDATE/DELETE policy: feedback is readable only via the service role
--- (e.g. the Supabase dashboard or an admin tool), never the public client.
+-- Optional triage flag mods can toggle.
+ALTER TABLE public.feedback ADD COLUMN IF NOT EXISTS resolved BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Moderators can read feedback (shown in the Mod dashboard). Regular users can
+-- still only insert — they never read others' submissions.
+DROP POLICY IF EXISTS "Mods can read feedback" ON public.feedback;
+CREATE POLICY "Mods can read feedback"
+ON public.feedback
+FOR SELECT
+TO authenticated
+USING (
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
+);
+
+-- Mods can mark feedback resolved.
+DROP POLICY IF EXISTS "Mods can update feedback" ON public.feedback;
+CREATE POLICY "Mods can update feedback"
+ON public.feedback
+FOR UPDATE
+TO authenticated
+USING (
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
+)
+WITH CHECK (
+  COALESCE((auth.jwt() -> 'app_metadata' ->> 'is_mod')::boolean, false)
+  OR COALESCE((auth.jwt() -> 'app_metadata' ->> 'isMod')::boolean, false)
+);
 
 CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON public.feedback(created_at DESC);
