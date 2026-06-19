@@ -574,13 +574,13 @@ export default function ProfilePage() {
 
     const daysSet = new Set<string>()
     entries.forEach((entry) => {
-      // Match the lists page: completed→finished_at, planned→created_at, else→updated_at
+      // Mirror lists page: completed→finished_at, watching→updated_at, else→created_at
       const raw =
         entry?.status === "completed"
           ? entry?.finished_at || entry?.updated_at
-          : entry?.status === "plan_to_watch"
-            ? entry?.created_at || entry?.updated_at
-            : entry?.updated_at || entry?.created_at
+          : entry?.status === "watching" || entry?.status === "rewatching"
+            ? entry?.updated_at || entry?.created_at
+            : entry?.created_at || entry?.updated_at
       if (!raw) return
       const date = new Date(raw)
       if (Number.isNaN(date.getTime())) return
@@ -628,9 +628,9 @@ export default function ProfilePage() {
       const raw =
         entry?.status === "completed"
           ? entry?.finished_at || entry?.updated_at
-          : entry?.status === "plan_to_watch"
-            ? entry?.created_at || entry?.updated_at
-            : entry?.updated_at || entry?.created_at
+          : entry?.status === "watching" || entry?.status === "rewatching"
+            ? entry?.updated_at || entry?.created_at
+            : entry?.created_at || entry?.updated_at
       const refDate = new Date(raw)
       return !Number.isNaN(refDate.getTime()) &&
         refDate.getMonth() === now.getMonth() &&
@@ -683,15 +683,17 @@ export default function ProfilePage() {
   }, [entries])
 
   const recentActivity = React.useMemo(() => {
-    // Match the lists page exactly:
-    //   completed → finished_at,  watching → updated_at,  planned → created_at
+    // Mirror the lists page detailText logic EXACTLY:
+    //   completed  → finished_at
+    //   watching   → updated_at
+    //   planned/on_hold/dropped → created_at (lists page shows "Added" for these)
     const activityTs = (entry: any) => {
       const value =
         entry?.status === "completed"
           ? entry?.finished_at || entry?.updated_at
-          : entry?.status === "plan_to_watch"
-            ? entry?.created_at || entry?.updated_at
-            : entry?.updated_at || entry?.created_at
+          : entry?.status === "watching" || entry?.status === "rewatching"
+            ? entry?.updated_at || entry?.created_at
+            : entry?.created_at || entry?.updated_at
       return value ? new Date(value).getTime() : 0
     }
 
@@ -708,9 +710,9 @@ export default function ProfilePage() {
         const ts =
           entry?.status === "completed"
             ? entry?.finished_at || entry?.updated_at
-            : entry?.status === "plan_to_watch"
-              ? entry?.created_at || entry?.updated_at
-              : entry?.updated_at || entry?.created_at
+            : entry?.status === "watching" || entry?.status === "rewatching"
+              ? entry?.updated_at || entry?.created_at
+              : entry?.created_at || entry?.updated_at
         return {
           anime: getMediaTitle(entry.media),
           episode: getEntryDisplayProgress(entry),

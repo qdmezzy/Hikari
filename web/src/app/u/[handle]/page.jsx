@@ -141,14 +141,13 @@ const buildActivityText = (entry) => {
 }
 
 const getListTimestamp = (entry, listType) => {
-  // Match the lists page exactly:
-  //   completed → finished_at,  watching → updated_at,  planned → created_at
+  // Mirror the lists page: completed→finished_at, watching→updated_at, else→created_at
   const raw =
     listType === "completed"
       ? entry?.finished_at || entry?.updated_at
-      : listType === "planned"
-        ? entry?.created_at || entry?.updated_at
-        : entry?.updated_at || entry?.created_at
+      : listType === "watching"
+        ? entry?.updated_at || entry?.created_at
+        : entry?.created_at || entry?.updated_at
   const relative = formatRelativeTime(raw)
   if (!relative) return ""
 
@@ -171,6 +170,14 @@ const getListTimestamp = (entry, listType) => {
 const getListItems = (entries) => {
   const ts = (value) => (value ? new Date(value).getTime() : 0)
 
+  // Per-status sort timestamp — must match the date shown for each list type
+  // (otherwise entries would appear out of order relative to their labels).
+  const sortTs = (entry, listType) => {
+    if (listType === "completed") return ts(entry?.finished_at || entry?.updated_at)
+    if (listType === "watching") return ts(entry?.updated_at || entry?.created_at)
+    return ts(entry?.created_at || entry?.updated_at)
+  }
+
   const watching = entries.filter((entry) => ["watching", "rewatching"].includes(entry?.status))
   const completed = entries.filter((entry) => entry?.status === "completed")
   const planned = entries.filter((entry) => entry?.status === "plan_to_watch")
@@ -179,12 +186,11 @@ const getListItems = (entries) => {
 
   // Plan to Watch: oldest added first.
   planned.sort((a, b) => ts(a.created_at) - ts(b.created_at))
-  // Completed: most recently finished first (fall back to updated_at).
-  completed.sort((a, b) => ts(b.finished_at || b.updated_at) - ts(a.finished_at || a.updated_at))
-  // Watching / on-hold / dropped: most recent activity first.
-  watching.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
-  onhold.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
-  dropped.sort((a, b) => ts(b.updated_at) - ts(a.updated_at))
+  // All others: most recent first (based on the date each list type displays).
+  completed.sort((a, b) => sortTs(b, "completed") - sortTs(a, "completed"))
+  watching.sort((a, b) => sortTs(b, "watching") - sortTs(a, "watching"))
+  onhold.sort((a, b) => sortTs(b, "onhold") - sortTs(a, "onhold"))
+  dropped.sort((a, b) => sortTs(b, "dropped") - sortTs(a, "dropped"))
 
   return { watching, completed, planned, onhold, dropped }
 }
@@ -493,13 +499,13 @@ export default function PublicProfilePage() {
 
     const daysSet = new Set()
     entries.forEach((entry) => {
-      // Match the lists page: completed→finished_at, planned→created_at, else→updated_at
+      // Mirror lists page: completed→finished_at, watching→updated_at, else→created_at
       const raw =
         entry?.status === "completed"
           ? entry?.finished_at || entry?.updated_at
-          : entry?.status === "plan_to_watch"
-            ? entry?.created_at || entry?.updated_at
-            : entry?.updated_at || entry?.created_at
+          : entry?.status === "watching" || entry?.status === "rewatching"
+            ? entry?.updated_at || entry?.created_at
+            : entry?.created_at || entry?.updated_at
       if (!raw) return
       const date = new Date(raw)
       if (Number.isNaN(date.getTime())) return
@@ -553,15 +559,17 @@ export default function PublicProfilePage() {
   )
 
   const recentActivity = React.useMemo(() => {
-    // Match the lists page exactly:
-    //   completed → finished_at,  watching → updated_at,  planned → created_at
+    // Mirror the lists page detailText logic EXACTLY:
+    //   completed  → finished_at
+    //   watching   → updated_at
+    //   planned/on_hold/dropped → created_at
     const activityTs = (entry) => {
       const value =
         entry?.status === "completed"
           ? entry?.finished_at || entry?.updated_at
-          : entry?.status === "plan_to_watch"
-            ? entry?.created_at || entry?.updated_at
-            : entry?.updated_at || entry?.created_at
+          : entry?.status === "watching" || entry?.status === "rewatching"
+            ? entry?.updated_at || entry?.created_at
+            : entry?.created_at || entry?.updated_at
       return value ? new Date(value).getTime() : 0
     }
 
@@ -577,9 +585,9 @@ export default function PublicProfilePage() {
         const ts =
           entry?.status === "completed"
             ? entry?.finished_at || entry?.updated_at
-            : entry?.status === "plan_to_watch"
-              ? entry?.created_at || entry?.updated_at
-              : entry?.updated_at || entry?.created_at
+            : entry?.status === "watching" || entry?.status === "rewatching"
+              ? entry?.updated_at || entry?.created_at
+              : entry?.created_at || entry?.updated_at
         return {
           id: entry.id,
           anime: getMediaTitle(entry?.media),
