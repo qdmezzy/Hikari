@@ -211,344 +211,356 @@ const watchStatusChoices = statusChoices.map((choice) => ({
   value: choice.value,
 }));
 
-const watchingCommand = {
-  data: new SlashCommandBuilder()
-    .setName("watching")
-    .setDescription("Show currently watched anime for yourself, a Hikari username, or linked @user.")
-    .addUserOption((option) => option.setName("user").setDescription("Linked Discord user"))
-    .addStringOption((option) => option.setName("username").setDescription("Hikari username")),
-  async execute(interaction) {
-    const userOpt = interaction.options.getUser("user");
-    const usernameOpt = interaction.options.getString("username");
+// ---- Subcommand handlers ----------------------------------------------
 
-    try {
-      const targetResult = await resolveTarget({
-        requesterDiscordId: interaction.user.id,
-        mentionDiscordId: userOpt?.id,
-        username: usernameOpt,
-      });
+const handleShow = async (interaction) => {
+  const userOpt = interaction.options.getUser("user");
+  const usernameOpt = interaction.options.getString("username");
 
-      if (!targetResult.ok) {
-        await replyError(interaction, targetResult.message);
-        return;
-      }
+  try {
+    const targetResult = await resolveTarget({
+      requesterDiscordId: interaction.user.id,
+      mentionDiscordId: userOpt?.id,
+      username: usernameOpt,
+    });
 
-      const { hikariUserId, handle, profile } = targetResult.target;
-      const entries = await getListEntriesByUser(hikariUserId, {
-        statuses: ["watching", "rewatching"],
-        limit: 200,
-      });
-      const preview = await buildListPreview(entries, 5);
-      const lines = preview.map((item, index) => `${index + 1}. ${item.title} - Ep ${item.progress}`);
-      const weekCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
-      const episodesThisWeek = (entries || [])
-        .filter((entry) => new Date(entry.updated_at || 0).getTime() >= weekCutoff)
-        .reduce((sum, entry) => sum + Number(entry.progress || 0), 0);
-      const displayHandle = handle ? `@${handle}` : "User";
-      const displayName = profile?.display_name || handle || "Hikari User";
-      const avatarUrl = profile?.avatar_url || null;
-
-      const embed = new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setTitle("Currently Watching")
-        .setDescription(
-          [
-            `${displayHandle}`,
-            lines.length ? lines.join("\n") : "No active watching entries.",
-          ].join("\n\n"),
-        )
-        .addFields(
-          { name: "TOTAL SHOWS", value: String(entries.length), inline: true },
-          { name: "EPISODES THIS WEEK", value: String(episodesThisWeek), inline: true },
-        )
-        .setFooter({ text: "光 Hikari" })
-        .setTimestamp();
-      if (avatarUrl) {
-        embed.setAuthor({ name: displayName, iconURL: avatarUrl });
-      }
-      const components = [];
-      if (handle) {
-        components.push(
-          new ActionRowBuilder().addComponents(
-            new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("View Full List").setURL(listUrl(handle)),
-          ),
-        );
-      }
-
-      await respond(interaction, { embeds: [embed], components });
-    } catch (error) {
-      await replyError(interaction, error?.message || "Failed to load watching list.");
+    if (!targetResult.ok) {
+      await replyError(interaction, targetResult.message);
+      return;
     }
-  },
-};
 
-const addCommand = {
-  data: new SlashCommandBuilder()
-    .setName("add")
-    .setDescription("Add an anime to your list (defaults to Planned).")
-    .addStringOption((option) => option.setName("anime").setDescription("Anime title").setRequired(true)),
-  async execute(interaction) {
-    const animeInput = interaction.options.getString("anime", true);
-    const link = await requireLinkedUser(interaction);
-    if (!link) return;
+    const { hikariUserId, handle, profile } = targetResult.target;
+    const entries = await getListEntriesByUser(hikariUserId, {
+      statuses: ["watching", "rewatching"],
+      limit: 200,
+    });
+    const preview = await buildListPreview(entries, 5);
+    const lines = preview.map((item, index) => `${index + 1}. ${item.title} - Ep ${item.progress}`);
+    const weekCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const episodesThisWeek = (entries || [])
+      .filter((entry) => new Date(entry.updated_at || 0).getTime() >= weekCutoff)
+      .reduce((sum, entry) => sum + Number(entry.progress || 0), 0);
+    const displayHandle = handle ? `@${handle}` : "User";
+    const displayName = profile?.display_name || handle || "Hikari User";
+    const avatarUrl = profile?.avatar_url || null;
 
-    try {
-      const media = await findAnimeForCommand(animeInput);
-      const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
-      if (existing) {
-        await replyError(interaction, `${mediaTitle(media)} is already in your list.`);
-        return;
-      }
-
-      const created = await upsertEntry({
-        hikariUserId: link.hikari_user_id,
-        mediaId: media.id,
-        status: "plan_to_watch",
-        progress: 0,
-        before: null,
-      });
-
-      rememberUndo(interaction.user.id, {
-        type: "restore_entry",
-        hikariUserId: link.hikari_user_id,
-        mediaId: media.id,
-        before: null,
-        after: created,
-      });
-
-      await replySuccess(interaction, `**${mediaTitle(media)}** was added as **Planned**.`, {
-        title: "Added to List",
-      });
-    } catch (error) {
-      await replyError(interaction, error?.message || "Failed to add anime.");
+    const embed = new EmbedBuilder()
+      .setColor(0x3b82f6)
+      .setTitle("Currently Watching")
+      .setDescription(
+        [`${displayHandle}`, lines.length ? lines.join("\n") : "No active watching entries."].join("\n\n"),
+      )
+      .addFields(
+        { name: "TOTAL SHOWS", value: String(entries.length), inline: true },
+        { name: "EPISODES THIS WEEK", value: String(episodesThisWeek), inline: true },
+      )
+      .setFooter({ text: "光 Hikari" })
+      .setTimestamp();
+    if (avatarUrl) {
+      embed.setAuthor({ name: displayName, iconURL: avatarUrl });
     }
-  },
-};
-
-const statusCommand = {
-  data: new SlashCommandBuilder()
-    .setName("status")
-    .setDescription("Set list status for an anime.")
-    .addStringOption((option) => option.setName("anime").setDescription("Anime title").setRequired(true))
-    .addStringOption((option) =>
-      option
-        .setName("state")
-        .setDescription("New status")
-        .setRequired(true)
-        .addChoices(...watchStatusChoices),
-    ),
-  async execute(interaction) {
-    const animeInput = interaction.options.getString("anime", true);
-    const stateInput = normalizeStatusInput(interaction.options.getString("state", true));
-    const link = await requireLinkedUser(interaction);
-    if (!link) return;
-
-    try {
-      const media = await findAnimeForCommand(animeInput);
-      const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
-      const before = existing ? { ...existing } : null;
-      const progress = existing?.progress || 0;
-
-      const updated = await upsertEntry({
-        hikariUserId: link.hikari_user_id,
-        mediaId: media.id,
-        status: stateInput,
-        progress,
-        before: existing,
-      });
-
-      rememberUndo(interaction.user.id, {
-        type: "restore_entry",
-        hikariUserId: link.hikari_user_id,
-        mediaId: media.id,
-        before,
-        after: updated,
-      });
-
-      const statusEmbed = new EmbedBuilder()
-        .setColor(0x22c55e)
-        .setTitle("Status Updated")
-        .setDescription(`**${mediaTitle(media)}** has been marked as **${normalizeStatusForDisplay(stateInput)}**.`)
-        .addFields(
-          { name: "Previous", value: normalizeStatusForDisplay(before?.status || "plan_to_watch"), inline: true },
-          { name: "New Status", value: normalizeStatusForDisplay(stateInput), inline: true },
-        )
-        .setFooter({ text: "光 Hikari" })
-        .setTimestamp();
-
-      await respond(interaction, { embeds: [statusEmbed] });
-    } catch (error) {
-      await replyError(interaction, error?.message || "Failed to update status.");
-    }
-  },
-};
-
-const progressCommand = {
-  data: new SlashCommandBuilder()
-    .setName("progress")
-    .setDescription("Set episode progress for an anime.")
-    .addStringOption((option) => option.setName("anime").setDescription("Anime title").setRequired(true))
-    .addIntegerOption((option) =>
-      option.setName("number").setDescription("Episode progress number").setRequired(true).setMinValue(0),
-    ),
-  async execute(interaction) {
-    const animeInput = interaction.options.getString("anime", true);
-    const progressValue = interaction.options.getInteger("number", true);
-    const link = await requireLinkedUser(interaction);
-    if (!link) return;
-
-    try {
-      const media = await findAnimeForCommand(animeInput);
-      const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
-      const before = existing ? { ...existing } : null;
-
-      let nextStatus = existing?.status || "watching";
-      if (media.episodes && progressValue >= media.episodes) {
-        nextStatus = "completed";
-      } else if (nextStatus === "plan_to_watch" && progressValue > 0) {
-        nextStatus = "watching";
-      }
-
-      const updated = await upsertEntry({
-        hikariUserId: link.hikari_user_id,
-        mediaId: media.id,
-        status: nextStatus,
-        progress: progressValue,
-        before: existing,
-      });
-
-      rememberUndo(interaction.user.id, {
-        type: "restore_entry",
-        hikariUserId: link.hikari_user_id,
-        mediaId: media.id,
-        before,
-        after: updated,
-      });
-
-      const embed = buildProgressEmbed({ media, progress: progressValue, status: nextStatus });
-      const row = buildProgressActionRow(media.id);
-      await respond(interaction, { embeds: [embed], components: [row] });
-    } catch (error) {
-      await replyError(interaction, error?.message || "Failed to update progress.");
-    }
-  },
-};
-
-const plusOneCommand = {
-  data: new SlashCommandBuilder()
-    .setName("plusone")
-    .setDescription("Increment episode progress by +1.")
-    .addStringOption((option) => option.setName("anime").setDescription("Anime title (optional)")),
-  async execute(interaction) {
-    const animeInput = interaction.options.getString("anime");
-    const link = await requireLinkedUser(interaction);
-    if (!link) return;
-
-    try {
-      let media = null;
-      let existing = null;
-      if (animeInput) {
-        media = await findAnimeForCommand(animeInput);
-        existing = await getEntryByMediaId(link.hikari_user_id, media.id);
-      } else {
-        const [latestWatching] = await getListEntriesByUser(link.hikari_user_id, {
-          statuses: ["watching", "rewatching"],
-          limit: 1,
-        });
-        if (!latestWatching) {
-          await replyError(interaction, "No active watching entry found. Pass an anime name with `/plusone <anime>`.");
-          return;
-        }
-        const mediaList = await getAnimeByIds([latestWatching.media_id]);
-        media = mediaList?.[0] || null;
-        existing = latestWatching;
-      }
-
-      if (!media) {
-        await replyError(interaction, "Could not resolve anime for plus one.");
-        return;
-      }
-
-      const { before, updated, nextProgress, nextStatus } = await applyPlusOne({
-        hikariUserId: link.hikari_user_id,
-        media,
-        existing,
-      });
-
-      rememberUndo(interaction.user.id, {
-        type: "restore_entry",
-        hikariUserId: link.hikari_user_id,
-        mediaId: media.id,
-        before,
-        after: updated,
-      });
-
-      const embed = buildProgressEmbed({ media, progress: nextProgress, status: nextStatus });
-      const row = buildProgressActionRow(media.id);
-      await respond(interaction, { embeds: [embed], components: [row] });
-    } catch (error) {
-      await replyError(interaction, error?.message || "Failed to increment progress.");
-    }
-  },
-};
-
-const removeCommand = {
-  data: new SlashCommandBuilder()
-    .setName("remove")
-    .setDescription("Remove an anime from your list.")
-    .addStringOption((option) => option.setName("anime").setDescription("Anime title").setRequired(true)),
-  async execute(interaction) {
-    const animeInput = interaction.options.getString("anime", true);
-    const link = await requireLinkedUser(interaction);
-    if (!link) return;
-
-    try {
-      const media = await findAnimeForCommand(animeInput);
-      const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
-      if (!existing) {
-        await replyError(interaction, `${mediaTitle(media)} is not currently in your list.`, { title: "Not Found" });
-        return;
-      }
-
-      const before = { ...existing };
-      const { error } = await supabase.from(listTable).delete().eq("id", existing.id);
-      if (error) throw error;
-
-      rememberUndo(interaction.user.id, {
-        type: "restore_deleted",
-        row: before,
-      });
-      const removedEmbed = new EmbedBuilder()
-        .setColor(0xf59e0b)
-        .setTitle("Anime Removed")
-        .setDescription(`**${mediaTitle(media)}** has been removed from your list.`)
-        .addFields(
-          { name: "EPISODES WATCHED", value: String(before.progress || 0), inline: true },
-          { name: "PREVIOUS STATUS", value: normalizeStatusForDisplay(before.status), inline: true },
-          { name: "Undo", value: "Use `/undo` to restore this entry.", inline: false },
-        )
-        .setFooter({ text: "光 Hikari" })
-        .setTimestamp();
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`${trackingPrefix}:undo`).setLabel("Undo").setStyle(ButtonStyle.Secondary),
+    const components = [];
+    if (handle) {
+      components.push(
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("View Full List").setURL(listUrl(handle)),
+        ),
       );
-      await respond(interaction, { embeds: [removedEmbed], components: [row] });
-    } catch (error) {
-      await replyError(interaction, error?.message || "Failed to remove anime.");
+    }
+
+    await respond(interaction, { embeds: [embed], components });
+  } catch (error) {
+    await replyError(interaction, error?.message || "Failed to load watching list.");
+  }
+};
+
+const handleAdd = async (interaction) => {
+  const animeInput = interaction.options.getString("anime", true);
+  const link = await requireLinkedUser(interaction);
+  if (!link) return;
+
+  try {
+    const media = await findAnimeForCommand(animeInput);
+    const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
+    if (existing) {
+      await replyError(interaction, `${mediaTitle(media)} is already in your list.`);
+      return;
+    }
+
+    const created = await upsertEntry({
+      hikariUserId: link.hikari_user_id,
+      mediaId: media.id,
+      status: "plan_to_watch",
+      progress: 0,
+      before: null,
+    });
+
+    rememberUndo(interaction.user.id, {
+      type: "restore_entry",
+      hikariUserId: link.hikari_user_id,
+      mediaId: media.id,
+      before: null,
+      after: created,
+    });
+
+    await replySuccess(interaction, `**${mediaTitle(media)}** was added as **Planned**.`, {
+      title: "Added to List",
+    });
+  } catch (error) {
+    await replyError(interaction, error?.message || "Failed to add anime.");
+  }
+};
+
+const handleStatus = async (interaction) => {
+  const animeInput = interaction.options.getString("anime", true);
+  const stateInput = normalizeStatusInput(interaction.options.getString("state", true));
+  const link = await requireLinkedUser(interaction);
+  if (!link) return;
+
+  try {
+    const media = await findAnimeForCommand(animeInput);
+    const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
+    const before = existing ? { ...existing } : null;
+    const progress = existing?.progress || 0;
+
+    const updated = await upsertEntry({
+      hikariUserId: link.hikari_user_id,
+      mediaId: media.id,
+      status: stateInput,
+      progress,
+      before: existing,
+    });
+
+    rememberUndo(interaction.user.id, {
+      type: "restore_entry",
+      hikariUserId: link.hikari_user_id,
+      mediaId: media.id,
+      before,
+      after: updated,
+    });
+
+    const statusEmbed = new EmbedBuilder()
+      .setColor(0x22c55e)
+      .setTitle("Status Updated")
+      .setDescription(`**${mediaTitle(media)}** has been marked as **${normalizeStatusForDisplay(stateInput)}**.`)
+      .addFields(
+        { name: "Previous", value: normalizeStatusForDisplay(before?.status || "plan_to_watch"), inline: true },
+        { name: "New Status", value: normalizeStatusForDisplay(stateInput), inline: true },
+      )
+      .setFooter({ text: "光 Hikari" })
+      .setTimestamp();
+
+    await respond(interaction, { embeds: [statusEmbed] });
+  } catch (error) {
+    await replyError(interaction, error?.message || "Failed to update status.");
+  }
+};
+
+const handleProgress = async (interaction) => {
+  const animeInput = interaction.options.getString("anime", true);
+  const progressValue = interaction.options.getInteger("episode", true);
+  const link = await requireLinkedUser(interaction);
+  if (!link) return;
+
+  try {
+    const media = await findAnimeForCommand(animeInput);
+    const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
+    const before = existing ? { ...existing } : null;
+
+    let nextStatus = existing?.status || "watching";
+    if (media.episodes && progressValue >= media.episodes) {
+      nextStatus = "completed";
+    } else if (nextStatus === "plan_to_watch" && progressValue > 0) {
+      nextStatus = "watching";
+    }
+
+    const updated = await upsertEntry({
+      hikariUserId: link.hikari_user_id,
+      mediaId: media.id,
+      status: nextStatus,
+      progress: progressValue,
+      before: existing,
+    });
+
+    rememberUndo(interaction.user.id, {
+      type: "restore_entry",
+      hikariUserId: link.hikari_user_id,
+      mediaId: media.id,
+      before,
+      after: updated,
+    });
+
+    const embed = buildProgressEmbed({ media, progress: progressValue, status: nextStatus });
+    const row = buildProgressActionRow(media.id);
+    await respond(interaction, { embeds: [embed], components: [row] });
+  } catch (error) {
+    await replyError(interaction, error?.message || "Failed to update progress.");
+  }
+};
+
+const handleNext = async (interaction) => {
+  const animeInput = interaction.options.getString("anime");
+  const link = await requireLinkedUser(interaction);
+  if (!link) return;
+
+  try {
+    let media = null;
+    let existing = null;
+    if (animeInput) {
+      media = await findAnimeForCommand(animeInput);
+      existing = await getEntryByMediaId(link.hikari_user_id, media.id);
+    } else {
+      const [latestWatching] = await getListEntriesByUser(link.hikari_user_id, {
+        statuses: ["watching", "rewatching"],
+        limit: 1,
+      });
+      if (!latestWatching) {
+        await replyError(interaction, "No active watching entry found. Try `/list next anime:<title>`.");
+        return;
+      }
+      const mediaList = await getAnimeByIds([latestWatching.media_id]);
+      media = mediaList?.[0] || null;
+      existing = latestWatching;
+    }
+
+    if (!media) {
+      await replyError(interaction, "Could not resolve anime for the next episode.");
+      return;
+    }
+
+    const { before, updated, nextProgress, nextStatus } = await applyPlusOne({
+      hikariUserId: link.hikari_user_id,
+      media,
+      existing,
+    });
+
+    rememberUndo(interaction.user.id, {
+      type: "restore_entry",
+      hikariUserId: link.hikari_user_id,
+      mediaId: media.id,
+      before,
+      after: updated,
+    });
+
+    const embed = buildProgressEmbed({ media, progress: nextProgress, status: nextStatus });
+    const row = buildProgressActionRow(media.id);
+    await respond(interaction, { embeds: [embed], components: [row] });
+  } catch (error) {
+    await replyError(interaction, error?.message || "Failed to increment progress.");
+  }
+};
+
+const handleRemove = async (interaction) => {
+  const animeInput = interaction.options.getString("anime", true);
+  const link = await requireLinkedUser(interaction);
+  if (!link) return;
+
+  try {
+    const media = await findAnimeForCommand(animeInput);
+    const existing = await getEntryByMediaId(link.hikari_user_id, media.id);
+    if (!existing) {
+      await replyError(interaction, `${mediaTitle(media)} is not currently in your list.`, { title: "Not Found" });
+      return;
+    }
+
+    const before = { ...existing };
+    const { error } = await supabase.from(listTable).delete().eq("id", existing.id);
+    if (error) throw error;
+
+    rememberUndo(interaction.user.id, {
+      type: "restore_deleted",
+      row: before,
+    });
+    const removedEmbed = new EmbedBuilder()
+      .setColor(0xf59e0b)
+      .setTitle("Anime Removed")
+      .setDescription(`**${mediaTitle(media)}** has been removed from your list.`)
+      .addFields(
+        { name: "EPISODES WATCHED", value: String(before.progress || 0), inline: true },
+        { name: "PREVIOUS STATUS", value: normalizeStatusForDisplay(before.status), inline: true },
+        { name: "Changed your mind?", value: "Tap **Undo** below to restore this entry.", inline: false },
+      )
+      .setFooter({ text: "光 Hikari" })
+      .setTimestamp();
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`${trackingPrefix}:undo`).setLabel("Undo").setStyle(ButtonStyle.Secondary),
+    );
+    await respond(interaction, { embeds: [removedEmbed], components: [row] });
+  } catch (error) {
+    await replyError(interaction, error?.message || "Failed to remove anime.");
+  }
+};
+
+// ---- One /list command with subcommands -------------------------------
+
+const listCommand = {
+  data: new SlashCommandBuilder()
+    .setName("list")
+    .setDescription("Manage and view your Hikari anime list.")
+    .addSubcommand((s) =>
+      s
+        .setName("show")
+        .setDescription("Show what you (or someone) are currently watching.")
+        .addUserOption((o) => o.setName("user").setDescription("Linked Discord user"))
+        .addStringOption((o) => o.setName("username").setDescription("Hikari username")),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("add")
+        .setDescription("Add an anime to your list (defaults to Planned).")
+        .addStringOption((o) => o.setName("anime").setDescription("Anime title").setRequired(true)),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("next")
+        .setDescription("Watch the next episode (+1). Defaults to your latest show.")
+        .addStringOption((o) => o.setName("anime").setDescription("Anime title (optional)")),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("update")
+        .setDescription("Set episode progress for an anime.")
+        .addStringOption((o) => o.setName("anime").setDescription("Anime title").setRequired(true))
+        .addIntegerOption((o) =>
+          o.setName("episode").setDescription("Episode number").setRequired(true).setMinValue(0),
+        ),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("status")
+        .setDescription("Set the status of an anime (watching, completed, …).")
+        .addStringOption((o) => o.setName("anime").setDescription("Anime title").setRequired(true))
+        .addStringOption((o) =>
+          o.setName("state").setDescription("New status").setRequired(true).addChoices(...watchStatusChoices),
+        ),
+    )
+    .addSubcommand((s) =>
+      s
+        .setName("remove")
+        .setDescription("Remove an anime from your list.")
+        .addStringOption((o) => o.setName("anime").setDescription("Anime title").setRequired(true)),
+    ),
+  async execute(interaction) {
+    switch (interaction.options.getSubcommand()) {
+      case "show":
+        return handleShow(interaction);
+      case "add":
+        return handleAdd(interaction);
+      case "next":
+        return handleNext(interaction);
+      case "update":
+        return handleProgress(interaction);
+      case "status":
+        return handleStatus(interaction);
+      case "remove":
+        return handleRemove(interaction);
+      default:
+        return replyError(interaction, "Unknown subcommand.");
     }
   },
 };
 
-const undoCommand = {
-  data: new SlashCommandBuilder().setName("undo").setDescription("Undo your last tracking mutation."),
-  async execute(interaction) {
-    try {
-      await runUndo(interaction);
-    } catch (error) {
-      await replyError(interaction, error?.message || "Undo failed.");
-    }
-  },
-};
+// ---- Button handlers (Undo / +1 stay as buttons, not commands) ---------
 
 export const isTrackingComponent = (interaction) =>
   String(interaction.customId || "").startsWith(`${trackingPrefix}:`);
@@ -612,12 +624,4 @@ export const handleTrackingComponent = async (interaction) => {
   return false;
 };
 
-export const trackingCommands = [
-  watchingCommand,
-  addCommand,
-  statusCommand,
-  progressCommand,
-  plusOneCommand,
-  undoCommand,
-  removeCommand,
-];
+export const trackingCommands = [listCommand];
