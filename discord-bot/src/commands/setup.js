@@ -210,4 +210,126 @@ const setupCommand = {
   },
 };
 
-export const setupCommands = [setupCommand];
+// ---------------------------------------------------------------------------
+// /secure — apply permissions to an EXISTING category and its channels.
+// Only edits permission overwrites; never creates/deletes anything, so all
+// messages are preserved. Use this on the channels you already have.
+// ---------------------------------------------------------------------------
+const secureCommand = {
+  data: new SlashCommandBuilder()
+    .setName("secure")
+    .setDescription("Apply permissions to an existing category & its channels (keeps all messages).")
+    .addChannelOption((o) =>
+      o
+        .setName("category")
+        .setDescription("The category to update")
+        .addChannelTypes(ChannelType.GuildCategory)
+        .setRequired(true),
+    )
+    .addStringOption((o) =>
+      o
+        .setName("mode")
+        .setDescription("How to lock it down")
+        .setRequired(true)
+        .addChoices(
+          { name: "🔒 Staff only — hide from everyone", value: "staff" },
+          { name: "📢 Read-only — anyone can view, only staff post", value: "readonly" },
+          { name: "🌐 Public — reset to default (anyone view + post)", value: "reset" },
+        ),
+    )
+    .addRoleOption((o) =>
+      o.setName("role").setDescription("Role allowed in (staff/read-only modes). Defaults to a Staff role."),
+    )
+    .setDMPermission(false)
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  async execute(interaction) {
+    if (!interaction.inGuild()) {
+      await replyError(interaction, "Run this in a server, not a DM.");
+      return;
+    }
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
+      await replyError(interaction, "You need the **Administrator** permission to run this.", { title: "Not Allowed" });
+      return;
+    }
+
+    const guild = interaction.guild;
+    const me = guild.members.me;
+    if (!me?.permissions.has(PermissionFlagsBits.ManageChannels) || !me?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+      await replyError(
+        interaction,
+        "I need **Manage Channels** and **Manage Roles** to edit permissions. Grant them and try again.",
+        { title: "Missing Permissions" },
+      );
+      return;
+    }
+
+    const category = interaction.options.getChannel("category");
+    const mode = interaction.options.getString("mode");
+    let role = interaction.options.getRole("role");
+
+    if (category?.type !== ChannelType.GuildCategory) {
+      await replyError(interaction, "Pick a **category**, not a regular channel.");
+      return;
+    }
+
+    await interaction.deferReply({ ephemeral: true });
+
+    const everyoneId = guild.roles.everyone.id;
+
+    // Staff / read-only modes need a role to allow in. Default to (or create) "Staff".
+    if ((mode === "staff" || mode === "readonly") && !role) {
+      await guild.roles.fetch().catch(() => {});
+      role =
+        guild.roles.cache.find((r) => r.name.toLowerCase() === STAFF_ROLE_NAME.toLowerCase()) ||
+        (await guild.roles
+          .create({ name: STAFF_ROLE_NAME, color: 0x22d3ee, hoist: true, reason: "Hikari /secure" })
+          .catch(() => null));
+    }
+
+    let overwrites = [];
+    if (mode === "staff") {
+      overwrites = [
+        { id: everyoneId, deny: [PermissionFlagsBits.ViewChannel] },
+        { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages] },
+      ];
+      if (role) overwrites.push({ id: role.id, allow: [PermissionFlagsBits.ViewChannel] });
+    } else if (mode === "readonly") {
+      overwrites = [
+        {
+          id: everyoneId,
+          deny: [
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.CreatePublicThreads,
+            PermissionFlagsBits.CreatePrivateThreads,
+          ],
+        },
+      ];
+      if (role) overwrites.push({ id: role.id, allow: [PermissionFlagsBits.SendMessages] });
+    } // reset → empty overwrites
+
+    try {
+      await category.permissionOverwrites.set(overwrites, "Hikari /secure");
+      // Sync every channel in the category to the category's permissions.
+      let synced = 0;
+      for (const child of category.children.cache.values()) {
+        await child.lockPermissions().catch(() => {});
+        synced += 1;
+      }
+
+      const label =
+        mode === "staff"
+          ? `🔒 locked to **@${role?.name || "(no role)"}**`
+          : mode === "readonly"
+            ? `📢 set to read-only (only **@${role?.name || "staff"}** can post)`
+            : "🌐 reset to default (public)";
+
+      await interaction.editReply({
+        content: `✅ **${category.name}** ${label}.\nSynced **${synced}** channel${synced === 1 ? "" : "s"} inside it — all messages kept.`,
+      });
+    } catch (error) {
+      await interaction.editReply({ content: `⚠️ Couldn't update **${category.name}**: ${error?.message || "unknown error"}.` });
+    }
+  },
+};
+
+export const setupCommands = [setupCommand, secureCommand];
