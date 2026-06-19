@@ -110,17 +110,32 @@ export const fetchAniListMediaByIds = async (ids = []) => {
   })
 
   if (missing.length) {
-    for (const batch of chunkIds(missing, 50)) {
-      const data = await fetchAniList(MEDIA_BY_IDS_QUERY, {
-        ids: batch,
-        perPage: batch.length,
+    // Go through our own media API (DB-cached) rather than AniList directly.
+    // Falls back to the AniList proxy if /api/media is unavailable.
+    let mediaList = []
+    try {
+      const res = await fetch("/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: missing }),
       })
-      const mediaList = data?.Page?.media || []
-      mediaList.forEach((media) => {
-        mediaCache.set(media.id, media)
-        mediaById.set(media.id, media)
-      })
+      if (res.ok) {
+        const json = await res.json()
+        mediaList = Array.isArray(json?.media) ? json.media : []
+      } else {
+        throw new Error("media endpoint error")
+      }
+    } catch {
+      for (const batch of chunkIds(missing, 50)) {
+        const data = await fetchAniList(MEDIA_BY_IDS_QUERY, { ids: batch, perPage: batch.length })
+        mediaList.push(...(data?.Page?.media || []))
+      }
     }
+
+    mediaList.forEach((media) => {
+      mediaCache.set(media.id, media)
+      mediaById.set(media.id, media)
+    })
     persistMediaCache()
   }
 
