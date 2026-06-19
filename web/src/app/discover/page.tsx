@@ -183,6 +183,10 @@ export default function DiscoverPage() {
   const personalGenresRef = useRef<string[]>([])
   const personalExcludeRef = useRef<number[]>([])
   const [personalizedReady, setPersonalizedReady] = useState(false)
+  // Load the feed exactly once, after we know whether/how to personalize it,
+  // so personalization never reloads (and cuts off) a trailer that's playing.
+  const [tasteResolved, setTasteResolved] = useState(false)
+  const feedLoadedRef = useRef(false)
   // Which media are already on the user's list (id -> status), to reflect the save button.
   const [savedStatus, setSavedStatus] = useState<Record<number, string>>({})
   const savingRef = useRef<Set<number>>(new Set())
@@ -436,29 +440,39 @@ export default function DiscoverPage() {
     }
   }, [goToNext, goToPrev])
 
+  // Initial load — runs once, only after personalization is resolved, so the
+  // first feed is already personalized and nothing reloads mid-trailer.
   useEffect(() => {
+    if (!tasteResolved || feedLoadedRef.current) return
+    feedLoadedRef.current = true
     loadFeedPage(discoverStartPageRef.current)
-  }, [loadFeedPage])
+  }, [tasteResolved, loadFeedPage])
 
   // Build a taste profile from the user's list: top genres (to bias the feed)
   // and the ids they already track (to exclude). Then refresh "For You".
   useEffect(() => {
     let active = true
+    if (authLoading) return // wait for auth to resolve before deciding
     if (!user) {
       personalGenresRef.current = []
       personalExcludeRef.current = []
       setPersonalizedReady(false)
       setSavedStatus({})
       setSaved({})
+      setTasteResolved(true) // signed out → load the generic feed
       return
     }
 
     const loadTaste = async () => {
       const { data, error } = await client
         .from("list_entries")
-        .select("media_id, status, media_type")
+        .select("media_id, status, score, media_type, updated_at")
         .eq("user_id", user.id)
-      if (!active || error || !data?.length) return
+      if (!active) return
+      if (error || !data?.length) {
+        setTasteResolved(true)
+        return
+      }
 
       // Reflect which titles are already tracked on the save buttons.
       const statusMap: Record<number, string> = {}
@@ -506,15 +520,11 @@ export default function DiscoverPage() {
           .map(([name]) => name)
         if (!active) return
         personalGenresRef.current = topGenres
-        if (topGenres.length) {
-          setPersonalizedReady(true)
-          // Refresh the "For You" feed with the personalized query.
-          if (activeVibeRef.current === "all") {
-            loadFeedPage(discoverStartPageRef.current)
-          }
-        }
+        if (topGenres.length) setPersonalizedReady(true)
       } catch {
         /* ignore — fall back to the generic feed */
+      } finally {
+        if (active) setTasteResolved(true) // now load the (personalized) feed
       }
     }
 
@@ -523,7 +533,7 @@ export default function DiscoverPage() {
       active = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, loadFeedPage])
+  }, [user, authLoading])
 
   useEffect(() => {
     if (!hasMore || loadingMore) return
