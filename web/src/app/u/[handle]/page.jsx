@@ -80,6 +80,17 @@ const formatRelativeTime = (value) => {
   return `${months}mo ago`
 }
 
+// Relative for recent activity, but a real date once it's old (so it reads
+// "Jan 3, 2024" instead of an unhelpful "21mo ago").
+const formatSmartTime = (value) => {
+  if (!value) return ""
+  const timestamp = new Date(value).getTime()
+  if (Number.isNaN(timestamp)) return ""
+  const days = (Date.now() - timestamp) / 86400000
+  if (days < 30) return formatRelativeTime(value)
+  return new Date(timestamp).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+}
+
 const formatEntryScore = (value) => {
   const numeric = Number(value || 0)
   if (!numeric) return null
@@ -103,8 +114,9 @@ const getTotalUnits = (entry) => {
 }
 
 const getProgressText = (entry) => {
-  const progress = Number(entry?.progress || 0)
   const total = getTotalUnits(entry)
+  // Completed entries always read as fully watched/read, never partial.
+  const progress = getEntryDisplayProgress(entry)
 
   if (total > 0) return `${progress}/${total}`
   return `${progress}`
@@ -148,22 +160,22 @@ const getListTimestamp = (entry, listType) => {
       : listType === "watching"
         ? entry?.updated_at || entry?.created_at
         : entry?.created_at || entry?.updated_at
-  const relative = formatRelativeTime(raw)
-  if (!relative) return ""
+  const when = formatSmartTime(raw)
+  if (!when) return ""
 
   switch (listType) {
     case "watching":
-      return `Updated ${relative}`
+      return `Last watched ${when}`
     case "completed":
-      return `Completed ${relative}`
+      return `Completed ${when}`
     case "planned":
-      return `Added ${relative}`
+      return `Added ${when}`
     case "onhold":
-      return `Paused ${relative}`
+      return `Paused ${when}`
     case "dropped":
-      return `Dropped ${relative}`
+      return `Dropped ${when}`
     default:
-      return relative
+      return when
   }
 }
 
