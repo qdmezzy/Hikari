@@ -19,6 +19,8 @@ export default function CalendarPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [viewMode, setViewMode] = useState("calendar")
   const [statusFilters, setStatusFilters] = useState(["watching", "rewatching", "on_hold"])
+  // "mine" = only what you track · "all" = the whole current season.
+  const [scheduleScope, setScheduleScope] = useState("mine")
   const [notifyIds, setNotifyIds] = useState([])
   const [schedule, setSchedule] = useState([])
   const [loadingSchedule, setLoadingSchedule] = useState(true)
@@ -48,6 +50,31 @@ export default function CalendarPage() {
     }
   }
   `
+
+  // Whole current-season airing schedule (for the "All Airing" tab).
+  const ALL_AIRING_QUERY = `
+  query ($season: MediaSeason, $seasonYear: Int, $perPage: Int) {
+    Page(perPage: $perPage) {
+      media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: POPULARITY_DESC, isAdult: false) {
+        id
+        title { romaji english }
+        coverImage { large }
+        episodes
+        nextAiringEpisode { airingAt timeUntilAiring episode }
+      }
+    }
+  }
+  `
+
+  const getCurrentSeason = () => {
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const year = now.getFullYear()
+    if (month <= 3) return { season: "WINTER", year }
+    if (month <= 6) return { season: "SPRING", year }
+    if (month <= 9) return { season: "SUMMER", year }
+    return { season: "FALL", year }
+  }
 
   const chunkIds = (ids, size) => {
     const batches = []
@@ -112,6 +139,50 @@ export default function CalendarPage() {
 
       setLoadingSchedule(true)
       setScheduleError("")
+
+      const toUpcoming = (mediaList) =>
+        mediaList
+          .filter((media) => media?.nextAiringEpisode)
+          .map((media) => ({
+            id: media.id,
+            title: media.title?.english || media.title?.romaji || "Untitled",
+            cover: media.coverImage?.large,
+            episode: media.nextAiringEpisode.episode,
+            airingAt: media.nextAiringEpisode.airingAt,
+            timeUntilAiring: media.nextAiringEpisode.timeUntilAiring,
+            totalEpisodes: media.episodes,
+          }))
+          .sort((a, b) => a.airingAt - b.airingAt)
+
+      // "All Airing" — the whole current season, regardless of your list.
+      if (scheduleScope === "all") {
+        try {
+          const { season, year } = getCurrentSeason()
+          const res = await fetch("/api/anilist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: ALL_AIRING_QUERY, variables: { season, seasonYear: year, perPage: 50 } }),
+          })
+          const json = await res.json()
+          if (!res.ok || json?.errors) {
+            throw new Error(json?.errors?.[0]?.message || "Failed to load airing schedule.")
+          }
+          const upcoming = toUpcoming(json?.data?.Page?.media ?? [])
+          if (isActive) {
+            setSchedule(upcoming)
+            const nextDate = upcoming[0]?.airingAt ? new Date(upcoming[0].airingAt * 1000) : new Date()
+            setCurrentMonth(nextDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }))
+            setLoadingSchedule(false)
+          }
+        } catch (err) {
+          console.error("Failed to load schedule:", err)
+          if (isActive) {
+            setScheduleError(err.message || "Could not load the airing schedule.")
+            setLoadingSchedule(false)
+          }
+        }
+        return
+      }
 
       if (!statusFilters.length) {
         setSchedule([])
@@ -202,7 +273,8 @@ export default function CalendarPage() {
     return () => {
       isActive = false
     }
-  }, [user, statusFilters])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, statusFilters, scheduleScope])
 
   const groupedSchedule = useMemo(() => {
     const grouped = schedule.reduce((acc, item) => {
@@ -243,7 +315,11 @@ export default function CalendarPage() {
             <div className="mt-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <h1 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">Airing schedule</h1>
-                <p className="mt-2 text-pretty text-muted-foreground">Upcoming episodes from the titles on your list.</p>
+                <p className="mt-2 text-pretty text-muted-foreground">
+                  {scheduleScope === "all"
+                    ? "Upcoming episodes across the whole current season."
+                    : "Upcoming episodes from the titles on your list."}
+                </p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -290,24 +366,50 @@ export default function CalendarPage() {
             </div>
           </header>
 
-          <div className="mb-6 mt-8 flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">Show</span>
-            {STATUS_OPTIONS.map((status) => (
+          {/* Scope tabs: your list vs the whole season */}
+          <div className="mt-8 flex w-fit items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+            {[
+              { id: "mine", label: "My List" },
+              { id: "all", label: "All Airing" },
+            ].map((scope) => (
               <button
-                key={status.id}
+                key={scope.id}
                 type="button"
-                onClick={() => toggleStatusFilter(status.id)}
+                onClick={() => setScheduleScope(scope.id)}
                 className={cn(
-                  "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                  statusFilters.includes(status.id)
+                  "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
+                  scheduleScope === scope.id
                     ? "bg-primary text-primary-foreground"
-                    : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {status.label}
+                {scope.label}
               </button>
             ))}
           </div>
+
+          {scheduleScope === "mine" ? (
+            <div className="mb-6 mt-4 flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted-foreground">Show</span>
+              {STATUS_OPTIONS.map((status) => (
+                <button
+                  key={status.id}
+                  type="button"
+                  onClick={() => toggleStatusFilter(status.id)}
+                  className={cn(
+                    "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    statusFilters.includes(status.id)
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {status.label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mb-6 mt-4" />
+          )}
 
           {loading || loadingSchedule ? (
             <div className="space-y-3">
