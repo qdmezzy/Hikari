@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { buildHikariLinkUrl, config } from "../config.js";
 import { embedColors } from "../lib/embeds.js";
+import { EMOJI } from "../lib/emojis.js";
 
 const FOOTER = "光 Hikari";
 
@@ -102,7 +103,7 @@ const buildHomeEmbed = () =>
   new EmbedBuilder()
     .setColor(embedColors.brand)
     .setAuthor({ name: "Hikari • Help" })
-    .setTitle("✨ What is Hikari?")
+    .setTitle(`${EMOJI.sparkle} What is Hikari?`)
     .setDescription(`${ABOUT}\n\n**Pick a category below** to see its commands.`)
     .addFields(
       categories.map((cat) => ({

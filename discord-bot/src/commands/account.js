@@ -7,6 +7,7 @@ import {
   buildSuccessEmbed,
   buildWarningEmbed,
 } from "../lib/embeds.js";
+import { EMOJI } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { getLinkByDiscordId, removeLinkByDiscordId, safeLinkTableMessage } from "../services/links.js";
 import { buildWatchingLine, getListCounts, getListEntriesByUser, getTopGenres } from "../services/profiles.js";
@@ -33,7 +34,7 @@ const linkCommand = {
         description: "Your Discord is connected to Hikari — track anime right from here.",
       }).addFields(
         { name: "👤 Username", value: existing.hikari_username || "Linked user", inline: true },
-        { name: "🎞️ Entries", value: `**${entries.length}**`, inline: true },
+        { name: `${EMOJI.episodes} Entries`, value: `**${entries.length}**`, inline: true },
       );
     } else {
       embed = buildInfoEmbed({

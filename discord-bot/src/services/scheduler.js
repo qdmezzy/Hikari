@@ -1,6 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 import { config } from "../config.js";
 import { getAiringSchedule, mediaTitle } from "../lib/anilist.js";
+import { EMOJI } from "../lib/emojis.js";
 import { getGuildsWithAlerts } from "./guilds.js";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -25,7 +26,7 @@ const buildAiringEmbed = (schedules) => {
 
   return new EmbedBuilder()
     .setColor(0x6c5ce7)
-    .setTitle("📅 Airing in the next 24 hours")
+    .setTitle(`${EMOJI.calendar} Airing in the next 24 hours`)
     .setDescription(lines.join("\n") || "Nothing scheduled right now.")
     .setFooter({ text: `Track everything on Hikari · ${config.hikariWebBaseUrl}` })
     .setTimestamp();

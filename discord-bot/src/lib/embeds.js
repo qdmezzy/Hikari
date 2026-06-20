@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import { config } from "../config.js";
+import { EMOJI } from "./emojis.js";
 
 // Brand palette tuned to the Hikari web app (primary blue → cyan accent).
 export const embedColors = {
@@ -56,13 +57,13 @@ export const buildInfoEmbed = ({ title, description, url } = {}) =>
   buildBaseEmbed({ color: embedColors.info, title, description, url });
 
 export const buildSuccessEmbed = ({ title, description, url } = {}) =>
-  buildBaseEmbed({ color: embedColors.success, title: title ? `✅  ${title}` : title, description, url });
+  buildBaseEmbed({ color: embedColors.success, title: title ? `${EMOJI.check}  ${title}` : title, description, url });
 
 export const buildWarningEmbed = ({ title, description, url } = {}) =>
-  buildBaseEmbed({ color: embedColors.warning, title: title ? `⚠️  ${title}` : title, description, url });
+  buildBaseEmbed({ color: embedColors.warning, title: title ? `${EMOJI.warning}  ${title}` : title, description, url });
 
 export const buildErrorEmbed = ({ title = "Request Failed", description } = {}) =>
-  buildBaseEmbed({ color: embedColors.error, title: `🚫  ${title}`, description });
+  buildBaseEmbed({ color: embedColors.error, title: `${EMOJI.cross}  ${title}`, description });
 
 export const profileUrl = (handle) =>
   handle ? `${config.hikariWebBaseUrl}/u/${encodeURIComponent(handle)}` : config.hikariWebBaseUrl;
@@ -92,25 +93,25 @@ export const buildProfileEmbed = ({ handle, displayName, avatarUrl, watchingLine
   const embed = buildBaseEmbed({
     color: embedColors.brand,
     title: safeName,
-    description: `🎬 **Now Watching**\n> ${nowWatching}`,
+    description: `${EMOJI.nowWatching} **Now Watching**\n> ${nowWatching}`,
     url: profileUrl(handle),
   }).addFields(
-    { name: "✅ Completed", value: `\`\`\`\n${c.completed || 0}\n\`\`\``, inline: true },
-    { name: "▶️ Watching", value: `\`\`\`\n${c.watching || 0}\n\`\`\``, inline: true },
-    { name: "🗓️ Planned", value: `\`\`\`\n${c.plan_to_watch || 0}\n\`\`\``, inline: true },
-    { name: "⏸️ On Hold", value: `\`\`\`\n${c.on_hold || 0}\n\`\`\``, inline: true },
-    { name: "🚫 Dropped", value: `\`\`\`\n${c.dropped || 0}\n\`\`\``, inline: true },
-    { name: "🎞️ Episodes", value: `\`\`\`\n${(totalEpisodes || 0).toLocaleString()}\n\`\`\``, inline: true },
+    { name: `${EMOJI.completed} Completed`, value: `\`\`\`\n${c.completed || 0}\n\`\`\``, inline: true },
+    { name: `${EMOJI.watching} Watching`, value: `\`\`\`\n${c.watching || 0}\n\`\`\``, inline: true },
+    { name: `${EMOJI.planned} Planned`, value: `\`\`\`\n${c.plan_to_watch || 0}\n\`\`\``, inline: true },
+    { name: `${EMOJI.onHold} On Hold`, value: `\`\`\`\n${c.on_hold || 0}\n\`\`\``, inline: true },
+    { name: `${EMOJI.dropped} Dropped`, value: `\`\`\`\n${c.dropped || 0}\n\`\`\``, inline: true },
+    { name: `${EMOJI.episodes} Episodes`, value: `\`\`\`\n${(totalEpisodes || 0).toLocaleString()}\n\`\`\``, inline: true },
   );
 
   embed.addFields({
-    name: "📊 Library",
-    value: `**${total.toLocaleString()}** titles tracked  ·  ⏱️ ~**${timeWatched}** watched`,
+    name: `${EMOJI.library} Library`,
+    value: `**${total.toLocaleString()}** titles tracked  ·  ${EMOJI.time} ~**${timeWatched}** watched`,
     inline: false,
   });
 
   if (topGenres?.length) {
-    embed.addFields({ name: "🎭 Top Genres", value: topGenres.map((g) => `\`${g}\``).join("  "), inline: false });
+    embed.addFields({ name: `${EMOJI.genres} Top Genres`, value: topGenres.map((g) => `\`${g}\``).join("  "), inline: false });
   }
 
   if (handle) embed.setAuthor({ name: `@${handle}` });
@@ -129,7 +130,7 @@ export const buildProfileButtons = ({ handle }) =>
 export const buildAnimeEmbed = (media) => {
   const title = media?.title?.english || media?.title?.romaji || "Unknown anime";
   const score10 = Number.isFinite(Number(media?.averageScore))
-    ? `⭐ ${(Number(media.averageScore) / 10).toFixed(1)} / 10`
+    ? `${EMOJI.star} ${(Number(media.averageScore) / 10).toFixed(1)} / 10`
     : "Not rated";
   const episodes = media?.episodes ?? "?";
   const type = media?.format ? String(media.format).replace(/_/g, " ") : "Anime";
@@ -146,15 +147,15 @@ export const buildAnimeEmbed = (media) => {
     description: desc,
     url: animeUrl(media?.id),
   }).addFields(
-    { name: "Rating", value: score10, inline: true },
-    { name: "📺 Format", value: String(type), inline: true },
-    { name: "🎞️ Episodes", value: String(episodes), inline: true },
-    { name: "📅 Year", value: String(year), inline: true },
-    { name: "📡 Status", value: status, inline: true },
+    { name: `${EMOJI.star} Rating`, value: score10, inline: true },
+    { name: `${EMOJI.format} Format`, value: String(type), inline: true },
+    { name: `${EMOJI.episodes} Episodes`, value: String(episodes), inline: true },
+    { name: `${EMOJI.year} Year`, value: String(year), inline: true },
+    { name: `${EMOJI.status} Status`, value: status, inline: true },
   );
 
-  if (genres.length) embed.addFields({ name: "🎭 Genres", value: genres.join("  •  "), inline: false });
-  if (studios.length) embed.addFields({ name: "🎨 Studio", value: studios.slice(0, 3).join(", "), inline: true });
+  if (genres.length) embed.addFields({ name: `${EMOJI.genres} Genres`, value: genres.join("  •  "), inline: false });
+  if (studios.length) embed.addFields({ name: `${EMOJI.studio} Studio`, value: studios.slice(0, 3).join(", "), inline: true });
   if (cover) embed.setThumbnail(cover);
 
   return embed;
@@ -164,13 +165,13 @@ export const buildAnimeButtons = (media) =>
   new ActionRowBuilder().addComponents(linkButton("Open on Hikari", animeUrl(media?.id), "▶️"));
 
 const STATUS_EMOJI = {
-  Watching: "▶️",
-  Completed: "✅",
-  Planned: "🗓️",
-  "Plan to Watch": "🗓️",
-  "On Hold": "⏸️",
-  Dropped: "🚫",
-  Rewatching: "🔁",
+  Watching: EMOJI.watching,
+  Completed: EMOJI.completed,
+  Planned: EMOJI.planned,
+  "Plan to Watch": EMOJI.planned,
+  "On Hold": EMOJI.onHold,
+  Dropped: EMOJI.dropped,
+  Rewatching: EMOJI.rewatching,
 };
 
 export const buildListEmbed = ({ handle, displayName, statusLabel: label, previewItems }) => {
