@@ -1,0 +1,50 @@
+🐛 BUGS FOUND
+🔴 Critical
+1. Discover page is completely broken
+
+URL: /discover
+The page shows "Loading discover feed..." forever and never renders content
+Console error: TypeError: Cannot read properties of null (reading 'replace') in chunk 30ea11065999f7ac.js
+Page title falls back to generic "Next.js · Hikari" (error state)
+This is a core feature that's completely non-functional
+2. "Add to List" on homepage navigates to detail page instead of adding
+
+On the featured carousel, clicking "Add to List" navigates to /media/{id} — the exact same behavior as "View Details"
+Expected: prompt sign-in, or open a quick-add modal, or add to list if authenticated
+Both buttons are functionally identical right now
+🟠 High
+3. Calendar/Schedule requires login to view
+
+/calendar (linked from nav as "Schedule" and from homepage "Full Schedule") shows the login page instead of the airing schedule
+The schedule data is already visible on the homepage — it should be accessible at /calendar without auth
+4. "Load more" breaks content in List view
+
+On /search in list view, clicking "Load more" causes all result content to disappear
+Only the "Browse anime" heading and sidebar filters remain
+Grid view "Load more" was not tested but list view is confirmed broken
+🟡 Medium
+5. Episode title missing episode number
+
+On the detail page Episodes tab, the episode title shows: "Episode - That Time I Got Reincarnated as a Slime the Movie: Tears of the Azure Sea | Trailer"
+The episode number between "Episode" and " - " is empty/null
+6. Inconsistent external link protocols (mixed content)
+
+Most Crunchyroll links use https://, but at least one uses http://:
+http://www.crunchyroll.com/one-piece (ONE PIECE on homepage)
+Should be https:// for all external links
+7. /schedule route returns 404 but /calendar works
+
+The nav correctly links to /calendar, but if anyone navigates to /schedule manually they get a dead-end 404 page
+Should redirect /schedule → /calendar
+8. Featured carousel dots unclickable (sticky header overlap)
+
+The carousel navigation dots at the bottom of the hero are covered by the sticky search bar
+Only the leftmost dot is partially accessible; dots 2 and 3 can't be clicked
+Affects desktop viewport (1920×1080)
+🟢 Low
+9. Characters tab: some characters missing Voice Actor label
+
+Kurobee, Vesta, Hakurou, and Rigur don't show a "Voice Actor" line while others (Rimuru, Diablo) do
+May be correct (no VA data), but inconsistent presentation
+
+

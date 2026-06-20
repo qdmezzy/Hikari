@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Navigation } from "@/components/layout/Navigation"
-import RequireAuth from "@/components/common/RequireAuth"
 import { EmptyState } from "@/components/common/EmptyState"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -135,10 +134,11 @@ export default function CalendarPage() {
     let isActive = true
 
     const loadSchedule = async () => {
-      if (!user) return
-
       setLoadingSchedule(true)
       setScheduleError("")
+
+      // Signed-out visitors can still view the whole-season schedule.
+      const effectiveScope = user ? scheduleScope : "all"
 
       const toUpcoming = (mediaList) =>
         mediaList
@@ -155,7 +155,7 @@ export default function CalendarPage() {
           .sort((a, b) => a.airingAt - b.airingAt)
 
       // "All Airing" — the whole current season, regardless of your list.
-      if (scheduleScope === "all") {
+      if (effectiveScope === "all") {
         try {
           const { season, year } = getCurrentSeason()
           const res = await fetch("/api/anilist", {
@@ -302,9 +302,11 @@ export default function CalendarPage() {
     setNotifyIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
   }
 
+  // Signed-out visitors always see the public "All Airing" view.
+  const effectiveScope = user ? scheduleScope : "all"
+
   return (
-    <RequireAuth>
-      <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
         <Navigation />
 
       <main className="pb-16 pt-24 lg:pt-28">
@@ -371,24 +373,34 @@ export default function CalendarPage() {
             {[
               { id: "mine", label: "My List" },
               { id: "all", label: "All Airing" },
-            ].map((scope) => (
-              <button
-                key={scope.id}
-                type="button"
-                onClick={() => setScheduleScope(scope.id)}
-                className={cn(
-                  "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
-                  scheduleScope === scope.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {scope.label}
-              </button>
-            ))}
+            ].map((scope) =>
+              scope.id === "mine" && !user ? (
+                <Link
+                  key={scope.id}
+                  href="/login?next=%2Fcalendar"
+                  className="rounded-lg px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  {scope.label}
+                </Link>
+              ) : (
+                <button
+                  key={scope.id}
+                  type="button"
+                  onClick={() => setScheduleScope(scope.id)}
+                  className={cn(
+                    "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
+                    effectiveScope === scope.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {scope.label}
+                </button>
+              ),
+            )}
           </div>
 
-          {scheduleScope === "mine" ? (
+          {effectiveScope === "mine" ? (
             <div className="mb-6 mt-4 flex flex-wrap items-center gap-2">
               <span className="text-sm text-muted-foreground">Show</span>
               {STATUS_OPTIONS.map((status) => (
@@ -417,24 +429,17 @@ export default function CalendarPage() {
                 <div key={index} className="card-elevated h-24 animate-pulse" />
               ))}
             </div>
-          ) : !user ? (
-            <EmptyState
-              icon={CalendarIcon}
-              title="Sign in to see your schedule"
-              description="Your upcoming episodes appear here once you're signed in."
-              action={
-                <Button asChild>
-                  <Link href="/login">Sign in</Link>
-                </Button>
-              }
-            />
           ) : scheduleError ? (
-            <EmptyState icon={CalendarIcon} title="Couldn't load your schedule" description={scheduleError} />
+            <EmptyState icon={CalendarIcon} title="Couldn't load the schedule" description={scheduleError} />
           ) : schedule.length === 0 ? (
             <EmptyState
               icon={CalendarIcon}
               title="No upcoming episodes"
-              description="Add currently-airing titles to your list and their next episodes will show up here."
+              description={
+                effectiveScope === "all"
+                  ? "Nothing with a confirmed next-episode time right now. Check back soon."
+                  : "Add currently-airing titles to your list and their next episodes will show up here."
+              }
               action={
                 <Button asChild>
                   <Link href="/search">Browse titles</Link>
@@ -578,6 +583,5 @@ export default function CalendarPage() {
         </div>
       </main>
       </div>
-    </RequireAuth>
   )
 }

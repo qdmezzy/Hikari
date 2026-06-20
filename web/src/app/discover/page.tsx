@@ -82,10 +82,12 @@ query ($page: Int, $perPage: Int, $sort: [MediaSort], $genreIn: [String], $idNot
 }
 `
 
-const getVibes = (genres: string[] = [], tags: Array<{ name?: string | null }> = []) => {
+const getVibes = (genres: Array<string | null> = [], tags: Array<{ name?: string | null }> = []) => {
   const vibeSet = new Set<string>()
-  const lowerGenres = genres.map((genre) => genre.toLowerCase())
-  const tagNames = tags.map((tag) => String(tag?.name || "").toLowerCase())
+  const lowerGenres = (Array.isArray(genres) ? genres : [])
+    .filter(Boolean)
+    .map((genre) => String(genre).toLowerCase())
+  const tagNames = (Array.isArray(tags) ? tags : []).map((tag) => String(tag?.name || "").toLowerCase())
 
   if (lowerGenres.some((genre) => ["action", "adventure", "shounen"].includes(genre))) vibeSet.add("hype")
   if (lowerGenres.includes("action")) vibeSet.add("action")
@@ -328,7 +330,13 @@ export default function DiscoverPage() {
           json,
           items: shuffleDiscoverItems(
             ((json?.data?.Page?.media || [])
-              .map(mapMediaToDiscoverItem)
+              .map((media: any) => {
+                try {
+                  return mapMediaToDiscoverItem(media)
+                } catch {
+                  return null // one malformed item must never break the whole feed
+                }
+              })
               .filter(Boolean) as DiscoverItem[])
           ),
           pageInfo: json?.data?.Page?.pageInfo,
@@ -464,34 +472,33 @@ export default function DiscoverPage() {
     }
 
     const loadTaste = async () => {
-      const { data, error } = await client
-        .from("list_entries")
-        .select("media_id, status, score, media_type, updated_at")
-        .eq("user_id", user.id)
-      if (!active) return
-      if (error || !data?.length) {
-        setTasteResolved(true)
-        return
-      }
-
-      // Reflect which titles are already tracked on the save buttons.
-      const statusMap: Record<number, string> = {}
-      const savedMap: Record<number, boolean> = {}
-      data.forEach((entry: any) => {
-        statusMap[entry.media_id] = entry.status
-        savedMap[entry.media_id] = true
-      })
-      if (active) {
-        setSavedStatus(statusMap)
-        setSaved(savedMap)
-      }
-
-      // Build a rating-aware taste profile: weight each title's genres by how
-      // the user engaged with it (status), how recently, and how they rated it.
-      const animeEntries = data.filter((e: any) => (e.media_type || "ANIME") === "ANIME")
-      personalExcludeRef.current = Array.from(new Set(data.map((e: any) => e.media_id)))
-
+      // The whole thing is wrapped so the feed ALWAYS loads (tasteResolved)
+      // even if a query/fetch throws — otherwise Discover gets stuck loading.
       try {
+        const { data, error } = await client
+          .from("list_entries")
+          .select("media_id, status, score, media_type, updated_at")
+          .eq("user_id", user.id)
+        if (!active) return
+        if (error || !data?.length) return
+
+        // Reflect which titles are already tracked on the save buttons.
+        const statusMap: Record<number, string> = {}
+        const savedMap: Record<number, boolean> = {}
+        data.forEach((entry: any) => {
+          statusMap[entry.media_id] = entry.status
+          savedMap[entry.media_id] = true
+        })
+        if (active) {
+          setSavedStatus(statusMap)
+          setSaved(savedMap)
+        }
+
+        // Build a rating-aware taste profile: weight each title's genres by how
+        // the user engaged with it (status), how recently, and how they rated it.
+        const animeEntries = data.filter((e: any) => (e.media_type || "ANIME") === "ANIME")
+        personalExcludeRef.current = Array.from(new Set(data.map((e: any) => e.media_id)))
+
         const mediaById = await fetchAniListMediaByIds(animeEntries.map((e: any) => e.media_id).slice(0, 120))
         const STATUS_WEIGHT: Record<string, number> = {
           completed: 1.2,

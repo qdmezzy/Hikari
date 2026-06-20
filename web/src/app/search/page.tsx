@@ -165,7 +165,13 @@ export default function BrowsePage() {
       if (id !== requestId.current) return
       const pageData = (data as { Page?: any })?.Page
       const nextResults: AniListMedia[] = pageData?.media || []
-      setResults((current) => (append ? [...current, ...nextResults] : nextResults))
+      // Dedupe by id — AniList can repeat titles across pages, and duplicate
+      // React keys make rows drop out ("content disappears" on Load more).
+      setResults((current) => {
+        if (!append) return nextResults
+        const seen = new Set(current.map((m) => m.id))
+        return [...current, ...nextResults.filter((m) => m?.id != null && !seen.has(m.id))]
+      })
       setPage(pageData?.pageInfo?.currentPage || nextPage)
       setHasMore(Boolean(pageData?.pageInfo?.hasNextPage))
       setTotal(pageData?.pageInfo?.total || nextResults.length)

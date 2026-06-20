@@ -166,13 +166,19 @@ export const getMediaHref = (mediaOrId, maybeTitle) => {
 
 export const getPrimaryStudio = (media) => media?.studios?.nodes?.[0]?.name || ""
 
+// Force https so old http:// links (e.g. some Crunchyroll entries) don't get
+// blocked as mixed content on our https site.
+const toHttps = (url) => (typeof url === "string" ? url.replace(/^http:\/\//i, "https://") : url)
+
 export const getStreamingLinks = (media) => {
   const links = Array.isArray(media?.externalLinks) ? media.externalLinks : []
-  const normalized = links.filter(
-    (link) =>
-      link?.url &&
-      (String(link?.type || "").toLowerCase() === "streaming" || STREAMING_SITE_PRIORITY.includes(String(link?.site || ""))),
-  )
+  const normalized = links
+    .filter(
+      (link) =>
+        link?.url &&
+        (String(link?.type || "").toLowerCase() === "streaming" || STREAMING_SITE_PRIORITY.includes(String(link?.site || ""))),
+    )
+    .map((link) => ({ ...link, url: toHttps(link.url) }))
 
   return normalized.sort((left, right) => {
     const leftIndex = STREAMING_SITE_PRIORITY.indexOf(String(left?.site || ""))

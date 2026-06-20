@@ -311,7 +311,11 @@ function UsersSection({ currentUserId }) {
                       <ExternalLink className="mr-1.5 size-3.5" /> Profile
                     </Link>
                   </Button>
-                ) : null}
+                ) : (
+                  <Button variant="outline" size="sm" disabled title="No public profile yet">
+                    <ExternalLink className="mr-1.5 size-3.5" /> Profile
+                  </Button>
+                )}
                 {rolesAvailable ? (
                   <Button
                     variant={u.isMod ? "outline" : "secondary"}

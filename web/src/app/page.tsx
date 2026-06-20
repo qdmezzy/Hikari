@@ -16,6 +16,7 @@ import Link from "next/link"
 import Image from "next/image"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { toast } from "sonner"
 import { RecommendedForYou } from "@/components/home/RecommendedForYou"
 import {
   fetchAniList,
@@ -395,6 +396,26 @@ export default function HomePage() {
   }, [authLoading, user])
 
   const featured = useMemo(() => featuredAnime[currentFeatured] || null, [currentFeatured, featuredAnime])
+  const [addingFeatured, setAddingFeatured] = useState(false)
+
+  const handleAddFeatured = async () => {
+    if (!featured || addingFeatured) return
+    if (!user) {
+      router.push("/login?next=%2F")
+      return
+    }
+    setAddingFeatured(true)
+    const { error } = await client.from("list_entries").upsert(
+      { user_id: user.id, media_id: featured.id, media_type: "ANIME", status: "plan_to_watch", progress: 0 },
+      { onConflict: "user_id,media_id" },
+    )
+    setAddingFeatured(false)
+    if (error) {
+      toast.error("Couldn't add that to your list. Please try again.")
+      return
+    }
+    toast.success(`Added ${featured.title} to Plan to Watch`)
+  }
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
@@ -459,7 +480,7 @@ export default function HomePage() {
           </div>
 
           {/* Hero Content */}
-          <div className="container mx-auto px-4 relative z-10">
+          <div className="container mx-auto px-4 relative z-30">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left Side - Info */}
               <AnimatePresence mode="wait">
@@ -572,14 +593,13 @@ export default function HomePage() {
                         className="flex flex-wrap gap-4 pt-4"
                       >
                         <Button
-                          asChild
                           size="lg"
+                          disabled={addingFeatured}
+                          onClick={handleAddFeatured}
                           className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white font-semibold px-8 shadow-lg shadow-primary/25 group"
                         >
-                          <Link href={getMediaHref(featured.id, featured.title)}>
-                            <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform" />
-                            Add to List
-                          </Link>
+                          <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform" />
+                          Add to List
                         </Button>
                         <Button
                           asChild
@@ -655,7 +675,7 @@ export default function HomePage() {
             </div>
 
             {/* Carousel Indicators */}
-            <div className="flex items-center justify-center gap-3 mt-12">
+            <div className="relative z-40 flex items-center justify-center gap-3 mt-12">
               {(featuredAnime.length ? featuredAnime : Array.from({ length: 3 })).map((_, index) => (
                 <motion.button
                   key={index}
@@ -771,7 +791,9 @@ export default function HomePage() {
                                 {anime.title}
                               </h3>
                               <p className="text-sm text-muted-foreground mt-1">
-                                {anime.totalEp ? `Episode ${anime.currentEp} of ${anime.totalEp}` : `Progress ${anime.currentEp}`}
+                                {anime.totalEp
+                                  ? `Episode ${anime.currentEp ?? 0} of ${anime.totalEp}`
+                                  : `Progress ${anime.currentEp ?? 0}`}
                               </p>
                               {anime.nextEpIn ? (
                                 <Badge variant="outline" className="mt-2 text-xs border-green-500/30 text-green-500 bg-green-500/10">

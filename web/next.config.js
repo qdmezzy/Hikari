@@ -14,6 +14,9 @@ const nextConfig = {
       { protocol: "https", hostname: "img.youtube.com" },
     ],
   },
+  async redirects() {
+    return [{ source: "/schedule", destination: "/calendar", permanent: true }];
+  },
 };
 
 module.exports = nextConfig;
