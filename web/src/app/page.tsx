@@ -513,6 +513,13 @@ export default function HomePage() {
                         transition={{ duration: 0.45, delay: 0.05 }}
                         className="flex flex-wrap items-center gap-2"
                       >
+                        <Link
+                          href="/feedback"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-primary/25 to-accent/25 border border-primary/30 text-primary text-sm font-semibold transition-opacity hover:opacity-90"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Closed Beta
+                        </Link>
                         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/20 text-primary text-sm font-medium">
                           <Flame className="w-3.5 h-3.5" />
                           Trending

@@ -75,23 +75,42 @@ export const listUrl = (handle) =>
 export const buildProfileEmbed = ({ handle, displayName, avatarUrl, watchingLine, counts, topGenres, totalEpisodes = 0 }) => {
   const safeName = displayName || handle || "User";
   const nowWatching = watchingLine || "Nothing in progress";
+  const c = counts || {};
+  const total =
+    (c.watching || 0) +
+    (c.completed || 0) +
+    (c.plan_to_watch || 0) +
+    (c.on_hold || 0) +
+    (c.dropped || 0) +
+    (c.rewatching || 0);
+
+  // Episodes → rough watch time (~24 min/ep).
+  const minutes = (totalEpisodes || 0) * 24;
+  const timeWatched =
+    minutes >= 60 * 24 ? `${(minutes / 60 / 24).toFixed(1)} days` : `${Math.max(0, Math.round(minutes / 60))} hrs`;
 
   const embed = buildBaseEmbed({
     color: embedColors.brand,
     title: safeName,
-    description: `▶️ **Now watching** · ${nowWatching}`,
+    description: `🎬 **Now Watching**\n> ${nowWatching}`,
     url: profileUrl(handle),
   }).addFields(
-    { name: "▶️ Watching", value: `**${counts?.watching || 0}**`, inline: true },
-    { name: "✅ Completed", value: `**${counts?.completed || 0}**`, inline: true },
-    { name: "🗓️ Planned", value: `**${counts?.plan_to_watch || 0}**`, inline: true },
-    { name: "⏸️ On hold", value: `**${counts?.on_hold || 0}**`, inline: true },
-    { name: "🚫 Dropped", value: `**${counts?.dropped || 0}**`, inline: true },
-    { name: "🎞️ Episodes", value: `**${totalEpisodes || 0}**`, inline: true },
+    { name: "✅ Completed", value: `\`\`\`\n${c.completed || 0}\n\`\`\``, inline: true },
+    { name: "▶️ Watching", value: `\`\`\`\n${c.watching || 0}\n\`\`\``, inline: true },
+    { name: "🗓️ Planned", value: `\`\`\`\n${c.plan_to_watch || 0}\n\`\`\``, inline: true },
+    { name: "⏸️ On Hold", value: `\`\`\`\n${c.on_hold || 0}\n\`\`\``, inline: true },
+    { name: "🚫 Dropped", value: `\`\`\`\n${c.dropped || 0}\n\`\`\``, inline: true },
+    { name: "🎞️ Episodes", value: `\`\`\`\n${(totalEpisodes || 0).toLocaleString()}\n\`\`\``, inline: true },
   );
 
+  embed.addFields({
+    name: "📊 Library",
+    value: `**${total.toLocaleString()}** titles tracked  ·  ⏱️ ~**${timeWatched}** watched`,
+    inline: false,
+  });
+
   if (topGenres?.length) {
-    embed.addFields({ name: "🎭 Top genres", value: topGenres.join("  •  "), inline: false });
+    embed.addFields({ name: "🎭 Top Genres", value: topGenres.map((g) => `\`${g}\``).join("  "), inline: false });
   }
 
   if (handle) embed.setAuthor({ name: `@${handle}` });
