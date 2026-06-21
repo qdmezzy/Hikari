@@ -87,10 +87,10 @@ export default async function ProfileOg({ params }: { params: Promise<{ handle: 
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              background: "linear-gradient(135deg, #3b82f6, #22d3ee)",
+              background: "linear-gradient(135deg, #faf0c7, #f3d36b)",
               fontSize: 70,
               fontWeight: 800,
-              color: "#fff",
+              color: "#171a40",
             }}
           >
             {initial}

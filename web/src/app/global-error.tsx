@@ -39,8 +39,8 @@ export default function GlobalError({
               padding: "10px 20px",
               fontSize: 14,
               fontWeight: 600,
-              color: "#fff",
-              background: "linear-gradient(90deg, #3b82f6, #22d3ee)",
+              color: "#171a40",
+              background: "linear-gradient(90deg, #faf0c7, #f3d36b)",
             }}
           >
             Try again

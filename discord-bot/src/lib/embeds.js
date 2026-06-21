@@ -2,14 +2,14 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "disc
 import { config } from "../config.js";
 import { EMOJI } from "./emojis.js";
 
-// Brand palette tuned to the Hikari web app (primary blue → cyan accent).
+// Brand palette tuned to the Hikari web app (navy base, banana/cream accent).
 export const embedColors = {
-  brand: 0x3b82f6,
-  info: 0x4f91f5,
+  brand: 0xf3d36b,
+  info: 0xfaf0c7,
   success: 0x22c55e,
   warning: 0xf59e0b,
   error: 0xef4444,
-  discovery: 0x8b5cf6,
+  discovery: 0xf0c14b,
 };
 
 const FOOTER = "光 Hikari";
