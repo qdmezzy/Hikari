@@ -284,14 +284,13 @@ export default function RegisterPage() {
 
         <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20">
           <div className="space-y-6">
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative">
-                <Sparkles className="h-10 w-10 text-primary" />
-                <Sparkle className="absolute -top-1 -right-1" size={12} />
-              </div>
-              <span className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Hikari
-              </span>
+            <Link href="/" className="group inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/hikari-wordmark.svg"
+                alt="Hikari"
+                className="h-16 w-auto transition-transform group-hover:scale-105"
+              />
             </Link>
 
             <div className="space-y-4 max-w-md">
@@ -343,12 +342,10 @@ export default function RegisterPage() {
         <FloatingDecorations density="sparse" className="lg:hidden" />
 
         <div className="w-full max-w-md space-y-8 relative z-10">
-          <div className="lg:hidden text-center">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <Sparkles className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Hikari
-              </span>
+          <div className="lg:hidden flex justify-center">
+            <Link href="/" className="inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-11 w-auto" />
             </Link>
           </div>
 

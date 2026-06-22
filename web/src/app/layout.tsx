@@ -43,11 +43,13 @@ export const metadata = {
     url: siteUrl,
     title: "Hikari — Anime Discovery & Tracking",
     description: "Discover, track & share your anime. Import from MyAnimeList & AniList in one click.",
+    images: [{ url: "/brand/og.jpg", width: 2560, height: 1440, alt: "Hikari" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Hikari — Anime Discovery & Tracking",
     description: "Discover, track & share your anime.",
+    images: ["/brand/og.jpg"],
   },
   appleWebApp: {
     capable: true,

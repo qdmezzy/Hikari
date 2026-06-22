@@ -125,14 +125,14 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
       <div className="container mx-auto px-4">
         <div className="flex h-16 lg:h-20 items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="group flex items-center gap-2 leading-none">
+          <Link href="/" className="group flex items-center gap-1.5 leading-none">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/brand/hikari-wordmark.svg"
               alt="Hikari"
-              className="h-9 w-auto lg:h-11 transition-transform group-hover:scale-[1.03]"
+              className="h-12 w-auto lg:h-16 transition-transform group-hover:scale-[1.03]"
             />
-            <span className="self-start rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary/90">
+            <span className="rounded-md border border-primary/30 bg-primary/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-primary">
               beta
             </span>
           </Link>
