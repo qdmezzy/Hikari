@@ -283,7 +283,7 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[360px] rounded-3xl border-white/10 bg-[#07111c]/95 p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-2xl"
+        className="w-[calc(100vw-1.5rem)] max-w-[360px] rounded-3xl border-white/10 bg-[#07111c]/95 p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-2xl"
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <div>

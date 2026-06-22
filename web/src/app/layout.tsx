@@ -49,6 +49,22 @@ export const metadata = {
     title: "Hikari — Anime Discovery & Tracking",
     description: "Discover, track & share your anime.",
   },
+  appleWebApp: {
+    capable: true,
+    title: "Hikari",
+    statusBarStyle: "black-translucent",
+  },
+}
+
+export const viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0f1133" },
+    { media: "(prefers-color-scheme: light)", color: "#faf6ea" },
+  ],
+  colorScheme: "dark light",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({ children }) {
