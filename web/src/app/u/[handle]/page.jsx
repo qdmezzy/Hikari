@@ -695,8 +695,9 @@ export default function PublicProfilePage() {
     <div className="min-h-screen bg-background" data-profile-build={PUBLIC_PROFILE_BUILD}>
       <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="bg-gradient-to-r from-primary to-accent bg-clip-text text-xl font-black text-transparent">
-            Hikari
+          <Link href="/" className="inline-flex">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-10 w-auto" />
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="outline" size="sm" className="rounded-xl" asChild>

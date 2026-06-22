@@ -289,7 +289,7 @@ export default function RegisterPage() {
               <img
                 src="/brand/hikari-wordmark.svg"
                 alt="Hikari"
-                className="h-16 w-auto transition-transform group-hover:scale-105"
+                className="h-24 w-auto transition-transform group-hover:scale-105"
               />
             </Link>
 

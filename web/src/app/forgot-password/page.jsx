@@ -56,11 +56,9 @@ export default function ForgotPasswordPage() {
         className="relative w-full max-w-md"
       >
         {/* Brand */}
-        <Link href="/" className="mb-8 flex flex-col items-center gap-1 leading-none">
-          <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-3xl font-black text-transparent">
-            Hikari
-          </span>
-          <span className="font-jp text-[10px] tracking-[0.32em] text-muted-foreground/70">ひかり</span>
+        <Link href="/" className="mb-8 flex justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-14 w-auto" />
         </Link>
 
         <div className="rounded-3xl border border-border/60 bg-card/70 p-8 shadow-[0_24px_70px_-30px_rgba(0,0,0,0.6)] backdrop-blur-xl">

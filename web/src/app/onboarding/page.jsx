@@ -232,9 +232,8 @@ export default function OnboardingPage() {
           {/* progress */}
           <div className="mb-8">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
-                <Sparkles className="size-4 text-primary" /> Hikari
-              </span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-6 w-auto" />
               <span>
                 Step {stepIndex + 1} of {steps.length}
               </span>

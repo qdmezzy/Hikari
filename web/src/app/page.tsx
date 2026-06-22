@@ -1070,11 +1070,9 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">
             <div className="col-span-2 md:col-span-1">
-              <Link href="/" className="mb-4 flex flex-col leading-none">
-                <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-xl font-black text-transparent">
-                  Hikari
-                </span>
-                <span className="font-jp text-[9px] tracking-[0.32em] text-muted-foreground/70">ひかり</span>
+              <Link href="/" className="mb-4 inline-flex">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-12 w-auto" />
               </Link>
               <p className="mb-2 font-jp text-xs tracking-wide text-muted-foreground/80">アニメをもっと楽しく</p>
               <p className="text-sm text-muted-foreground">

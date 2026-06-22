@@ -109,7 +109,7 @@ export default async function ProfileOg({ params }: { params: Promise<{ handle: 
 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", fontSize: 30, color: "#9aa6b8" }}>See my anime on Hikari</div>
-          <div style={{ display: "flex", fontSize: 40, fontWeight: 800, color: "#34c8ee" }}>Hikari</div>
+          <div style={{ display: "flex", fontSize: 40, fontWeight: 800, color: "#faf0c7" }}>Hikari</div>
         </div>
       </div>
     ),

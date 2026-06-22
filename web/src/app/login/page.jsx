@@ -239,7 +239,7 @@ export default function LoginPage() {
               <img
                 src="/brand/hikari-wordmark.svg"
                 alt="Hikari"
-                className="h-16 w-auto transition-transform group-hover:scale-105"
+                className="h-24 w-auto transition-transform group-hover:scale-105"
               />
             </Link>
 
@@ -306,11 +306,10 @@ export default function LoginPage() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-md space-y-8 relative z-10"
         >
-          <div className="lg:hidden text-center">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <span className="text-2xl font-black bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                Hikari
-              </span>
+          <div className="lg:hidden flex justify-center">
+            <Link href="/" className="inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-12 w-auto" />
             </Link>
           </div>
 
