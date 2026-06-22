@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useState, useEffect, useMemo, useCallback } from "react";
 import client from "@/lib/client";
+import { ensureUserHandle } from "@/lib/public-profile";
 
 const AuthContext = createContext(null);
 const AUTH_CACHE_KEY = "hikari-auth-user";
@@ -51,6 +52,7 @@ const AuthProvider = ({children}) => {
                 const nextUser = data?.session?.user || null;
                 setUser(nextUser);
                 writeCachedUser(nextUser);
+                if (nextUser) void ensureUserHandle(nextUser);
             } catch (error) {
                 console.warn("Unable to load auth session.", error);
             } finally {
@@ -67,6 +69,7 @@ const AuthProvider = ({children}) => {
             const nextUser = session?.user || null;
             setUser(nextUser)
             writeCachedUser(nextUser)
+            if (nextUser) void ensureUserHandle(nextUser)
             setLoading(false)
         })
 

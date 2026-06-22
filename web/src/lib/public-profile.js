@@ -214,3 +214,57 @@ export const fetchPublicProfileByHandle = async (handle) => {
   }
   return { data, error }
 }
+
+const processedHandleUserIds = new Set()
+
+const deriveHandleBase = (user) => {
+  const fromName = normalizeHandle(user?.user_metadata?.full_name || user?.user_metadata?.display_name || "")
+  const fromEmail = normalizeHandle(user?.email ? user.email.split("@")[0] : "")
+  let base = fromName || fromEmail || "user"
+  if (base.length < 3) base = `${base}fan`
+  return base.slice(0, 20)
+}
+
+/**
+ * Guarantees every signed-in user has a handle + public profile row. New users
+ * are prompted to choose one at sign-up (the register form and OAuth
+ * onboarding). This is the safety net for anyone who skips that step, so nobody
+ * is ever left without a handle / public profile. Users can still change it
+ * later in Settings. No-ops when the user already has a handle, and never
+ * throws (failures simply retry on the next load).
+ */
+export const ensureUserHandle = async (user) => {
+  if (!user?.id || processedHandleUserIds.has(user.id)) return
+  const existing = normalizeHandle(user?.user_metadata?.username || user?.user_metadata?.handle || "")
+  if (existing) {
+    processedHandleUserIds.add(user.id)
+    return
+  }
+  processedHandleUserIds.add(user.id)
+
+  try {
+    const base = deriveHandleBase(user)
+    let assigned = null
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      const candidate = attempt === 0 ? base : `${base}${Math.floor(1000 + Math.random() * 9000)}`
+      const { available, skipped } = await checkHandleAvailability(candidate, user.id)
+      if (skipped) return // profile schema not migrated yet — bail quietly
+      if (!available) continue
+      const { error } = await client.auth.updateUser({ data: { username: candidate, handle: candidate } })
+      if (!error) {
+        assigned = candidate
+        break
+      }
+    }
+    if (!assigned) {
+      processedHandleUserIds.delete(user.id) // allow a retry on the next session load
+      return
+    }
+    await upsertPublicProfile(
+      { ...user, user_metadata: { ...(user.user_metadata || {}), username: assigned, handle: assigned } },
+      { handle: assigned },
+    )
+  } catch {
+    processedHandleUserIds.delete(user.id)
+  }
+}
