@@ -1070,3 +1070,21 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Reduce motion — opt-in from Settings (overrides .force-motion). */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast — opt-in from Settings. Brighter borders + secondary text. */
+html.high-contrast {
+  --border: oklch(0.5 0.04 278);
+  --input: oklch(0.5 0.04 278);
+  --muted-foreground: oklch(0.86 0.02 92);
+  --ring: oklch(0.92 0.1 95);
+}

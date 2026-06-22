@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
 import { useTheme } from "next-themes"
 import { saveAccentColor } from "@/lib/accent"
+import { saveAppearance } from "@/lib/appearance"
 import client from "@/lib/client"
 import { toast } from "sonner"
 import { checkHandleAvailability, isHandleTakenError, normalizeHandle, upsertPublicProfile } from "@/lib/public-profile"
@@ -343,6 +344,11 @@ export default function SettingsPage() {
   React.useEffect(() => {
     saveAccentColor(display.accentColor)
   }, [display.accentColor])
+
+  // Apply + persist reduce-motion / high-contrast live.
+  React.useEffect(() => {
+    saveAppearance({ reduceMotion: display.reduceMotion, highContrast: display.highContrast })
+  }, [display.reduceMotion, display.highContrast])
 
   React.useEffect(() => {
     const next = Array.isArray(user?.identities) ? user.identities : []
@@ -1441,6 +1447,14 @@ export default function SettingsPage() {
                 icon={Palette}
               />
               <ToggleRow
+                id="high-contrast"
+                label="High contrast"
+                desc="Stronger borders and brighter text for readability."
+                checked={display.highContrast}
+                onChange={(checked) => updateDisplayState({ highContrast: checked })}
+                icon={Eye}
+              />
+              <ToggleRow
                 id="show-trailers"
                 label="Show trailers"
                 desc="Display trailer blocks where available."
@@ -1615,69 +1629,6 @@ export default function SettingsPage() {
             </div>
           </SettingsPanel>
 
-          <SettingsPanel title="Playback" description="Tune playback, subtitles, and spoiler preferences.">
-            <div className="space-y-4">
-              <ToggleRow
-                id="auto-next-episode"
-                label="Auto-play next episode"
-                desc="Start the next episode automatically."
-                checked={content.autoNextEpisode}
-                onChange={(checked) => updateContentState({ autoNextEpisode: checked })}
-                icon={Play}
-              />
-              <ToggleRow
-                id="auto-skip-intro"
-                label="Auto-skip intros"
-                desc="Skip opening sequences when possible."
-                checked={content.autoSkipIntro}
-                onChange={(checked) => updateContentState({ autoSkipIntro: checked })}
-                icon={Play}
-              />
-              <ToggleRow
-                id="auto-skip-outro"
-                label="Auto-skip outros"
-                desc="Skip ending sequences when possible."
-                checked={content.autoSkipOutro}
-                onChange={(checked) => updateContentState({ autoSkipOutro: checked })}
-                icon={Play}
-              />
-            </div>
-
-            <div className="grid gap-4 pt-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Video quality</Label>
-                <Select value={content.videoQuality} onValueChange={(value) => updateContentState({ videoQuality: value })}>
-                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto</SelectItem>
-                    <SelectItem value="1080p">1080p</SelectItem>
-                    <SelectItem value="720p">720p</SelectItem>
-                    <SelectItem value="480p">480p</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Subtitle language</Label>
-                <Select
-                  value={content.subtitleLanguage}
-                  onValueChange={(value) => updateContentState({ subtitleLanguage: value })}
-                >
-                  <SelectTrigger className="h-11 rounded-xl border-border/60 bg-background/50">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="ja">Japanese</SelectItem>
-                    <SelectItem value="es">Spanish</SelectItem>
-                    <SelectItem value="none">None</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </SettingsPanel>
         </div>
       )
     }
@@ -1731,15 +1682,6 @@ export default function SettingsPage() {
               <p className="text-sm uppercase tracking-[0.24em] text-muted-foreground">Account email</p>
               <p className="mt-2 font-medium text-foreground">{user?.email || "No email on file"}</p>
             </div>
-
-            <ToggleRow
-              id="two-factor"
-              label="Two-factor authentication"
-              desc="Store your preference now and wire the full flow later."
-              checked={account.twoFactorEnabled}
-              onChange={(checked) => updateAccountState({ twoFactorEnabled: checked })}
-              icon={Shield}
-            />
           </div>
         </SettingsPanel>
 
