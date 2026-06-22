@@ -262,7 +262,7 @@ export default function DiscoverPage() {
         setSavedStatus((prev) => ({ ...prev, [id]: "plan_to_watch" }))
         toast.success("Added to Plan to Watch")
       } else if (status && status !== "plan_to_watch") {
-        // Already tracked under another status — don't clobber it.
+        
         toast.info(`Already in your ${STATUS_LABELS[status] || "list"}`)
       } else {
         const { error } = await client

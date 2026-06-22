@@ -256,8 +256,8 @@ function ListPageContent() {
     })
 
     const ts = (value) => (value ? new Date(value).getTime() : 0)
-    // Plan to Watch: oldest added first.
-    groups.planned.sort((a, b) => ts(a.created_at) - ts(b.created_at))
+    // Plan to Watch: newest added first.
+    groups.planned.sort((a, b) => ts(b.created_at) - ts(a.created_at))
     // Completed: most recently finished first (fall back to updated_at).
     groups.completed.sort(
       (a, b) => ts(b.finished_at || b.updated_at) - ts(a.finished_at || a.updated_at),

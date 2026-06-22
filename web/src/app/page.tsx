@@ -1113,6 +1113,7 @@ export default function HomePage() {
             <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
               <Link href="/terms" className="hover:text-accent transition-colors">Terms</Link>
               <Link href="/privacy" className="hover:text-accent transition-colors">Privacy</Link>
+              <Link href="/status" className="hover:text-accent transition-colors">Status</Link>
               <Link href="/feedback" className="hover:text-accent transition-colors">Feedback</Link>
               <Link href="/settings" className="hover:text-accent transition-colors">Settings</Link>
               <Link href="/lists" className="hover:text-accent transition-colors">My List</Link>

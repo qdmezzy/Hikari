@@ -2,6 +2,7 @@ import { Client, Collection, Events, GatewayIntentBits, REST, Routes } from "dis
 import { commands, handleComponentInteraction } from "./commands/index.js";
 import { config } from "./config.js";
 import { buildErrorEmbed } from "./lib/embeds.js";
+import { startHeartbeat } from "./services/heartbeat.js";
 import { startAiringBroadcast } from "./services/scheduler.js";
 
 const client = new Client({
@@ -30,6 +31,7 @@ const registerCommands = async () => {
 client.once(Events.ClientReady, (readyClient) => {
   console.log(`[hikari-bot] Ready as ${readyClient.user.tag}`);
   startAiringBroadcast(readyClient);
+  startHeartbeat(readyClient);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
