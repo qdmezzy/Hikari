@@ -130,7 +130,7 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
             <img
               src="/brand/hikari-wordmark.svg"
               alt="Hikari"
-              className="h-10 w-auto lg:h-12 transition-transform group-hover:scale-[1.03]"
+              className="h-12 w-auto lg:h-16 transition-transform group-hover:scale-[1.03]"
             />
             <span className="rounded-md border border-primary/30 bg-primary/15 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-primary">
               beta
