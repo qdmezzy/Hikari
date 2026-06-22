@@ -234,17 +234,13 @@ export default function LoginPage() {
             transition={{ duration: 0.6 }}
             className="space-y-8 max-w-lg"
           >
-            <Link href="/" className="flex items-center gap-3 group">
-              <div className="relative">
-                <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl opacity-70 transition-opacity group-hover:opacity-100" />
-                <div className="relative flex h-14 w-14 items-center justify-center transition-transform group-hover:scale-110">
-                  <Sparkles className="h-9 w-9 text-primary drop-shadow-[0_0_22px_rgba(34,211,238,0.42)]" />
-                </div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background" />
-              </div>
-              <span className="text-3xl font-black bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                Hikari
-              </span>
+            <Link href="/" className="group inline-flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/hikari-wordmark.svg"
+                alt="Hikari"
+                className="h-16 w-auto transition-transform group-hover:scale-105"
+              />
             </Link>
 
             <div className="space-y-4">

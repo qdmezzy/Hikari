@@ -125,14 +125,14 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
       <div className="container mx-auto px-4">
         <div className="flex h-16 lg:h-20 items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="group flex items-center gap-1.5 leading-none">
-            <span className="flex flex-col leading-none">
-              <span className="bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-xl font-black text-transparent lg:text-2xl">
-                Hikari
-              </span>
-              <span className="font-jp text-[9px] tracking-[0.32em] text-muted-foreground/70">ひかり</span>
-            </span>
-            <span className="mt-0.5 self-start rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary/90">
+          <Link href="/" className="group flex items-center gap-2 leading-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/hikari-wordmark.svg"
+              alt="Hikari"
+              className="h-9 w-auto lg:h-11 transition-transform group-hover:scale-[1.03]"
+            />
+            <span className="self-start rounded-md border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary/90">
               beta
             </span>
           </Link>
