@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
 import { useTheme } from "next-themes"
+import { saveAccentColor } from "@/lib/accent"
 import client from "@/lib/client"
 import { toast } from "sonner"
 import { checkHandleAvailability, isHandleTakenError, normalizeHandle, upsertPublicProfile } from "@/lib/public-profile"
@@ -142,7 +143,7 @@ const defaultNotifications = {
 
 const defaultDisplay = {
   theme: "system",
-  accentColor: "teal",
+  accentColor: "banana",
   language: "en",
   timezone: "auto",
   dateFormat: "relative",
@@ -337,6 +338,12 @@ export default function SettingsPage() {
     resetFromUser(user)
   }, [user, resetFromUser])
 
+  // Apply + persist the accent color whenever it changes (on load from saved
+  // settings and on every swatch click), so the choice takes effect live.
+  React.useEffect(() => {
+    saveAccentColor(display.accentColor)
+  }, [display.accentColor])
+
   React.useEffect(() => {
     const next = Array.isArray(user?.identities) ? user.identities : []
     setConnectedIdentities(next)
@@ -517,6 +524,7 @@ export default function SettingsPage() {
   }, [connectedIdentities])
 
   const accentColors = [
+    { id: "banana", className: "bg-[#faf0c7]" },
     { id: "teal", className: "bg-cyan-400" },
     { id: "blue", className: "bg-sky-500" },
     { id: "purple", className: "bg-violet-500" },
