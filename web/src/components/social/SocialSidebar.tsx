@@ -206,7 +206,7 @@ export function SocialSidebar() {
       <Card className="border border-white/10 bg-black/40 animate-slide-up stagger-2 shadow-lg shadow-black/20">
         <CardHeader className="pb-2 pt-3 px-3">
           <CardTitle className="text-sm flex items-center gap-2">
-            <Users className="h-4 w-4 text-cyan-400" />
+            <Users className="h-4 w-4 text-primary" />
             Active Fandoms
           </CardTitle>
         </CardHeader>

@@ -247,8 +247,8 @@ export function PostComposer({
             {avatarUrl ? <AvatarImage src={avatarUrl} alt="Profile avatar" /> : null}
             <AvatarFallback
               className={cn(
-                "text-white text-sm",
-                isCommunity ? "bg-primary" : "bg-gradient-to-br from-cyan-500 to-blue-500",
+                "text-primary-foreground text-sm",
+                isCommunity ? "bg-primary" : "bg-gradient-to-br from-primary to-accent",
               )}
             >
               {avatarInitial}
@@ -465,7 +465,7 @@ export function PostComposer({
                   className={cn(
                     "gap-1 h-7 px-2 text-xs rounded-full",
                     isCommunity ? "bg-muted/40 hover:bg-muted/70" : "bg-white/5 hover:bg-white/10",
-                    showClip ? "text-cyan-400" : "text-muted-foreground hover:text-foreground",
+                    showClip ? "text-primary" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Film className="h-3.5 w-3.5" />

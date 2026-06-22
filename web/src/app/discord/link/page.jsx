@@ -14,14 +14,14 @@ const STATUS_META = {
     description: "Setting up secure handoff between Discord and Hikari.",
     badge: "Initializing",
     Icon: Sparkles,
-    tone: "text-cyan-300",
+    tone: "text-primary",
   },
   linking: {
     title: "Linking Your Account",
     description: "Verifying your session and connecting Discord.",
     badge: "Processing",
     Icon: LoaderCircle,
-    tone: "text-cyan-300",
+    tone: "text-primary",
   },
   success: {
     title: "Discord Linked",

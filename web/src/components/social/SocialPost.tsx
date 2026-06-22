@@ -473,7 +473,7 @@ export function SocialPost({
                   asChild
                   variant="ghost"
                   size="sm"
-                  className="gap-1 h-7 px-2 hover:bg-blue-500/10 transition-smooth"
+                  className="gap-1 h-7 px-2 hover:bg-primary/10 transition-smooth"
                 >
                   <Link href={shareUrl}>
                     <MessageCircle className="h-3.5 w-3.5" />
@@ -484,7 +484,7 @@ export function SocialPost({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1 h-7 px-2 hover:bg-blue-500/10 transition-smooth"
+                  className="gap-1 h-7 px-2 hover:bg-primary/10 transition-smooth"
                 >
                   <MessageCircle className="h-3.5 w-3.5" />
                   <span className="text-xs">{formatNumber(post.comments)}</span>

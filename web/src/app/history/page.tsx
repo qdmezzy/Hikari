@@ -259,8 +259,8 @@ export default function WatchHistoryPage() {
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/25">
-                    <History className="h-6 w-6 text-white" />
+                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
+                    <History className="h-6 w-6 text-primary-foreground" />
                   </div>
                   <div>
                     <h1 className="text-2xl font-bold text-foreground md:text-3xl">
