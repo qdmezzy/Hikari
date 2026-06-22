@@ -377,7 +377,14 @@ function ListPageContent() {
     const finishedOn = toDate(entry?.finished_at)
     const lastWatchedOn = toDate(entry?.updated_at)
     const addedOn = toDate(entry?.created_at)
-    // lastWatchedOn is used for the Watching tab; completed entries only show finishedAt.
+    // updated_at is bumped by imports and edits, not just watching — so only
+    // treat it as real watch/read activity when it lands meaningfully after the
+    // entry was added. Otherwise an imported list would falsely read
+    // "Last watched today" on every title.
+    const createdMs = entry?.created_at ? new Date(entry.created_at).getTime() : 0
+    const updatedMs = entry?.updated_at ? new Date(entry.updated_at).getTime() : 0
+    const hasProgressActivity = createdMs > 0 && updatedMs - createdMs > 120_000
+    const lastActivityVerb = isMangaEntry(entry) ? "Last read" : "Last watched"
     const addedLabel = formatRelativeTime(entry?.created_at)
     const meta = tabMeta[tabId]
     const Icon = meta.icon
@@ -395,9 +402,11 @@ function ListPageContent() {
             ? "Read"
             : "Completed"
         : tabId === "watching"
-          ? lastWatchedOn
-            ? `Last watched ${lastWatchedOn}`
-            : `Added ${addedLabel || "recently"}`
+          ? hasProgressActivity && lastWatchedOn
+            ? `${lastActivityVerb} ${lastWatchedOn}`
+            : addedOn
+              ? `Added ${addedOn}`
+              : `Added ${addedLabel || "recently"}`
           : addedOn
             ? `Added ${addedOn}`
             : `Added ${addedLabel || "recently"}`
