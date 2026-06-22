@@ -430,7 +430,7 @@ export default function HomePage() {
       
       <main className="relative z-10">
         {/* Epic Hero Section with Featured Anime */}
-        <section className="relative min-h-[85vh] flex items-center overflow-hidden pt-20 md:pt-24">
+        <section className="relative min-h-[85vh] flex items-center overflow-hidden pt-20 md:pt-24 pb-10">
           {/* Banner Background */}
           {featured ? (
             <AnimatePresence mode="wait">
@@ -480,7 +480,7 @@ export default function HomePage() {
           </div>
 
           {/* Hero Content */}
-          <div className="container mx-auto px-4 relative z-30">
+          <div className="container mx-auto px-4 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               {/* Left Side - Info */}
               <AnimatePresence mode="wait">
@@ -675,7 +675,7 @@ export default function HomePage() {
             </div>
 
             {/* Carousel Indicators */}
-            <div className="relative z-40 flex items-center justify-center gap-3 mt-12">
+            <div className="flex items-center justify-center gap-3 mt-12">
               {(featuredAnime.length ? featuredAnime : Array.from({ length: 3 })).map((_, index) => (
                 <motion.button
                   key={index}
@@ -706,7 +706,7 @@ export default function HomePage() {
         </section>
 
         {/* Quick Search Bar - No keyboard shortcut */}
-        <section className="relative -mt-8 px-4 z-20">
+        <section className="relative mt-2 px-4 z-20">
           <div className="max-w-4xl mx-auto">
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-primary/50 via-accent/50 to-primary/50 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity" />
