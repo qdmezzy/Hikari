@@ -1112,16 +1112,6 @@ html.reduce-motion *::after {
   );
 }
 
-/* Faint engineering grid for hero/section backdrops. */
-.brand-grid {
-  background-image:
-    linear-gradient(to right, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px);
-  background-size: 46px 46px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, black 5%, transparent 75%);
-  mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, black 5%, transparent 75%);
-}
-
 /* Banana → cream display gradient for hero headings. */
 .text-brand {
   background: linear-gradient(

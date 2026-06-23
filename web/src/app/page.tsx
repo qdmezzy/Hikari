@@ -422,7 +422,6 @@ export default function HomePage() {
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Animated Background Gradients — banana-forward brand glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="brand-grid absolute inset-0 opacity-60" />
         <div className="absolute -top-[35%] -left-[15%] w-[75%] h-[75%] rounded-full bg-gradient-to-br from-primary/25 via-accent/12 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
         <div className="absolute -bottom-[30%] -right-[20%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-accent/18 via-primary/8 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50%] h-[50%] rounded-full bg-gradient-radial from-sparkle/8 to-transparent blur-2xl" />
