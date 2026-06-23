@@ -1081,6 +1081,79 @@ html.reduce-motion *::after {
   scroll-behavior: auto !important;
 }
 
+/* ============================================
+   HIKARI BRAND — sparkle + burst motifs
+   Echoes the logo: a banana/cream spark-burst H on navy.
+   ============================================ */
+
+/* Twinkle used by <Sparkle> (was referenced but never defined). */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.7) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15) rotate(25deg);
+  }
+}
+
+.animate-sparkle {
+  animation: sparkle 2.8s ease-in-out infinite;
+}
+
+/* Banana brand radial glow — the signature hero light. */
+.brand-glow {
+  background: radial-gradient(
+    circle at center,
+    color-mix(in oklch, var(--primary) 55%, transparent) 0%,
+    color-mix(in oklch, var(--accent) 22%, transparent) 38%,
+    transparent 72%
+  );
+}
+
+/* Faint engineering grid for hero/section backdrops. */
+.brand-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 7%, transparent) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, black 5%, transparent 75%);
+  mask-image: radial-gradient(ellipse 80% 70% at 30% 40%, black 5%, transparent 75%);
+}
+
+/* Banana → cream display gradient for hero headings. */
+.text-brand {
+  background: linear-gradient(
+    115deg,
+    color-mix(in oklch, var(--primary) 85%, white) 0%,
+    var(--foreground) 45%,
+    var(--primary) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Spinning ray-burst behind hero focal points (logo energy). */
+@keyframes brand-rays {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.brand-rays {
+  background: repeating-conic-gradient(
+    from 0deg,
+    color-mix(in oklch, var(--primary) 40%, transparent) 0deg 4deg,
+    transparent 4deg 16deg
+  );
+  -webkit-mask-image: radial-gradient(circle, black 0%, transparent 62%);
+  mask-image: radial-gradient(circle, black 0%, transparent 62%);
+  animation: brand-rays 40s linear infinite;
+}
+
 /* High contrast — opt-in from Settings. Brighter borders + secondary text. */
 html.high-contrast {
   --border: oklch(0.5 0.04 278);

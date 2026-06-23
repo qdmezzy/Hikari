@@ -7,7 +7,7 @@ import { Navigation } from "@/components/layout/Navigation"
 import { AnimeCard } from "@/components/media/AnimeCard"
 import {
   Search, Clock, Star, Play, Heart, Plus, ChevronRight,
-  Sparkles, Flame, Calendar, Eye, Zap, ExternalLink, Compass, Puzzle
+  Flame, Calendar, Eye, Zap, ExternalLink, Puzzle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,7 @@ import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import { toast } from "sonner"
 import { RecommendedForYou } from "@/components/home/RecommendedForYou"
+import { Sparkle, StarBurst, FloatingDecorations } from "@/components/common/anime-decorations"
 import {
   fetchAniList,
   fetchAniListMediaByIds,
@@ -419,11 +420,12 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Animated Background Gradients */}
+      {/* Animated Background Gradients — banana-forward brand glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[40%] -left-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-br from-primary/20 via-accent/10 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute -bottom-[30%] -right-[20%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-accent/15 via-primary/5 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50%] h-[50%] rounded-full bg-gradient-radial from-sparkle/5 to-transparent blur-2xl" />
+        <div className="brand-grid absolute inset-0 opacity-60" />
+        <div className="absolute -top-[35%] -left-[15%] w-[75%] h-[75%] rounded-full bg-gradient-to-br from-primary/25 via-accent/12 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
+        <div className="absolute -bottom-[30%] -right-[20%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-accent/18 via-primary/8 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[50%] h-[50%] rounded-full bg-gradient-radial from-sparkle/8 to-transparent blur-2xl" />
       </div>
 
       <Navigation />
@@ -472,9 +474,13 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-card" />
           )}
 
+          {/* Brand sparkle field + banana wash fills the hero with logo energy */}
+          <FloatingDecorations density="normal" className="z-[1] opacity-80" />
+          <div className="brand-glow pointer-events-none absolute -left-24 top-1/3 z-[1] h-80 w-80 opacity-50 blur-2xl" />
+
           {/* Decorative vertical kana accent */}
           <div className="pointer-events-none absolute right-6 top-1/2 z-[1] hidden -translate-y-1/2 select-none xl:block">
-            <span className="writing-vertical font-jp text-[8rem] font-bold leading-none tracking-tight text-foreground/[0.05]">
+            <span className="writing-vertical font-jp text-[9rem] font-black leading-none tracking-tight text-primary/[0.08]">
               ヒカリ
             </span>
           </div>
@@ -536,7 +542,7 @@ export default function HomePage() {
                         transition={{ duration: 0.5, delay: 0.12 }}
                         className="max-w-[10ch] text-4xl md:text-6xl lg:text-[clamp(3.5rem,5.5vw,6rem)] leading-[0.9] font-black tracking-tight"
                       >
-                        <span className="bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent drop-shadow-lg">
+                        <span className="text-brand drop-shadow-[0_2px_20px_rgba(0,0,0,0.35)]">
                           {featured.heroTitle || featured.title}
                         </span>
                       </motion.h1>
@@ -645,9 +651,14 @@ export default function HomePage() {
                   className="relative"
                 >
                   <Link href={getMediaHref(featured.id, featured.title)} className="block cursor-pointer">
+                    {/* Brand ray-burst + sparkles echo the Hikari logo */}
+                    <div className="brand-rays pointer-events-none absolute -inset-20 -z-10 opacity-[0.16]" />
+                    <StarBurst size={44} className="pointer-events-none absolute -left-7 -top-7 z-30 text-primary animate-spin-slow" />
+                    <Sparkle size={28} className="pointer-events-none absolute -right-5 top-8 z-30 !text-primary" />
+                    <Sparkle size={18} className="pointer-events-none absolute -left-4 bottom-20 z-30 !text-accent" delay={0.7} />
                     <motion.div
-                      className="absolute -inset-4 bg-gradient-to-r from-primary/40 via-accent/40 to-primary/40 rounded-3xl blur-2xl opacity-60"
-                      animate={{ opacity: [0.45, 0.75, 0.45], scale: [0.98, 1.03, 0.98] }}
+                      className="absolute -inset-4 bg-gradient-to-r from-primary/45 via-accent/45 to-primary/45 rounded-3xl blur-2xl opacity-60"
+                      animate={{ opacity: [0.45, 0.8, 0.45], scale: [0.98, 1.04, 0.98] }}
                       transition={{ duration: 4.5, ease: "easeInOut", repeat: Infinity }}
                     />
                     <motion.div
@@ -743,7 +754,10 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <Play className="w-6 h-6 text-primary" />
+                <span className="relative inline-flex">
+                  <Play className="w-6 h-6 text-primary" />
+                  <Sparkle size={12} className="absolute -right-1.5 -top-1.5 !text-primary" />
+                </span>
                 <div>
                   <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">視聴中</p>
                   <h2 className="text-2xl font-bold text-foreground">Continue Watching</h2>
@@ -855,7 +869,10 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto relative">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <Flame className="w-6 h-6 text-orange-500" />
+                <span className="relative inline-flex">
+                  <Flame className="w-6 h-6 text-orange-500" />
+                  <Sparkle size={12} className="absolute -right-1.5 -top-1.5 !text-primary" />
+                </span>
                 <div>
                   <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">人気急上昇</p>
                   <h2 className="text-2xl font-bold text-foreground">Trending Now</h2>
@@ -906,7 +923,10 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
-                <Calendar className="w-6 h-6 text-purple-500" />
+                <span className="relative inline-flex">
+                  <Calendar className="w-6 h-6 text-purple-500" />
+                  <Sparkle size={12} className="absolute -right-1.5 -top-1.5 !text-primary" />
+                </span>
                 <div>
                   <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">放送予定</p>
                   <h2 className="text-2xl font-bold text-foreground">Airing Schedule</h2>
@@ -1029,37 +1049,6 @@ export default function HomePage() {
                   </Button>
                 </div>
               </div>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA Section - Fixed: No more "Get Started" confusion */}
-        <section className="px-4 py-20 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-accent/10 to-primary/20" />
-          <div className="max-w-4xl mx-auto relative text-center">
-            <Badge className="mb-6 bg-gradient-to-r from-primary to-accent text-white border-0">
-              <Sparkles className="w-3 h-3 mr-1" />
-              Join the Community
-            </Badge>
-            <h2 className="text-4xl md:text-5xl font-black text-foreground mb-4">
-              Track anime <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">spoiler-free</span>
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Keep your watch history organized, manage your lists, and discover something new every day.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/register">
-                <Button size="lg" className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white font-semibold px-8 shadow-lg shadow-primary/25">
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Start Tracking Free
-                </Button>
-              </Link>
-              <Link href="/discover">
-                <Button size="lg" variant="outline" className="border-2 border-foreground/20 hover:bg-foreground/10 backdrop-blur-sm">
-                  <Compass className="w-5 h-5 mr-2" />
-                  Discover Feed
-                </Button>
-              </Link>
             </div>
           </div>
         </section>
