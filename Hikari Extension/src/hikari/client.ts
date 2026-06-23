@@ -17,33 +17,47 @@ type FetchEntriesOptions = {
   orderDir?: 'asc' | 'desc';
 };
 
-async function request(path: string, options: RequestInit = {}) {
+type RequestOptions = {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  headers?: Record<string, string>;
+  body?: string;
+};
+
+// All Supabase REST calls go through the background worker (api.request.xhr) so
+// auto-tracking writes succeed from content scripts on CSP-locked sites too.
+async function request(path: string, options: RequestOptions = {}) {
   const { url, anonKey } = getHikariConfig();
   const session = await getValidSession();
   if (!session) {
     throw new Error('Not signed in.');
   }
 
-  const headers = new Headers(options.headers || {});
-  headers.set('apikey', anonKey);
-  headers.set('Authorization', `Bearer ${session.accessToken}`);
-  headers.set('Content-Type', 'application/json');
+  const headers: Record<string, string> = {
+    apikey: anonKey,
+    Authorization: `Bearer ${session.accessToken}`,
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
 
-  const res = await fetch(`${url}${path}`, {
-    ...options,
+  const response = await api.request.xhr(options.method || 'GET', {
+    url: `${url}${path}`,
     headers,
+    data: options.body,
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || 'Request failed');
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(response.responseText || 'Request failed');
   }
 
-  if (res.status === 204) {
+  if (!response.responseText) {
     return null;
   }
 
-  return res.json();
+  try {
+    return JSON.parse(response.responseText);
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchEntry(mediaId: number) {

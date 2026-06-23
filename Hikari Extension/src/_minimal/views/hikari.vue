@@ -5,9 +5,7 @@
     <div v-else-if="!session" class="hikari-auth">
       <div class="hikari-auth-inner">
         <div v-if="authStep === 'onboarding'" class="hikari-auth-card onboarding-card">
-          <div class="onboarding-icon">
-            <span class="material-icons">auto_awesome</span>
-          </div>
+          <img :src="logoUrl" alt="Hikari" class="onboarding-icon" />
           <h2>Welcome to Hikari</h2>
           <p>Track your anime progress automatically while you watch</p>
 
@@ -92,7 +90,7 @@
 
         <div v-else class="hikari-auth-card">
           <div class="auth-brand">
-            <div class="hikari-logo">H</div>
+            <img :src="logoUrl" alt="Hikari" class="hikari-logo" />
             <div>
               <div class="hikari-title">Hikari</div>
               <div class="hikari-subtitle">Extension</div>
@@ -130,7 +128,7 @@
     <div v-else class="hikari-app">
       <header class="hikari-header">
         <div class="hikari-brand">
-          <div class="hikari-logo">H</div>
+          <img :src="logoUrl" alt="Hikari" class="hikari-logo" />
           <div class="hikari-title">Hikari</div>
         </div>
         <nav class="hikari-nav">
@@ -140,6 +138,14 @@
             @click="view = 'dashboard'"
           >
             <span class="material-icons">show_chart</span>
+          </button>
+          <button
+            class="hikari-nav-btn"
+            :class="{ active: view === 'upcoming' }"
+            @click="view = 'upcoming'"
+            title="Upcoming episodes"
+          >
+            <span class="material-icons">calendar_today</span>
           </button>
           <button
             class="hikari-nav-btn"
@@ -212,6 +218,36 @@
             </div>
           </div>
 
+          <div v-if="upcomingItems.length" class="hikari-section">
+            <div class="hikari-section-header">
+              <div class="section-title">
+                <span class="material-icons">calendar_today</span>
+                Next up
+              </div>
+              <button class="link-btn" @click="view = 'upcoming'">See all</button>
+            </div>
+            <div class="upcoming-list">
+              <button
+                v-for="item in upcomingItems.slice(0, 3)"
+                :key="item.mediaId"
+                class="upcoming-card"
+                :class="{ soon: item.timeUntil <= 86400 }"
+                @click="openInHikari(`/media/${item.mediaId}`)"
+              >
+                <img :src="item.image || placeholder" :alt="item.title" />
+                <div class="upcoming-meta">
+                  <div class="upcoming-title">{{ item.title }}</div>
+                  <div class="upcoming-ep">Episode {{ item.episode }}</div>
+                  <div class="upcoming-when">
+                    <span class="material-icons">schedule</span>
+                    {{ formatCountdown(item.airingAt, nowTick) }}
+                  </div>
+                </div>
+                <span class="upcoming-day">{{ formatAiringDay(item.airingAt) }}</span>
+              </button>
+            </div>
+          </div>
+
           <div class="hikari-section">
             <div class="hikari-section-header">
               <div class="section-title">
@@ -243,6 +279,44 @@
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+        <section v-if="view === 'upcoming'" class="hikari-view">
+          <div class="hikari-section-header">
+            <div class="section-title">
+              <span class="material-icons">calendar_today</span>
+              Upcoming episodes
+            </div>
+            <button class="link-btn" @click="openInHikari('/calendar')">Full calendar</button>
+          </div>
+
+          <div v-if="upcomingLoading && !upcomingItems.length" class="hikari-muted">
+            Loading schedule...
+          </div>
+          <div v-else-if="!upcomingItems.length" class="hikari-muted">
+            Nothing airing from your list right now. Add some currently-airing shows and they'll
+            show up here.
+          </div>
+
+          <div v-else class="upcoming-list">
+            <button
+              v-for="item in upcomingItems"
+              :key="item.mediaId"
+              class="upcoming-card"
+              :class="{ soon: item.timeUntil <= 86400 }"
+              @click="openInHikari(`/media/${item.mediaId}`)"
+            >
+              <img :src="item.image || placeholder" :alt="item.title" />
+              <div class="upcoming-meta">
+                <div class="upcoming-title">{{ item.title }}</div>
+                <div class="upcoming-ep">Episode {{ item.episode }}</div>
+                <div class="upcoming-when">
+                  <span class="material-icons">schedule</span>
+                  {{ formatCountdown(item.timeUntil, nowTick) }}
+                </div>
+              </div>
+              <span class="upcoming-day">{{ formatAiringDay(item.airingAt) }}</span>
+            </button>
           </div>
         </section>
         <section v-if="view === 'detected'" class="hikari-view">
@@ -349,15 +423,6 @@
                   <span></span>
                 </button>
               </div>
-              <div class="setting-row">
-                <div>
-                  <div class="setting-title">Spoiler Shield</div>
-                  <div class="setting-sub">Hide content past your progress</div>
-                </div>
-                <button class="toggle" :class="{ on: settings.spoilerShield }" @click="toggleSetting('spoilerShield')">
-                  <span></span>
-                </button>
-              </div>
             </div>
 
             <button class="quicklinks-row" @click="view = 'quicklinks'">
@@ -454,7 +519,7 @@
 <script lang="ts" setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fetchEntries, fetchEntry, upsertEntry } from '../../hikari/client';
-import { fetchMediaById, searchAniList } from '../../hikari/anilist';
+import { fetchAiringByIds, fetchMediaById, searchAniList } from '../../hikari/anilist';
 import {
   cacheMatch,
   getCachedMatch,
@@ -468,7 +533,7 @@ import { getValidSession, signInWithPassword, signOut } from '../../hikari/auth'
 import { HIKARI_WEB_URL } from '../../hikari/config';
 import { router } from '../router';
 
-type View = 'dashboard' | 'detected' | 'settings' | 'quicklinks';
+type View = 'dashboard' | 'upcoming' | 'detected' | 'settings' | 'quicklinks';
 type AuthStep = 'onboarding' | 'quicklinks' | 'login';
 
 type QuicklinkPage = {
@@ -491,6 +556,15 @@ type WatchingItem = {
 type HistoryItem = WatchingItem & {
   updatedAt?: string | number | null;
   progressPercent?: number;
+};
+
+type UpcomingItem = {
+  mediaId: number;
+  title: string;
+  image: string;
+  episode: number;
+  airingAt: number;
+  timeUntil: number;
 };
 
 const quicklinkPages = require('../../utils/quicklinks.json') as QuicklinkPage[];
@@ -586,7 +660,19 @@ const statusOptions = [
   { id: 'rewatching', label: 'Rewatching' },
 ];
 
-const placeholder = 'https://via.placeholder.com/120x180?text=Hikari';
+const logoUrl =
+  typeof chrome !== 'undefined' && chrome.runtime?.getURL
+    ? chrome.runtime.getURL('icons/hikari-mark.png')
+    : 'icons/hikari-mark.png';
+
+const placeholder =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="180" viewBox="0 0 120 180">` +
+      `<rect width="120" height="180" rx="10" fill="#1f1f1f"/>` +
+      `<text x="60" y="96" font-family="sans-serif" font-size="42" font-weight="700" fill="#faf0c7" ` +
+      `text-anchor="middle" dominant-baseline="middle">H</text></svg>`,
+  );
 
 const fill = inject('fill') as { value: any } | undefined;
 const detectedTab = computed(() => fill?.value || null);
@@ -606,7 +692,6 @@ const defaultQuicklinks = allQuicklinks.map((site) => site.key);
 const settings = ref<ExtensionSettings>({
   autoTrack: true,
   notifications: true,
-  spoilerShield: true,
   quicklinks: defaultQuicklinks,
 });
 
@@ -625,6 +710,8 @@ const normalizeQuicklinks = (list: string[]) => {
 const dashboardLoading = ref(false);
 const watchingItems = ref<WatchingItem[]>([]);
 const recentItems = ref<HistoryItem[]>([]);
+const upcomingItems = ref<UpcomingItem[]>([]);
+const upcomingLoading = ref(false);
 const stats = ref({
   timeWatched: '0h',
   completed: 0,
@@ -775,6 +862,34 @@ const formatRelativeTime = (value?: string | number | null, now?: number) => {
   if (days < 7) return `${days}d ago`;
   const date = new Date(timestamp);
   return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+};
+
+// Countdown to an upcoming episode. Derived from the absolute airing time and
+// `nowMs` (the reactive minute tick) so the label stays accurate and counts down
+// live between refreshes.
+const formatCountdown = (airingAt: number, nowMs?: number) => {
+  const nowSeconds = Math.floor((nowMs || Date.now()) / 1000);
+  const seconds = Math.max(0, (airingAt || 0) - nowSeconds);
+  if (seconds <= 0) return 'Airing now';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `in ${days}d ${hours}h`;
+  if (hours > 0) return `in ${hours}h ${minutes}m`;
+  return `in ${minutes}m`;
+};
+
+const formatAiringDay = (airingAt: number) => {
+  if (!airingAt) return '';
+  const date = new Date(airingAt * 1000);
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(today.getDate() + 1);
+  const isTomorrow = date.toDateString() === tomorrow.toDateString();
+  if (isToday) return 'Today';
+  if (isTomorrow) return 'Tomorrow';
+  return date.toLocaleDateString(undefined, { weekday: 'short' });
 };
 
 const mediaCache = new Map<number, any>();
@@ -1052,11 +1167,58 @@ const loadDashboard = async () => {
       }),
     );
     recentItems.value = recentMediaItems;
+
+    void loadUpcoming(entriesWithOverrides);
   } catch (error) {
     watchingItems.value = [];
     recentItems.value = [];
   } finally {
     dashboardLoading.value = false;
+  }
+};
+
+// Build the "upcoming episodes" list from the user's currently-airing titles.
+const loadUpcoming = async (entries: any[]) => {
+  const animeIds = Array.from(
+    new Set(
+      (entries || [])
+        .filter(
+          entry =>
+            (entry.media_type || 'ANIME') === 'ANIME' &&
+            ['watching', 'rewatching', 'plan_to_watch'].includes(entry.status),
+        )
+        .map(entry => Number(entry.media_id))
+        .filter(Number.isFinite),
+    ),
+  );
+
+  if (!animeIds.length) {
+    upcomingItems.value = [];
+    return;
+  }
+
+  upcomingLoading.value = true;
+  try {
+    const airing = await fetchAiringByIds(animeIds);
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    upcomingItems.value = airing.map(media => {
+      const next = media.nextAiringEpisode!;
+      return {
+        mediaId: media.id,
+        title: media.title?.english || media.title?.romaji || `ID ${media.id}`,
+        image: media.coverImage?.large || placeholder,
+        episode: next.episode,
+        airingAt: next.airingAt,
+        timeUntil:
+          typeof next.timeUntilAiring === 'number'
+            ? next.timeUntilAiring
+            : next.airingAt - nowSeconds,
+      };
+    });
+  } catch (error) {
+    // Non-fatal: keep the previous list; the popup refreshes on a timer.
+  } finally {
+    upcomingLoading.value = false;
   }
 };
 
@@ -1193,7 +1355,7 @@ watch(lastAutoUpdate, (value) => {
   width: 100%;
   background: transparent;
   color: #ffffff;
-  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  font-family: "Montserrat", "Segoe UI", system-ui, sans-serif;
   border-radius: 0;
   overflow: hidden;
   display: flex;
@@ -1239,15 +1401,11 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .hikari-logo {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #f97316, #ea580c);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: #ffffff;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .hikari-title {
@@ -1261,7 +1419,7 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .hikari-auth-card {
-  background: #0f0f0f;
+  background: #141735;
   border: 1px solid #1f1f1f;
   border-radius: 24px;
   padding: 22px;
@@ -1293,15 +1451,12 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .onboarding-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, #f97316, #ea580c);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
-  color: #ffffff;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 14px;
+  filter: drop-shadow(0 6px 18px rgba(250, 240, 199, 0.18));
 }
 
 .onboarding-feature {
@@ -1310,8 +1465,8 @@ watch(lastAutoUpdate, (value) => {
   gap: 12px;
   padding: 14px;
   border-radius: 16px;
-  background: #171717;
-  border: 1px solid #262626;
+  background: #1a1e44;
+  border: 1px solid #2b3066;
   text-align: left;
   margin: 12px 0;
 }
@@ -1327,8 +1482,8 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .feature-orange {
-  background: rgba(249, 115, 22, 0.2);
-  color: #f97316;
+  background: rgba(250, 240, 199, 0.2);
+  color: #faf0c7;
 }
 
 .feature-green {
@@ -1434,16 +1589,16 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .hikari-form input {
-  background: #141414;
-  border: 1px solid #262626;
+  background: #10132e;
+  border: 1px solid #2b3066;
   border-radius: 14px;
   padding: 10px 12px;
   color: #ffffff;
 }
 
 .hikari-primary {
-  background: #f97316;
-  color: #0a0a0a;
+  background: #faf0c7;
+  color: #161a3a;
   border: none;
   border-radius: 14px;
   padding: 12px;
@@ -1463,7 +1618,7 @@ watch(lastAutoUpdate, (value) => {
 .hikari-secondary {
   background: transparent;
   color: #ffffff;
-  border: 1px solid #262626;
+  border: 1px solid #2b3066;
   border-radius: 12px;
   padding: 12px;
   cursor: pointer;
@@ -1479,7 +1634,7 @@ watch(lastAutoUpdate, (value) => {
   display: flex;
   flex-direction: column;
   min-height: 100%;
-  background: #141414;
+  background: #10132e;
   border-radius: 22px;
   border: 1px solid #1f1f1f;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
@@ -1494,8 +1649,8 @@ watch(lastAutoUpdate, (value) => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid #262626;
-  background: #141414;
+  border-bottom: 1px solid #2b3066;
+  background: #10132e;
 }
 
 .hikari-nav {
@@ -1517,8 +1672,8 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .hikari-nav-btn.active {
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
+  background: rgba(250, 240, 199, 0.15);
+  color: #faf0c7;
 }
 
 .hikari-main {
@@ -1540,7 +1695,7 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .stat-card {
-  background: #1a1a1a;
+  background: #1a1e44;
   border-radius: 14px;
   padding: 12px;
   display: flex;
@@ -1572,8 +1727,8 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .stat-orange {
-  background: rgba(249, 115, 22, 0.2);
-  color: #f97316;
+  background: rgba(250, 240, 199, 0.2);
+  color: #faf0c7;
 }
 
 .stat-pink {
@@ -1606,13 +1761,13 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .section-title span {
-  color: #f97316;
+  color: #faf0c7;
 }
 
 .link-btn {
   background: transparent;
   border: none;
-  color: #f97316;
+  color: #faf0c7;
   font-size: 12px;
   cursor: pointer;
   display: inline-flex;
@@ -1627,7 +1782,7 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .watching-card {
-  background: #1a1a1a;
+  background: #1a1e44;
   border-radius: 14px;
   padding: 10px;
   display: flex;
@@ -1666,7 +1821,7 @@ watch(lastAutoUpdate, (value) => {
 .watching-bar {
   margin-top: 8px;
   height: 8px;
-  background: #262626;
+  background: #2b3066;
   border-radius: 999px;
   overflow: hidden;
 }
@@ -1674,8 +1829,8 @@ watch(lastAutoUpdate, (value) => {
 .watching-bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #f97316, #fb923c);
-  box-shadow: 0 0 8px rgba(249, 115, 22, 0.4);
+  background: linear-gradient(90deg, #faf0c7, #f4dd92);
+  box-shadow: 0 0 8px rgba(250, 240, 199, 0.4);
   width: 0%;
   transition: width 0.3s ease;
 }
@@ -1685,8 +1840,8 @@ watch(lastAutoUpdate, (value) => {
   height: 32px;
   border-radius: 10px;
   border: none;
-  background: #f97316;
-  color: #0a0a0a;
+  background: #faf0c7;
+  color: #161a3a;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1696,12 +1851,102 @@ watch(lastAutoUpdate, (value) => {
   color: #737373;
 }
 
+.upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upcoming-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: #1a1e44;
+  border: 1px solid #2b3066;
+  border-radius: 14px;
+  padding: 10px;
+  cursor: pointer;
+  color: #ffffff;
+  transition: border-color 0.2s ease, transform 0.1s ease;
+}
+
+.upcoming-card:hover {
+  border-color: #faf0c7;
+}
+
+.upcoming-card:active {
+  transform: scale(0.99);
+}
+
+.upcoming-card.soon {
+  border-color: rgba(250, 240, 199, 0.5);
+  background: rgba(250, 240, 199, 0.08);
+}
+
+.upcoming-card img {
+  width: 46px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.upcoming-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.upcoming-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.upcoming-ep {
+  font-size: 11px;
+  color: #a3a3a3;
+}
+
+.upcoming-when {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #faf0c7;
+  margin-top: 4px;
+}
+
+.upcoming-when span.material-icons {
+  font-size: 13px;
+}
+
+.upcoming-day {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 600;
+  color: #d4d4d4;
+  background: #2b3066;
+  border-radius: 8px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.upcoming-card.soon .upcoming-day {
+  background: rgba(250, 240, 199, 0.2);
+  color: #faf0c7;
+}
+
 .hikari-note {
   margin-top: 12px;
   padding: 12px;
   border-radius: 12px;
-  background: rgba(249, 115, 22, 0.1);
-  border: 1px solid rgba(249, 115, 22, 0.2);
+  background: rgba(250, 240, 199, 0.1);
+  border: 1px solid rgba(250, 240, 199, 0.2);
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -1729,18 +1974,18 @@ watch(lastAutoUpdate, (value) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(249, 115, 22, 0.1);
+  background: rgba(250, 240, 199, 0.1);
   padding: 8px 12px;
   border-radius: 12px;
   font-size: 12px;
-  color: #f97316;
+  color: #faf0c7;
 }
 
 .detected-card {
-  background: #1a1a1a;
+  background: #1a1e44;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid #262626;
+  border: 1px solid #2b3066;
 }
 
 .detected-hero {
@@ -1758,7 +2003,7 @@ watch(lastAutoUpdate, (value) => {
 .detected-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to bottom, transparent, #1a1a1a);
+  background: linear-gradient(to bottom, transparent, #1a1e44);
 }
 
 .detected-body {
@@ -1773,7 +2018,7 @@ watch(lastAutoUpdate, (value) => {
   height: 82px;
   border-radius: 10px;
   overflow: hidden;
-  border: 2px solid #0a0a0a;
+  border: 2px solid #161a3a;
 }
 
 .detected-cover img {
@@ -1800,7 +2045,7 @@ watch(lastAutoUpdate, (value) => {
 
 .detected-match {
   font-size: 11px;
-  color: #f97316;
+  color: #faf0c7;
   margin-top: 6px;
 }
 
@@ -1817,10 +2062,10 @@ watch(lastAutoUpdate, (value) => {
 
 .status-trigger {
   width: 100%;
-  border: 1px solid #262626;
+  border: 1px solid #2b3066;
   border-radius: 10px;
   padding: 10px 12px;
-  background: #141414;
+  background: #10132e;
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -1832,8 +2077,8 @@ watch(lastAutoUpdate, (value) => {
   left: 0;
   right: 0;
   top: calc(100% + 6px);
-  background: #1a1a1a;
-  border: 1px solid #262626;
+  background: #1a1e44;
+  border: 1px solid #2b3066;
   border-radius: 10px;
   overflow: hidden;
   z-index: 10;
@@ -1850,8 +2095,8 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .status-menu button.active {
-  background: rgba(249, 115, 22, 0.15);
-  color: #f97316;
+  background: rgba(250, 240, 199, 0.15);
+  color: #faf0c7;
 }
 
 .progress-control {
@@ -1878,21 +2123,21 @@ watch(lastAutoUpdate, (value) => {
   height: 34px;
   border-radius: 10px;
   border: none;
-  background: #262626;
+  background: #2b3066;
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;
 }
 
 .progress-btn.primary {
-  background: #f97316;
-  color: #0a0a0a;
+  background: #faf0c7;
+  color: #161a3a;
 }
 
 .progress-row input {
   flex: 1;
-  background: #141414;
-  border: 1px solid #262626;
+  background: #10132e;
+  border: 1px solid #2b3066;
   border-radius: 10px;
   padding: 8px;
   color: #ffffff;
@@ -1901,7 +2146,7 @@ watch(lastAutoUpdate, (value) => {
 
 .progress-bar {
   height: 6px;
-  background: #262626;
+  background: #2b3066;
   border-radius: 999px;
   overflow: hidden;
 }
@@ -1909,7 +2154,7 @@ watch(lastAutoUpdate, (value) => {
 .progress-bar span {
   display: block;
   height: 100%;
-  background: #f97316;
+  background: #faf0c7;
   width: 0%;
 }
 
@@ -1951,7 +2196,7 @@ watch(lastAutoUpdate, (value) => {
 .toggle {
   width: 40px;
   height: 22px;
-  background: #262626;
+  background: #2b3066;
   border-radius: 999px;
   border: none;
   position: relative;
@@ -1970,7 +2215,7 @@ watch(lastAutoUpdate, (value) => {
 }
 
 .toggle.on {
-  background: #f97316;
+  background: #faf0c7;
 }
 
 .toggle.on span {
@@ -1985,8 +2230,8 @@ watch(lastAutoUpdate, (value) => {
   gap: 10px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #262626;
-  background: #141414;
+  border: 1px solid #2b3066;
+  background: #10132e;
   cursor: pointer;
   color: #ffffff;
 }
@@ -1995,19 +2240,19 @@ watch(lastAutoUpdate, (value) => {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  background: rgba(249, 115, 22, 0.15);
+  background: rgba(250, 240, 199, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #f97316;
+  color: #faf0c7;
 }
 
 .settings-advanced {
   margin-top: 16px;
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid #262626;
-  background: #141414;
+  border: 1px solid #2b3066;
+  background: #10132e;
 }
 
 .advanced-list {
@@ -2023,8 +2268,8 @@ watch(lastAutoUpdate, (value) => {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 10px;
-  border: 1px solid #262626;
-  background: #0f0f0f;
+  border: 1px solid #2b3066;
+  background: #141735;
   color: #ffffff;
   font-size: 11px;
   cursor: pointer;
@@ -2032,13 +2277,13 @@ watch(lastAutoUpdate, (value) => {
 
 .advanced-link span.material-icons {
   font-size: 16px;
-  color: #f97316;
+  color: #faf0c7;
 }
 
 .profile-row {
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid #262626;
+  border-top: 1px solid #2b3066;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2048,11 +2293,12 @@ watch(lastAutoUpdate, (value) => {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f97316, #ea580c);
+  background: linear-gradient(135deg, #faf0c7, #f4dd92);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  color: #161a3a;
 }
 
 .profile-info {
@@ -2084,15 +2330,15 @@ watch(lastAutoUpdate, (value) => {
   gap: 12px;
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid #262626;
-  background: #141414;
+  border: 1px solid #2b3066;
+  background: #10132e;
   color: #ffffff;
   cursor: pointer;
   position: relative;
 }
 
 .site-row.active {
-  border-color: #f97316;
+  border-color: #faf0c7;
 }
 
 .site-icon {
@@ -2109,7 +2355,7 @@ watch(lastAutoUpdate, (value) => {
 
 .check-icon {
   margin-left: auto;
-  color: #f97316;
+  color: #faf0c7;
   opacity: 0;
 }
 

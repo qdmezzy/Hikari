@@ -24,7 +24,9 @@ function updateListener() {
 
 async function registerScripts() {
   if (typeof chrome.scripting === 'undefined') {
-    con.error('Custom Domain is not possible');
+    // `scripting` is an optional permission and is undefined until the user
+    // grants it. Expected, not an error — log quietly instead of red-flagging it.
+    con.log('Custom domains unavailable (scripting permission not granted)');
     return;
   }
 
@@ -40,7 +42,20 @@ async function registerScripts() {
 
   await chrome.scripting.unregisterContentScripts();
   if (domains) {
-    await Promise.all(domains.map(registerScript));
+    // Only register sites we actually hold host permission for. The chibi list
+    // contains hundreds of domains; trying to register ones we can't access just
+    // throws a wall of permission errors. This keeps it to enabled sites only.
+    const permitted: domainType[] = [];
+    for (const domainConfig of domains) {
+      if (domainConfig.page === 'hostpermission') continue;
+      try {
+        const has = await chrome.permissions.contains({ origins: [domainConfig.domain] });
+        if (has) permitted.push(domainConfig);
+      } catch {
+        /* invalid match pattern — skip */
+      }
+    }
+    await Promise.all(permitted.map(registerScript));
   }
 
   const scripts = await chrome.scripting.getRegisteredContentScripts();

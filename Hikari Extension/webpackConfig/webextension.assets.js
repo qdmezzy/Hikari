@@ -138,16 +138,6 @@ const generateManifest = () => {
         '128': 'icons/icon128.png',
       },
     },
-    sidebar_action: {
-      default_panel: 'window.html',
-      open_at_install: false,
-      default_icon: {
-        '16': 'icons/icon16.png',
-        '32': 'icons/icon32.png',
-        '48': 'icons/icon48.png',
-        '128': 'icons/icon128.png',
-      },
-    },
     options_ui: {
       page: 'settings.html',
       browser_style: false,
@@ -188,15 +178,31 @@ const generateManifest = () => {
       'alarms',
       'notifications',
       'declarativeNetRequestWithHostAccess',
+      // Required so chibi-based sites (e.g. Crunchyroll) can be registered as
+      // dynamic content scripts on startup — without this they never inject.
+      'scripting',
     ],
-    "optional_permissions": [
-      "scripting",
-    ],
+    "optional_permissions": [],
     host_permissions: httpPermissionsJson,
     "optional_host_permissions": [
       "*://*/*",
     ],
   };
+
+  // sidebar_action is a Firefox-only manifest key; Chrome logs an
+  // "Unrecognized manifest key" warning for it. Only emit it for Firefox.
+  if (appTarget === 'firefox') {
+    mani.sidebar_action = {
+      default_panel: 'window.html',
+      open_at_install: false,
+      default_icon: {
+        '16': 'icons/icon16.png',
+        '32': 'icons/icon32.png',
+        '48': 'icons/icon48.png',
+        '128': 'icons/icon128.png',
+      },
+    };
+  }
 
   if (mode === 'travis' && appTarget !== 'firefox') {
     delete mani.browser_specific_settings;

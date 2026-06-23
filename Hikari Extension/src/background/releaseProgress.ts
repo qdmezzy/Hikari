@@ -1,4 +1,5 @@
 import { getList } from '../_provider/listFactory';
+import { NotAutenticatedError } from '../_provider/Errors';
 import type { listElement } from '../_provider/listAbstract';
 import { KeepAlive } from './keepAlive';
 import {
@@ -97,12 +98,16 @@ async function listUpdateWithPOST(state, type) {
         try {
           await multiple(list, type, logger);
         } catch (e) {
-          logger.error(e);
+          if (e instanceof NotAutenticatedError) logger.log('No list provider authenticated — skipping.');
+          else logger.error(e);
         }
       }
     })
     .catch(e => {
-      logger.error(e);
+      // Hikari users don't connect a MAL-Sync list provider, so this prediction
+      // sync legitimately has nothing to authenticate against — keep it quiet.
+      if (e instanceof NotAutenticatedError) logger.log('No list provider authenticated — skipping.');
+      else logger.error(e);
     });
 }
 

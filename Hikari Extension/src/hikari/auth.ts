@@ -14,22 +14,34 @@ type SessionResponse = {
   };
 };
 
-export async function signInWithPassword(email: string, password: string) {
+// Supabase auth via the background worker (api.request.xhr) so it works from
+// content scripts on CSP-restricted streaming sites and from the popup alike.
+async function authRequest(path: string, body: Record<string, unknown>): Promise<SessionResponse> {
   const { url, anonKey } = getHikariConfig();
-  const res = await fetch(`${url}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
+  const response = await api.request.xhr('POST', {
+    url: `${url}${path}`,
     headers: {
       apikey: anonKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    data: JSON.stringify(body),
   });
 
-  const data = (await res.json()) as SessionResponse;
-  if (!res.ok) {
-    throw new Error((data as any)?.error_description || 'Sign in failed');
+  let data: any = {};
+  try {
+    data = JSON.parse(response.responseText || '{}');
+  } catch {
+    data = {};
   }
 
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(data?.error_description || data?.msg || 'Authentication failed');
+  }
+
+  return data as SessionResponse;
+}
+
+const persist = async (data: SessionResponse) => {
   const expiresAt = Math.floor(Date.now() / 1000) + data.expires_in;
   await setSession({
     accessToken: data.access_token,
@@ -41,6 +53,11 @@ export async function signInWithPassword(email: string, password: string) {
       displayName: data.user.user_metadata?.display_name,
     },
   });
+};
+
+export async function signInWithPassword(email: string, password: string) {
+  const data = await authRequest('/auth/v1/token?grant_type=password', { email, password });
+  await persist(data);
 }
 
 export async function signOut() {
@@ -56,32 +73,14 @@ export async function getValidSession() {
 }
 
 export async function refreshSession(refreshToken: string) {
-  const { url, anonKey } = getHikariConfig();
-  const res = await fetch(`${url}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST',
-    headers: {
-      apikey: anonKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-
-  const data = (await res.json()) as SessionResponse;
-  if (!res.ok) {
+  try {
+    const data = await authRequest('/auth/v1/token?grant_type=refresh_token', {
+      refresh_token: refreshToken,
+    });
+    await persist(data);
+  } catch (e) {
     await setSession(null);
-    throw new Error((data as any)?.error_description || 'Session refresh failed');
+    throw e;
   }
-
-  const expiresAt = Math.floor(Date.now() / 1000) + data.expires_in;
-  await setSession({
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token,
-    expiresAt,
-    user: {
-      id: data.user.id,
-      email: data.user.email,
-      displayName: data.user.user_metadata?.display_name,
-    },
-  });
   return getSession();
 }

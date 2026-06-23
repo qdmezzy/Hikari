@@ -393,7 +393,9 @@ export const background = {
           setBadgeText('');
         });
     }
-    con.error('Background list Sync not allowed');
+    // Cross-provider background list sync is a MAL-Sync feature Hikari doesn't
+    // use; when it isn't enabled this is expected, not an error.
+    con.log('Background list Sync not enabled');
     return [];
 
     async function syncLists(type) {

@@ -17,7 +17,6 @@ const LAST_AUTO_UPDATE_KEY = 'hikariLastAutoUpdate';
 export type ExtensionSettings = {
   autoTrack: boolean;
   notifications: boolean;
-  spoilerShield: boolean;
   quicklinks: string[];
 };
 
@@ -32,7 +31,6 @@ export type LastAutoUpdate = {
 const DEFAULT_SETTINGS: ExtensionSettings = {
   autoTrack: true,
   notifications: true,
-  spoilerShield: true,
   quicklinks: ['crunchyroll'],
 };
 

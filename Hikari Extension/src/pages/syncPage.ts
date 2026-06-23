@@ -7,7 +7,7 @@ import { SearchClass } from '../_provider/Search/vueSearchClass';
 import { emitter } from '../utils/emitter';
 import { Cache } from '../utils/Cache';
 import { isIframeUrl } from '../utils/manifest';
-import { NotFoundError, UrlNotSupportedError } from '../_provider/Errors';
+import { NotAutenticatedError, NotFoundError, UrlNotSupportedError } from '../_provider/Errors';
 import { hasMissingPermissions } from '../utils/customDomains';
 import { localStore } from '../utils/localStore';
 import { MangaProgress } from '../utils/mangaProgress/MangaProgress';
@@ -457,6 +457,13 @@ export class SyncPage {
           tempSingle = getSingle(localUrl);
           await tempSingle.update();
           this.singleObj = tempSingle;
+        } else if (e instanceof NotAutenticatedError) {
+          // Hikari-only mode: the user tracks via Hikari (handled by syncHikari),
+          // not a MAL-Sync list provider. When no provider is authenticated, skip
+          // the native sync silently instead of throwing / flashing a red error.
+          logger.log('[Hikari] No list provider authenticated — skipping native sync.');
+          if (tempSingle) this.singleObj = tempSingle;
+          return;
         } else {
           if (tempSingle) this.singleObj = tempSingle;
           this.singleObj.flashmError(e);

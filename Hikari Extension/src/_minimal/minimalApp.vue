@@ -59,9 +59,9 @@ const applyHikariBackground = () => {
   if (isPopup.value || route.name === 'Hikari') {
     rootHtml.classList.add('hikari-mode');
     rootHtml.classList.remove('backImage');
-    rootHtml.style.background = '#0f0f0f';
+    rootHtml.style.background = '#0f1133';
     rootHtml.style.backgroundImage = 'none';
-    rootBody.style.background = '#0f0f0f';
+    rootBody.style.background = '#0f1133';
     rootHtml.style.borderRadius = '0';
     rootHtml.style.setProperty('--cl-backdrop', 'transparent');
     rootHtml.style.setProperty('--cl-background', 'transparent');

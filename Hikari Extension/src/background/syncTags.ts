@@ -5,10 +5,10 @@ function saveInList(key, el) {
   con.info('Save', key, 'in sync list [', el, ']');
   return api.storage.get('list-tagSettings').then(list => {
     try {
-      list = JSON.parse(list);
-      if (!Array.isArray(list)) throw 'Not an array';
+      list = list ? JSON.parse(list) : [];
+      if (!Array.isArray(list)) list = [];
     } catch (e) {
-      con.error(e);
+      con.log('Resetting tag sync list', e);
       list = [];
     }
     list.push({
@@ -41,9 +41,9 @@ function importList() {
     .get('list-tagSettings')
     .then(async list => {
       try {
-        list = JSON.parse(list);
+        list = list ? JSON.parse(list) : [];
       } catch (e) {
-        con.error(e);
+        con.log('No tag sync list yet', e);
         list = [];
       }
       let curDate = await api.storage.get('tm-list-tagSettings');
