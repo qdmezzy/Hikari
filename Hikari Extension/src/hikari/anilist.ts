@@ -64,9 +64,89 @@ query ($id: Int) {
 }
 `;
 
+// Persistent media cache. Covers/titles/episodes are stable, so caching them
+// in chrome.storage keeps us well under AniList's rate limit (the popup + the
+// scrobbler were re-fetching the same titles on every refresh and getting 429s).
+const MEDIA_CACHE_KEY = 'hikariMediaCache';
+const MEDIA_CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
+const MEDIA_CACHE_CAP = 600;
+
+type MediaCacheEntry = { data: any; ts: number };
+
+async function readMediaCache(): Promise<Record<string, MediaCacheEntry>> {
+  try {
+    const r = await chrome.storage.local.get(MEDIA_CACHE_KEY);
+    return (r[MEDIA_CACHE_KEY] as Record<string, MediaCacheEntry>) || {};
+  } catch {
+    return {};
+  }
+}
+
+async function writeMediaCache(cache: Record<string, MediaCacheEntry>) {
+  try {
+    let toStore = cache;
+    const entries = Object.entries(cache);
+    if (entries.length > MEDIA_CACHE_CAP) {
+      toStore = Object.fromEntries(entries.sort((a, b) => b[1].ts - a[1].ts).slice(0, MEDIA_CACHE_CAP));
+    }
+    await chrome.storage.local.set({ [MEDIA_CACHE_KEY]: toStore });
+  } catch {
+    /* storage full / unavailable — non-fatal */
+  }
+}
+
 export async function fetchMediaById(id: number) {
+  const cache = await readMediaCache();
+  const hit = cache[String(id)];
+  if (hit && Date.now() - hit.ts < MEDIA_CACHE_TTL) return hit.data;
+
   const json = await anilistPost(MEDIA_QUERY, { id });
-  return json?.data?.Media ?? null;
+  const media = json?.data?.Media ?? null;
+  if (media) {
+    cache[String(id)] = { data: media, ts: Date.now() };
+    await writeMediaCache(cache);
+  }
+  return media;
+}
+
+const MEDIA_BATCH_QUERY = `
+query ($ids: [Int], $perPage: Int) {
+  Page(page: 1, perPage: $perPage) {
+    media(id_in: $ids) {
+      id
+      type
+      title { romaji english }
+      coverImage { large }
+      nextAiringEpisode { episode }
+      episodes
+      chapters
+      format
+    }
+  }
+}
+`;
+
+// Warm the cache for many ids in a single request (instead of one call per id).
+export async function prefetchMedia(ids: number[]) {
+  const unique = Array.from(new Set(ids.map(Number).filter(Number.isFinite)));
+  if (!unique.length) return;
+
+  const cache = await readMediaCache();
+  const now = Date.now();
+  const missing = unique.filter(id => {
+    const hit = cache[String(id)];
+    return !(hit && now - hit.ts < MEDIA_CACHE_TTL);
+  });
+  if (!missing.length) return;
+
+  for (const batch of chunk(missing, 50)) {
+    const json = await anilistPost(MEDIA_BATCH_QUERY, { ids: batch, perPage: batch.length });
+    const media = (json?.data?.Page?.media ?? []) as any[];
+    media.forEach(m => {
+      if (m?.id) cache[String(m.id)] = { data: m, ts: Date.now() };
+    });
+  }
+  await writeMediaCache(cache);
 }
 
 export type AiringMedia = {

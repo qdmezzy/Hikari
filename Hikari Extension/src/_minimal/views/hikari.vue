@@ -151,8 +151,9 @@
             class="hikari-nav-btn"
             :class="{ active: view === 'detected' }"
             @click="view = 'detected'"
+            title="Auto-tracked + current detection"
           >
-            <span class="material-icons">play_circle_filled</span>
+            <span class="material-icons">playlist_add_check</span>
           </button>
           <button
             class="hikari-nav-btn"
@@ -208,12 +209,19 @@
           <div class="hikari-section">
             <div class="hikari-note">
               <div class="note-dot"></div>
-              <div>
+              <div style="flex: 1; min-width: 0">
                 <div class="note-title">Auto-tracking active</div>
                 <div class="note-sub">
                   {{ detectedSite ? `Watching ${detectedSite}` : 'Waiting for a supported site' }}
                 </div>
-                <div class="note-sub">{{ lastAutoUpdateLabel }}</div>
+                <div v-if="liveActive" class="live-row" :class="liveProgress?.state">
+                  <span class="live-dot"></span>
+                  <span>{{ liveLabel }}</span>
+                </div>
+                <div v-else class="note-sub">{{ lastAutoUpdateLabel }}</div>
+                <div v-if="liveActive" class="live-bar" style="margin-top: 6px">
+                  <span :style="{ width: `${livePercent}%` }"></span>
+                </div>
               </div>
             </div>
           </div>
@@ -320,83 +328,67 @@
           </div>
         </section>
         <section v-if="view === 'detected'" class="hikari-view">
-          <div class="hikari-detected-banner">
-            <div class="note-dot"></div>
-            <span>{{ detectedTab ? `Detected on ${detectedSite}` : 'No active tab detected' }}</span>
-          </div>
-
-          <div class="detected-card">
-            <div class="detected-hero">
-              <img :src="detectedImage || placeholder" alt="" />
-              <div class="detected-overlay"></div>
-            </div>
-            <div class="detected-body">
-              <div class="detected-cover">
-                <img :src="detectedImage || placeholder" alt="" />
+          <!-- Compact current detection + live status + one-tap manual save -->
+          <div class="detected-strip">
+            <img :src="detectedImage || placeholder" alt="" />
+            <div class="detected-strip-meta">
+              <div class="detected-title">{{ detectedTitle || 'No media detected' }}</div>
+              <div class="detected-sub">
+                <template v-if="detectedTab">
+                  Ep {{ detectedProgress }}<template v-if="detectedTotal">/{{ detectedTotal }}</template>
+                  · {{ detectedSite }}
+                </template>
+                <template v-else>No active tab</template>
               </div>
-              <div class="detected-info">
-                <div class="detected-title">{{ detectedTitle || 'No media detected' }}</div>
-                <div class="detected-sub">
-                  {{ detectedTotal ? `${detectedTotal} episodes` : 'Episodes unknown' }}
-                </div>
-                <div v-if="detectedMatchNote" class="detected-match">{{ detectedMatchNote }}</div>
+              <div v-if="liveActive" class="live-row" :class="liveProgress?.state">
+                <span class="live-dot"></span>
+                <span>{{ liveLabel }}</span>
               </div>
             </div>
-
-            <div class="detected-actions">
-              <div class="status-dropdown">
-                <button class="status-trigger" @click="statusOpen = !statusOpen">
-                  {{ statusLabel }}
-                  <span class="material-icons">expand_more</span>
-                </button>
-                <div v-if="statusOpen" class="status-menu">
-                  <button
-                    v-for="option in statusOptions"
-                    :key="option.id"
-                    :class="{ active: detectedStatus === option.id }"
-                    @click="selectStatus(option.id)"
-                  >
-                    {{ option.label }}
-                  </button>
-                </div>
-              </div>
-
-              <div class="progress-control">
-                <div class="progress-header">
-                  <span>Episode</span>
-                  <span>{{ detectedProgress }} / {{ detectedTotal || '?' }}</span>
-                </div>
-                <div class="progress-row">
-                  <button class="progress-btn" @click="adjustDetected(-1)">-</button>
-                  <input
-                    type="number"
-                    min="0"
-                    :max="detectedTotal || undefined"
-                    v-model.number="detectedProgress"
-                    @change="clampDetected"
-                  />
-                  <button class="progress-btn primary" @click="adjustDetected(1)">+</button>
-                </div>
-                <div class="progress-bar">
-                  <span :style="{ width: detectedTotal ? `${(detectedProgress / detectedTotal) * 100}%` : '0%' }"></span>
-                </div>
-              </div>
+            <div class="detected-strip-actions">
+              <button class="progress-btn" @click="adjustDetected(-1)" :disabled="!detectedMedia">-</button>
+              <button class="progress-btn" @click="adjustDetected(1)" :disabled="!detectedMedia">+</button>
+              <button
+                class="hikari-primary detected-save-sm"
+                @click="saveDetected"
+                :disabled="savePending || !detectedMedia"
+              >
+                {{ savePending ? '…' : 'Save' }}
+              </button>
             </div>
           </div>
-
-          <div v-if="detectedLoading" class="hikari-muted">Matching title...</div>
+          <div v-if="liveActive" class="live-bar"><span :style="{ width: `${livePercent}%` }"></span></div>
           <div v-if="detectedError" class="hikari-error">{{ detectedError }}</div>
 
-          <div class="detected-buttons">
-            <button class="hikari-secondary" @click="openInHikari(mediaLinkPath)" :disabled="!detectedMedia">
-              Open in Hikari
-            </button>
+          <!-- Running log of what Hikari auto-tracked -->
+          <div class="hikari-section-header">
+            <div class="section-title">
+              <span class="material-icons">playlist_add_check</span>
+              Auto-tracked
+            </div>
+            <button class="link-btn" @click="openInHikari('/lists')">My list</button>
+          </div>
+
+          <div v-if="!autoUpdates.length" class="hikari-muted">
+            Nothing auto-tracked yet. Watch about half of an episode on a supported site and it
+            shows up here automatically.
+          </div>
+
+          <div v-else class="updates-list">
             <button
-              class="hikari-primary"
-              @click="saveDetected"
-              :disabled="savePending || !detectedMedia"
+              v-for="item in autoUpdates"
+              :key="`${item.mediaId}-${item.episode}-${item.at}`"
+              class="update-row"
+              @click="openInHikari(`/media/${item.mediaId}`)"
             >
-              {{ savePending ? 'Saving...' : 'Save' }}
+              <img :src="item.image || placeholder" :alt="item.title" />
+              <div class="update-meta">
+                <div class="update-title">{{ item.title || `ID ${item.mediaId}` }}</div>
+                <div class="update-sub">
+                  Episode {{ item.episode }}<template v-if="item.site"> · {{ item.site }}</template>
+                </div>
+              </div>
+              <span class="update-time">{{ formatRelativeTime(item.at, nowTick) || 'just now' }}</span>
             </button>
           </div>
         </section>
@@ -519,15 +511,18 @@
 <script lang="ts" setup>
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { fetchEntries, fetchEntry, upsertEntry } from '../../hikari/client';
-import { fetchAiringByIds, fetchMediaById, searchAniList } from '../../hikari/anilist';
+import { fetchAiringByIds, fetchMediaById, prefetchMedia, searchAniList } from '../../hikari/anilist';
 import {
   cacheMatch,
+  getAutoUpdates,
   getCachedMatch,
   getExtensionSettings,
   getLastAutoUpdate,
+  getLiveProgress,
   setExtensionSettings,
   type ExtensionSettings,
   type LastAutoUpdate,
+  type LiveProgress,
 } from '../../hikari/storage';
 import { getValidSession, signInWithPassword, signOut } from '../../hikari/auth';
 import { HIKARI_WEB_URL } from '../../hikari/config';
@@ -811,6 +806,41 @@ const loadLastAutoUpdate = async () => {
   lastAutoUpdate.value = await getLastAutoUpdate();
 };
 
+const autoUpdates = ref<LastAutoUpdate[]>([]);
+const loadAutoUpdates = async () => {
+  autoUpdates.value = await getAutoUpdates();
+};
+
+const liveProgress = ref<LiveProgress | null>(null);
+const loadLiveProgress = async () => {
+  liveProgress.value = await getLiveProgress();
+};
+
+// Live status only counts as "current" if it was updated very recently.
+const liveActive = computed(() => {
+  nowTick.value; // re-evaluate as time passes so it expires
+  const live = liveProgress.value;
+  return !!live && Date.now() - live.at < 5 * 60 * 1000;
+});
+
+const livePercent = computed(() =>
+  liveProgress.value ? Math.round(Math.min(Math.max(liveProgress.value.fraction, 0), 1) * 100) : 0,
+);
+
+const liveLabel = computed(() => {
+  if (!liveActive.value || !liveProgress.value) return '';
+  switch (liveProgress.value.state) {
+    case 'saving':
+      return 'Saving…';
+    case 'saved':
+      return 'Saved ✓';
+    case 'error':
+      return 'Save failed — retrying';
+    default:
+      return livePercent.value >= 50 ? 'Watching · saved at 50%' : `Watching · ${livePercent.value}% (saves at 50%)`;
+  }
+});
+
 const toggleSetting = async (key: keyof ExtensionSettings) => {
   const next = { ...settings.value, [key]: !settings.value[key] };
   settings.value = next;
@@ -1046,7 +1076,11 @@ const resolveDetected = async () => {
         const entry = await fetchEntry(media.id);
         if (entry) {
           detectedStatus.value = entry.status;
-          detectedProgress.value = clampValue(entry.progress || 0, detectedTotal.value);
+          // Show the episode detected on the *page* (so a wrong number is visible
+          // and one tap fixes it); fall back to saved progress if the page has none.
+          const pageEp = clampValue(payload.episode || 0, detectedTotal.value);
+          detectedProgress.value =
+            pageEp > 0 ? pageEp : clampValue(entry.progress || 0, detectedTotal.value);
         }
       } catch (error) {
         detectedError.value = '';
@@ -1129,6 +1163,12 @@ const loadDashboard = async () => {
     const watching = sortedEntries
       .filter((entry) => ['watching', 'rewatching'].includes(entry.status))
       .slice(0, 6);
+
+    // Warm the media cache for everything we're about to render in ONE batched
+    // request, so the per-item lookups below are cache hits (no rate limit).
+    const recentEntries = sortedEntries.slice(0, 6);
+    await prefetchMedia([...watching, ...recentEntries].map((e) => e.media_id));
+
     const mediaItems = await Promise.all(
       watching.map(async (entry) => {
         const media = await getMediaInfo(entry.media_id);
@@ -1146,7 +1186,6 @@ const loadDashboard = async () => {
     );
     watchingItems.value = mediaItems;
 
-    const recentEntries = sortedEntries.slice(0, 6);
     const recentMediaItems = await Promise.all(
       recentEntries.map(async (entry) => {
         const media = await getMediaInfo(entry.media_id);
@@ -1286,6 +1325,8 @@ onMounted(async () => {
   await loadSession();
   await loadSettings();
   await loadLastAutoUpdate();
+  await loadAutoUpdates();
+  await loadLiveProgress();
   if (session.value) {
     await loadDashboard();
   }
@@ -1294,6 +1335,12 @@ onMounted(async () => {
   if (chrome?.storage?.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== 'local') return;
+      if (changes.hikariLiveProgress) {
+        liveProgress.value = (changes.hikariLiveProgress.newValue as LiveProgress) || null;
+      }
+      if (changes.hikariAutoUpdates) {
+        autoUpdates.value = (changes.hikariAutoUpdates.newValue as LastAutoUpdate[]) || [];
+      }
       if (changes.hikariLastAutoUpdate) {
         lastAutoUpdate.value = changes.hikariLastAutoUpdate.newValue || null;
         loadSession().then(() => {
@@ -1310,18 +1357,22 @@ onMounted(async () => {
     nowTick.value = Date.now();
   }, 60 * 1000);
 
+  // Refresh on a relaxed cadence — media is cached, so we mainly need to pick up
+  // session changes. Auto-update + detection refresh instantly via storage/tab
+  // watchers, so a tight loop here just burned through the AniList rate limit.
   refreshTimer = window.setInterval(() => {
     loadSession().then(() => {
       loadLastAutoUpdate();
+      loadAutoUpdates();
+      loadLiveProgress();
       if (session.value) {
         loadDashboard();
-        resolveDetected();
       } else {
         watchingItems.value = [];
         recentItems.value = [];
       }
     });
-  }, 30 * 1000);
+  }, 120 * 1000);
 });
 
 onBeforeUnmount(() => {
@@ -2166,6 +2217,158 @@ watch(lastAutoUpdate, (value) => {
 .detected-buttons button {
   flex: 1;
 }
+.detected-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid #2b3066;
+  background: #1a1e44;
+}
+
+.detected-strip img {
+  width: 36px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.detected-strip-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.detected-strip-meta .detected-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detected-strip-meta .detected-sub {
+  font-size: 11px;
+  color: #8b8fb0;
+  margin-top: 2px;
+}
+
+.detected-strip-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.detected-save-sm {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.live-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  margin-top: 3px;
+  color: #8b8fb0;
+}
+
+.live-row.saving {
+  color: #faf0c7;
+}
+
+.live-row.saved {
+  color: #34d399;
+}
+
+.live-row.error {
+  color: #f87171;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.live-bar {
+  height: 4px;
+  background: #2b3066;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.live-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #faf0c7, #f4dd92);
+  transition: width 0.4s ease;
+}
+
+.updates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  background: #1a1e44;
+  border: 1px solid #2b3066;
+  border-radius: 12px;
+  padding: 8px;
+  cursor: pointer;
+  color: #ffffff;
+  transition: border-color 0.2s ease;
+}
+
+.update-row:hover {
+  border-color: #faf0c7;
+}
+
+.update-row img {
+  width: 38px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.update-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.update-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.update-sub {
+  font-size: 11px;
+  color: #8b8fb0;
+  margin-top: 2px;
+}
+
+.update-time {
+  font-size: 10px;
+  color: #6b7099;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
 .hikari-settings h3 {
   margin: 0 0 12px;
   font-size: 14px;

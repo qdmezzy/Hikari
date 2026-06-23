@@ -13,6 +13,9 @@ const SESSION_KEY = 'hikariSession';
 const MATCH_CACHE_KEY = 'hikariMatchCache';
 const SETTINGS_KEY = 'hikariExtensionSettings';
 const LAST_AUTO_UPDATE_KEY = 'hikariLastAutoUpdate';
+const AUTO_UPDATES_KEY = 'hikariAutoUpdates';
+const AUTO_UPDATES_CAP = 40;
+const LIVE_PROGRESS_KEY = 'hikariLiveProgress';
 
 export type ExtensionSettings = {
   autoTrack: boolean;
@@ -26,6 +29,7 @@ export type LastAutoUpdate = {
   episode?: number;
   site?: string;
   mediaId?: number;
+  image?: string;
 };
 
 const DEFAULT_SETTINGS: ExtensionSettings = {
@@ -84,4 +88,46 @@ export async function getLastAutoUpdate(): Promise<LastAutoUpdate | null> {
 
 export async function setLastAutoUpdate(update: LastAutoUpdate) {
   await chrome.storage.local.set({ [LAST_AUTO_UPDATE_KEY]: update });
+}
+
+// Live "now watching" status the content script writes as you watch, so the
+// popup can show exactly what's happening (and self-heal state) in real time.
+export type LiveProgress = {
+  at: number;
+  episode?: number;
+  fraction: number; // 0..1 of the episode watched
+  state: 'watching' | 'saving' | 'saved' | 'error';
+  site?: string;
+};
+
+export async function getLiveProgress(): Promise<LiveProgress | null> {
+  const result = await chrome.storage.local.get(LIVE_PROGRESS_KEY);
+  return (result[LIVE_PROGRESS_KEY] as LiveProgress) || null;
+}
+
+export async function setLiveProgress(progress: LiveProgress | null) {
+  if (!progress) {
+    await chrome.storage.local.remove(LIVE_PROGRESS_KEY);
+    return;
+  }
+  await chrome.storage.local.set({ [LIVE_PROGRESS_KEY]: progress });
+}
+
+export async function getAutoUpdates(): Promise<LastAutoUpdate[]> {
+  const result = await chrome.storage.local.get(AUTO_UPDATES_KEY);
+  return (result[AUTO_UPDATES_KEY] as LastAutoUpdate[]) || [];
+}
+
+// Append an auto-tracked update to the running history (newest first, deduped
+// by media+episode so re-fires don't pile up). Also keeps lastAutoUpdate.
+export async function pushAutoUpdate(update: LastAutoUpdate) {
+  const list = await getAutoUpdates();
+  const filtered = list.filter(
+    item => !(item.mediaId === update.mediaId && item.episode === update.episode),
+  );
+  const next = [update, ...filtered].slice(0, AUTO_UPDATES_CAP);
+  await chrome.storage.local.set({
+    [AUTO_UPDATES_KEY]: next,
+    [LAST_AUTO_UPDATE_KEY]: update,
+  });
 }

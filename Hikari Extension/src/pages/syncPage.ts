@@ -13,7 +13,13 @@ import { localStore } from '../utils/localStore';
 import { MangaProgress } from '../utils/mangaProgress/MangaProgress';
 import { getPageConfig } from '../utils/test';
 import { searchAniList, fetchMediaById } from '../hikari/anilist';
-import { cacheMatch, getCachedMatch, getExtensionSettings, setLastAutoUpdate } from '../hikari/storage';
+import {
+  cacheMatch,
+  getCachedMatch,
+  getExtensionSettings,
+  pushAutoUpdate,
+  setLiveProgress,
+} from '../hikari/storage';
 import { fetchEntry, upsertEntry } from '../hikari/client';
 import { getValidSession } from '../hikari/auth';
 
@@ -25,6 +31,11 @@ if (typeof browser !== 'undefined' && typeof chrome !== 'undefined') {
 }
 
 const logger = con.m('Sync', '#348fff');
+
+// How much of an episode you must watch before Hikari auto-updates your list.
+// 0.5 = halfway. We write the episode you're actually on, so skipping ahead and
+// watching half of a later episode jumps your progress straight to it.
+const HIKARI_WATCH_THRESHOLD = 0.5;
 
 let browsingTimeout;
 
@@ -87,6 +98,22 @@ export class SyncPage {
   public videoSyncInterval;
 
   private hikariSyncPending = false;
+
+  // Fires the Hikari scrobble once per episode at the watch threshold. Reset
+  // whenever a new episode page is detected.
+  private hikariScrobbled = false;
+
+  // Throttle timestamp for the live "now watching" status writes.
+  private hikariLiveLast = 0;
+
+  // Whether we ever received video-player time for the current episode, the last
+  // watched fraction we saw, and a fallback timer used when no player time
+  // arrives (some sites/players can't be read).
+  private hikariGotVideoTime = false;
+
+  private hikariLastFraction = 0;
+
+  private hikariFallbackTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     public url,
@@ -178,6 +205,36 @@ export class SyncPage {
     this.resetPlayerError();
     const syncDuration = api.settings.get('videoDuration');
     const progress = (item.current / (item.duration * (syncDuration / 100))) * 100;
+
+    // Hikari auto-track: update once you've watched at least HIKARI_WATCH_THRESHOLD
+    // of the episode (default 50%), once per episode. syncHikari writes the
+    // episode you're on, so skipping ahead jumps your progress to that episode.
+    const hikariWatched = item.duration > 0 ? item.current / item.duration : 0;
+    this.hikariGotVideoTime = true;
+    this.hikariLastFraction = hikariWatched;
+    this.writeHikariLive(hikariWatched, 'watching');
+
+    if (
+      hikariWatched >= HIKARI_WATCH_THRESHOLD &&
+      this.curState &&
+      !this.hikariScrobbled &&
+      !this.hikariSyncPending
+    ) {
+      this.writeHikariLive(hikariWatched, 'saving', true);
+      this.syncHikari(this.curState)
+        .then(done => {
+          // Only stop trying once it actually committed (or was a definitive
+          // skip). A transient failure leaves the flag false so the next tick
+          // retries automatically.
+          this.hikariScrobbled = done;
+          this.writeHikariLive(hikariWatched, done ? 'saved' : 'error', true);
+        })
+        .catch(error => {
+          logger.error('[Hikari] Sync failed', error);
+          this.writeHikariLive(hikariWatched, 'error', true);
+        });
+    }
+
     if (j.$('#malSyncProgress').length) {
       if (progress < 100) {
         j.$('.ms-progress').css('width', `${progress}%`);
@@ -367,7 +424,13 @@ export class SyncPage {
       if (typeof this.page.sync.getVolume !== 'undefined') {
         state.volume = this.page.sync.getVolume(this.url);
       }
-      this.syncHikari(state).catch(error => logger.error('[Hikari] Sync failed', error));
+      // New episode detected — arm the scrobble. The actual Hikari update fires
+      // from setVideoTime once you've watched past the threshold (default 50%),
+      // with a timed fallback in case player time can't be read on this site.
+      this.hikariScrobbled = false;
+      this.hikariGotVideoTime = false;
+      this.hikariLastFraction = 0;
+      this.armHikariFallback(state);
       if (this.page.type === 'anime') {
         getPlayerTime((item, player) => {
           this.tempPlayer = player;
@@ -712,17 +775,64 @@ export class SyncPage {
     return null;
   }
 
-  private async syncHikari(state: pageState) {
-    const settings = await getExtensionSettings();
-    if (!settings.autoTrack) return;
+  // Fallback for sites where the video player's time can't be read: if no player
+  // time has arrived a few minutes after detecting the episode, assume it's being
+  // watched and sync once. (When player time IS available, the 50% threshold in
+  // setVideoTime handles it and this no-ops.)
+  private armHikariFallback(state: pageState) {
+    if (this.hikariFallbackTimer) clearTimeout(this.hikariFallbackTimer);
+    if (this.page.type !== 'anime') return;
 
-    if (this.hikariSyncPending) return;
+    this.hikariFallbackTimer = setTimeout(() => {
+      if (this.hikariGotVideoTime || this.hikariScrobbled || this.hikariSyncPending) return;
+      this.writeHikariLive(0.5, 'saving', true);
+      this.syncHikari(state)
+        .then(done => {
+          this.hikariScrobbled = done;
+          this.writeHikariLive(0.5, done ? 'saved' : 'error', true);
+        })
+        .catch(error => {
+          logger.error('[Hikari] Fallback sync failed', error);
+          this.writeHikariLive(0.5, 'error', true);
+        });
+    }, 2 * 60 * 1000);
+  }
+
+  // Publish the live "now watching" status to storage so the popup can show it.
+  // Plain progress updates are throttled; state changes (saving/saved/error) are
+  // written immediately.
+  private writeHikariLive(
+    fraction: number,
+    state: 'watching' | 'saving' | 'saved' | 'error',
+    force = false,
+  ) {
+    const now = Date.now();
+    if (!force && state === 'watching' && now - this.hikariLiveLast < 5000) return;
+    this.hikariLiveLast = now;
+    void setLiveProgress({
+      at: now,
+      episode: this.curState?.episode,
+      fraction: Math.min(Math.max(fraction, 0), 1),
+      state,
+      site: this.page?.name,
+    });
+  }
+
+  // Commit the current episode to the user's Hikari list.
+  // Returns true when there's nothing more to do (committed, or a definitive
+  // skip like "already watched"/"dropped"). Returns false on a transient failure
+  // (rate limit / network) so the caller can retry on the next tick.
+  private async syncHikari(state: pageState): Promise<boolean> {
+    const settings = await getExtensionSettings();
+    if (!settings.autoTrack) return true;
+    if (this.hikariSyncPending) return false;
+
     const episodeValue = Number.isFinite(state.episode)
       ? state.episode
       : Number.isFinite(state.detectedEpisode)
         ? state.detectedEpisode
         : null;
-    if (episodeValue === null) return;
+    if (episodeValue === null) return true;
 
     const session = await getValidSession();
     if (!session) {
@@ -731,63 +841,69 @@ export class SyncPage {
         localStore.setItem(warnKey, String(Date.now()));
         utils.flashm('Sign in to Hikari to enable tracking.', { error: true, type: 'Hikari' });
       }
-      return;
+      return true; // not signed in — nothing to retry
     }
 
     this.hikariSyncPending = true;
     try {
       const media = await this.resolveHikariMedia(state);
-      if (!media?.id) return;
+      if (!media?.id) return false; // couldn't match the title (often rate limited) — retry
 
       const progress = Math.max(0, Math.floor(episodeValue || 0));
       const mediaType = media.type || (this.page.type === 'manga' ? 'MANGA' : 'ANIME');
       const total = mediaType === 'MANGA' ? media.chapters : media.episodes;
 
-      const updatePayload = {
-        at: Date.now(),
-        title: state.title,
-        episode: progress,
-        site: this.page?.name,
-        mediaId: media.id,
-      };
-
+      // Already synced this exact episode very recently — done.
       const syncKey = `hikariSync:${media.id}:${progress}`;
-      const lastSync = Number(localStore.getItem(syncKey) || 0);
-      if (Date.now() - lastSync < 10 * 60 * 1000) {
-        await setLastAutoUpdate(updatePayload);
-        return;
-      }
-      localStore.setItem(syncKey, String(Date.now()));
+      if (Date.now() - Number(localStore.getItem(syncKey) || 0) < 10 * 60 * 1000) return true;
 
       let status: HikariStatus = 'watching';
-      let existing: { status?: HikariStatus } | null = null;
+      let existing: { status?: HikariStatus; progress?: number } | null;
       try {
-        existing = (await fetchEntry(media.id)) as { status?: HikariStatus } | null;
+        existing = (await fetchEntry(media.id)) as { status?: HikariStatus; progress?: number } | null;
       } catch (error) {
-        existing = null;
+        return false; // couldn't read the entry — retry
       }
 
       const isNewEntry = !existing?.status;
-      if (existing?.status) {
-        status = existing.status;
-      }
-
-      if (status === 'dropped') return;
+      if (existing?.status) status = existing.status;
+      if (status === 'dropped') return true; // respect "dropped" — leave it alone
       if (status === 'plan_to_watch' && progress > 0) status = 'watching';
+
+      // Never move progress backward — rewatching/scrubbing an earlier episode
+      // shouldn't lower your list. (Rewatch status may set any episode.)
+      const existingProgress = Number(existing?.progress || 0);
+      if (status !== 'rewatching' && progress <= existingProgress) return true;
+
       if (!isNewEntry && total && progress >= total) status = 'completed';
 
-      await upsertEntry({
-        user_id: session.user.id,
-        media_id: media.id,
-        media_type: mediaType,
-        status,
-        progress,
-      });
       try {
-        await setLastAutoUpdate(updatePayload);
+        await upsertEntry({
+          user_id: session.user.id,
+          media_id: media.id,
+          media_type: mediaType,
+          status,
+          progress,
+        });
       } catch (error) {
-        // ignore storage failures
+        return false; // write failed — retry
       }
+
+      // Only mark as synced AFTER the write succeeds, so failures can retry.
+      localStore.setItem(syncKey, String(Date.now()));
+      try {
+        await pushAutoUpdate({
+          at: Date.now(),
+          title: media.title?.english || media.title?.romaji || state.title,
+          episode: progress,
+          site: this.page?.name,
+          mediaId: media.id,
+          image: media.coverImage?.large || '',
+        });
+      } catch (error) {
+        // history write is best-effort
+      }
+      return true;
     } finally {
       this.hikariSyncPending = false;
     }
