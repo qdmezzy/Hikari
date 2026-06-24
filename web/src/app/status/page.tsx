@@ -118,7 +118,6 @@ export default function StatusPage() {
           </p>
         </header>
 
-        {/* Overall banner */}
         <div
           className={`mt-8 flex items-center justify-between gap-4 rounded-2xl border p-5 ${
             error
@@ -161,7 +160,6 @@ export default function StatusPage() {
           </button>
         </div>
 
-        {/* Services */}
         <section className="mt-8">
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <Activity className="size-5 text-primary" /> Services
@@ -198,7 +196,6 @@ export default function StatusPage() {
           </div>
         </section>
 
-        {/* API roadmap */}
         <section className="mt-10">
           <div className="flex items-end justify-between gap-4">
             <h2 className="text-lg font-semibold">Our own API</h2>
@@ -252,7 +249,6 @@ export default function StatusPage() {
           </ol>
         </section>
 
-        {/* Incidents */}
         <section className="mt-10">
           <h2 className="text-lg font-semibold">Recent incidents</h2>
           {data?.incidents?.length ? (

@@ -80,7 +80,6 @@ export const AnimeCard = React.memo(function AnimeCard({
           className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
 
-        {/* Top badges */}
         <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-2.5">
           <span className="rounded-full bg-foreground/75 px-2.5 py-1 text-[11px] font-medium text-background backdrop-blur-sm">
             {episodeCount
@@ -95,7 +94,6 @@ export const AnimeCard = React.memo(function AnimeCard({
           ) : null}
         </div>
 
-        {/* Quick add */}
         {onQuickAdd ? (
           <button
             type="button"
@@ -118,7 +116,6 @@ export const AnimeCard = React.memo(function AnimeCard({
         ) : null}
       </div>
 
-      {/* Info panel */}
       <div className="flex flex-col gap-1 p-3">
         <h3 className="line-clamp-1 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
           {title}

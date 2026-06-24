@@ -251,7 +251,6 @@ export default function WatchHistoryPage() {
         <main className="pb-24 pt-24 md:pb-8">
           <div className="px-4 py-8 md:px-8">
             <div className="mx-auto max-w-4xl">
-              {/* Header */}
               <div
                 className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
                 style={{
@@ -289,7 +288,6 @@ export default function WatchHistoryPage() {
                 </DropdownMenu>
               </div>
 
-              {/* Search */}
               <Card
                 className="mb-6 bg-card/50 border-border/50"
                 style={{
@@ -315,7 +313,6 @@ export default function WatchHistoryPage() {
                 </CardContent>
               </Card>
 
-              {/* History List */}
               <div className="space-y-8">
                 {loadingEntries ? (
                   <Card className="bg-card/50 border-border/50">

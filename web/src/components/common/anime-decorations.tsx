@@ -318,12 +318,10 @@ export function AnimeDecorations({
 }) {
   return (
     <div className={cn("fixed inset-0 pointer-events-none z-0", className)} aria-hidden="true">
-      {/* Gradient orbs */}
       <GlowOrb color="primary" size="lg" className="top-0 left-0 -translate-x-1/2 -translate-y-1/2 opacity-30" />
       <GlowOrb color="accent" size="md" className="bottom-0 right-0 translate-x-1/4 translate-y-1/4 opacity-20" />
       <GlowOrb color="aurora" size="sm" className="top-1/2 right-1/4 opacity-15" />
       
-      {/* Floating decorations */}
       <FloatingDecorations density={variant} />
     </div>
   )

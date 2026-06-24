@@ -4,17 +4,8 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * INSTALLATION NOTE:
- * When running locally, make sure to:
- * 1. Run `npm install` to install all dependencies
- * 2. Delete .next folder and restart dev server if styles don't load
- * 3. This project uses Tailwind CSS v4 with @tailwindcss/postcss
- */
-
-/* Hikari - Source redesign theme */
 :root {
-  /* Hikari brand — light (cream paper + navy) */
+
   --background: oklch(0.985 0.015 95);
   --foreground: oklch(0.22 0.05 278);
   --card: oklch(0.995 0.008 95);
@@ -61,7 +52,7 @@
 }
 
 .dark {
-  /* Hikari brand — dark (navy + banana) */
+
   --background: oklch(0.16 0.05 278);
   --foreground: oklch(0.95 0.014 95);
   --card: oklch(0.21 0.05 278);
@@ -165,15 +156,13 @@
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
-    /* Native-app feel: nothing is selectable by default. Copy-worthy surfaces
-       opt back in below (form fields + the .selectable utility). */
+
     -webkit-user-select: none;
     user-select: none;
-    /* Remove the blue flash on tap for mobile. */
+
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Re-enable text selection only where users genuinely need to read/copy. */
   input,
   textarea,
   select,
@@ -184,13 +173,11 @@
     user-select: text;
   }
 
-  /* Branded selection highlight. */
   ::selection {
     background-color: color-mix(in oklch, var(--primary) 28%, transparent);
     color: var(--foreground);
   }
 
-  /* Interactive elements get a pointer; disabled ones make it clear. */
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
   a[href],
@@ -205,19 +192,16 @@
     cursor: not-allowed;
   }
 
-  /* Images shouldn't be draggable/selectable — feels like a prototype otherwise. */
   img {
     -webkit-user-drag: none;
     user-select: none;
   }
 
-  /* Consistent, accessible focus ring across the app. */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 
-  /* Respect users who prefer reduced motion. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -258,7 +242,6 @@
     animation: rise-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
-  /* Japanese accent typography helpers */
   .font-jp {
     font-family: var(--font-jp);
   }
@@ -296,12 +279,10 @@
   }
 }
 
-/* Safe area for mobile bottom nav */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
-/* Scoped redesign preview styles */
 .glacier-preview {
   position: relative;
   min-height: 100vh;
@@ -357,11 +338,6 @@
   }
 }
 
-/* ============================================
-   SMOOTHER ANIMATIONS - Buttery smooth!
-   ============================================ */
-
-/* Custom easing functions for ultra smooth animations */
 :root {
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
@@ -370,7 +346,6 @@
   --spring-soft: cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-/* Smooth page entrance */
 @keyframes page-in {
   from {
     opacity: 0;
@@ -388,7 +363,6 @@
   animation: page-in 0.7s var(--ease-out-expo) forwards;
 }
 
-/* Fade in up with smooth decel */
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -404,7 +378,6 @@
   animation: fade-in-up 0.8s var(--ease-out-expo) forwards;
 }
 
-/* Scale in with spring */
 @keyframes scale-in {
   from {
     opacity: 0;
@@ -420,7 +393,6 @@
   animation: scale-in 0.6s var(--spring-soft) forwards;
 }
 
-/* Pop in - for cards and elements */
 @keyframes pop-in {
   0% {
     opacity: 0;
@@ -436,7 +408,6 @@
   animation: pop-in 0.5s var(--spring) forwards;
 }
 
-/* Slide in from left */
 @keyframes slide-in-left {
   from {
     opacity: 0;
@@ -452,7 +423,6 @@
   animation: slide-in-left 0.6s var(--ease-out-expo) forwards;
 }
 
-/* Slide in from right */
 @keyframes slide-in-right {
   from {
     opacity: 0;
@@ -468,7 +438,6 @@
   animation: slide-in-right 0.6s var(--ease-out-expo) forwards;
 }
 
-/* Slide up and fade */
 @keyframes slide-up-fade {
   from {
     opacity: 0;
@@ -484,7 +453,6 @@
   animation: slide-up-fade 0.7s var(--ease-out-expo) forwards;
 }
 
-/* Slide up */
 @keyframes slide-up {
   from {
     opacity: 0;
@@ -500,7 +468,6 @@
   animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Fade in */
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -514,7 +481,6 @@
   animation: fade-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Slide in */
 @keyframes slide-in {
   from {
     opacity: 0;
@@ -530,7 +496,6 @@
   animation: slide-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Scale in */
 @keyframes scale-in {
   from {
     opacity: 0;
@@ -546,7 +511,6 @@
   animation: scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Smooth transitions */
 .transition-smooth {
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -562,7 +526,6 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Bounce in */
 @keyframes bounce-in {
   0% {
     opacity: 0;
@@ -584,7 +547,6 @@
   animation: bounce-in 0.6s var(--ease-out-expo) forwards;
 }
 
-/* Float animation - smoother */
 @keyframes float {
   0%,
   100% {
@@ -599,7 +561,6 @@
   animation: float 4s ease-in-out infinite;
 }
 
-/* Gentle pulse */
 @keyframes gentle-pulse {
   0%,
   100% {
@@ -616,7 +577,6 @@
   animation: gentle-pulse 3s ease-in-out infinite;
 }
 
-/* Glow pulse - smoother */
 @keyframes glow-pulse {
   0%,
   100% {
@@ -631,7 +591,6 @@
   animation: glow-pulse 3s ease-in-out infinite;
 }
 
-/* Shimmer - smoother and longer */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -647,7 +606,6 @@
   animation: shimmer 3s ease-in-out infinite;
 }
 
-/* Gradient flow */
 @keyframes gradient-flow {
   0%,
   100% {
@@ -668,7 +626,6 @@
   animation: gradient-flow 6s ease infinite;
 }
 
-/* Draw animation for underline */
 @keyframes draw {
   from {
     stroke-dasharray: 1000;
@@ -684,7 +641,6 @@
   animation: draw 1.5s var(--ease-out-expo) forwards;
 }
 
-/* Wiggle - fun */
 @keyframes wiggle {
   0%,
   100% {
@@ -712,7 +668,6 @@
   animation: wiggle 0.5s ease-in-out;
 }
 
-/* Spin slow */
 @keyframes spin-slow {
   from {
     transform: rotate(0deg);
@@ -726,7 +681,6 @@
   animation: spin-slow 8s linear infinite;
 }
 
-/* Stagger delays - finer control */
 .stagger-1 {
   animation-delay: 0.03s;
 }
@@ -764,11 +718,6 @@
   animation-delay: 0.36s;
 }
 
-/* ============================================
-   UNIQUE DESIGN ELEMENTS
-   ============================================ */
-
-/* Glassmorphism - refined */
 .glass {
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(20px);
@@ -781,7 +730,6 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Gradient text */
 .text-gradient {
   background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
   -webkit-background-clip: text;
@@ -789,7 +737,6 @@
   background-clip: text;
 }
 
-/* Premium gradient text - animated */
 .text-gradient-gold {
   background: linear-gradient(
     90deg,
@@ -806,7 +753,6 @@
   animation: gradient-flow 4s linear infinite;
 }
 
-/* Glow effects */
 .glow-primary {
   box-shadow: 0 0 30px var(--glow-primary);
 }
@@ -824,7 +770,6 @@
   transform: translateY(-2px);
 }
 
-/* Interactive card */
 .card-interactive {
   transition: all 0.5s var(--ease-out-expo);
 }
@@ -834,7 +779,6 @@
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
 }
 
-/* Anime card hover */
 .anime-card-hover {
   transition: all 0.5s var(--ease-out-expo);
 }
@@ -851,7 +795,6 @@
   transform: scale(1.1);
 }
 
-/* Gradient border - animated */
 .gradient-border {
   position: relative;
   background: var(--card);
@@ -873,7 +816,6 @@
   mask-composite: exclude;
 }
 
-/* Smooth button press */
 .btn-press {
   transition: all 0.2s var(--ease-out-expo);
 }
@@ -882,7 +824,6 @@
   transform: scale(0.96);
 }
 
-/* Custom scrollbar - smoother */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -902,7 +843,6 @@
   background: oklch(0.35 0.02 280);
 }
 
-/* Hide scrollbar */
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -912,7 +852,6 @@
   display: none;
 }
 
-/* Blob morphing */
 .blob {
   border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%;
   animation: blob-morph 10s ease-in-out infinite;
@@ -934,7 +873,6 @@
   }
 }
 
-/* Focus ring animation */
 @keyframes focus-ring {
   0% {
     box-shadow: 0 0 0 0 var(--glow-primary);
@@ -947,12 +885,10 @@
   }
 }
 
-/* Magnetic hover effect helper */
 .magnetic {
   transition: transform 0.4s var(--ease-out-expo);
 }
 
-/* Noise texture overlay */
 .noise-overlay {
   position: relative;
 }
@@ -967,7 +903,6 @@
   mix-blend-mode: overlay;
 }
 
-/* Spotlight on hover */
 .spotlight::before {
   content: "";
   position: absolute;
@@ -1016,11 +951,8 @@
   opacity: 1;
 }
 
-/* ============================================
-   MOBILE OPTIMIZATION
-   ============================================ */
 @media (max-width: 768px) {
-  /* Prevent mobile Safari zooming form fields. */
+
   input,
   select,
   textarea {
@@ -1045,7 +977,6 @@
     box-shadow: none !important;
   }
 
-  /* Backdrop blur is expensive on lower-end phones. */
   .backdrop-blur-2xl {
     backdrop-filter: blur(10px) !important;
   }
@@ -1071,7 +1002,6 @@
   }
 }
 
-/* Reduce motion — opt-in from Settings (overrides .force-motion). */
 html.reduce-motion *,
 html.reduce-motion *::before,
 html.reduce-motion *::after {
@@ -1081,12 +1011,6 @@ html.reduce-motion *::after {
   scroll-behavior: auto !important;
 }
 
-/* ============================================
-   HIKARI BRAND — sparkle + burst motifs
-   Echoes the logo: a banana/cream spark-burst H on navy.
-   ============================================ */
-
-/* Twinkle used by <Sparkle> (was referenced but never defined). */
 @keyframes sparkle {
   0%, 100% {
     opacity: 0.2;
@@ -1102,7 +1026,6 @@ html.reduce-motion *::after {
   animation: sparkle 2.8s ease-in-out infinite;
 }
 
-/* Banana brand radial glow — the signature hero light. */
 .brand-glow {
   background: radial-gradient(
     circle at center,
@@ -1112,7 +1035,6 @@ html.reduce-motion *::after {
   );
 }
 
-/* Banana → cream display gradient for hero headings. */
 .text-brand {
   background: linear-gradient(
     115deg,
@@ -1126,7 +1048,6 @@ html.reduce-motion *::after {
   color: transparent;
 }
 
-/* Spinning ray-burst behind hero focal points (logo energy). */
 @keyframes brand-rays {
   to {
     transform: rotate(360deg);
@@ -1144,7 +1065,6 @@ html.reduce-motion *::after {
   animation: brand-rays 40s linear infinite;
 }
 
-/* High contrast — opt-in from Settings. Brighter borders + secondary text. */
 html.high-contrast {
   --border: oklch(0.5 0.04 278);
   --input: oklch(0.5 0.04 278);

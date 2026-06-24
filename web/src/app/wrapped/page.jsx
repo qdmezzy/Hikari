@@ -515,7 +515,6 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background">
-      {/* Progress bars */}
       <div className="absolute inset-x-0 top-0 z-30 flex gap-1.5 px-3 pt-3 md:px-6 md:pt-5">
         {slides.map((s, i) => (
           <div key={s.key} className="h-1 flex-1 overflow-hidden rounded-full bg-foreground/15">
@@ -530,7 +529,6 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
         ))}
       </div>
 
-      {/* Top bar */}
       <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 pt-7 md:px-7 md:pt-9">
         <div className="flex items-center gap-2">
           <span className="font-jp text-sm tracking-[0.3em] text-primary/80">ひかり</span>
@@ -557,7 +555,6 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
         </div>
       </div>
 
-      {/* Stage */}
       <div className="relative flex-1 overflow-hidden" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <button aria-label="Previous" onClick={goPrev} className="absolute left-0 top-0 z-20 h-full w-1/3 cursor-default focus:outline-none" />
         <button aria-label="Next" onClick={goNext} className="absolute right-0 top-0 z-20 h-full w-2/3 cursor-default focus:outline-none" />
@@ -577,7 +574,6 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
         </AnimatePresence>
       </div>
 
-      {/* Desktop arrows */}
       <button onClick={goPrev} aria-label="Previous slide" disabled={safeIndex === 0} className="absolute left-3 top-1/2 z-30 hidden h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card/70 text-foreground backdrop-blur transition hover:bg-card disabled:opacity-0 md:flex">
         <ChevronLeft className="h-5 w-5" />
       </button>

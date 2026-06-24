@@ -147,7 +147,6 @@ export default function DiscordLinkPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
-      {/* Ambient background */}
       <div className="pointer-events-none fixed inset-0">
         <div
           className="absolute -left-1/3 -top-1/3 size-[70%] animate-pulse rounded-full bg-gradient-to-br from-[#5865F2]/25 via-primary/15 to-transparent blur-3xl"
@@ -160,14 +159,12 @@ export default function DiscordLinkPage() {
       </div>
 
       <div className="relative w-full max-w-md animate-pop-in">
-        {/* Brand */}
         <Link href="/" className="mb-7 flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-14 w-auto" />
         </Link>
 
         <div className="rounded-3xl border border-border/60 bg-card/70 p-8 text-center shadow-[0_24px_70px_-30px_rgba(0,0,0,0.6)] backdrop-blur-xl">
-          {/* State icon */}
           <div className={cn("mx-auto mb-5 flex size-16 items-center justify-center rounded-2xl", toneBg)}>
             <StateIcon className={cn("size-8", status === "linking" && "animate-spin")} />
           </div>

@@ -955,7 +955,6 @@ function CommunityExperience({ user, isMod }) {
       <Navigation />
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24">
         <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-          {/* Activity */}
           <section>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -1004,9 +1003,7 @@ function CommunityExperience({ user, isMod }) {
             </div>
           </section>
 
-          {/* Right sidebar */}
           <aside className="space-y-5">
-            {/* Announcements */}
             {announcements.length > 0 || isMod ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1043,7 +1040,6 @@ function CommunityExperience({ user, isMod }) {
               </div>
             ) : null}
 
-            {/* Forum Activity */}
             <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="font-semibold text-foreground">Forum Activity</h3>
@@ -1078,7 +1074,6 @@ function CommunityExperience({ user, isMod }) {
               )}
             </div>
 
-            {/* Recent Reviews */}
             <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
               <h3 className="mb-4 font-semibold text-foreground">Recent Reviews</h3>
               {reviewsLoading ? (

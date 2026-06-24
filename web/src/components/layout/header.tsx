@@ -124,7 +124,6 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
     )}>
       <div className="container mx-auto px-4">
         <div className="flex h-16 lg:h-20 items-center justify-between gap-4">
-          {/* Logo */}
           <Link href="/" className="group flex items-center gap-1.5 leading-none">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -137,7 +136,6 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon
@@ -187,7 +185,6 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
             })}
           </nav>
 
-          {/* Search Bar - Desktop */}
           <div className="hidden lg:flex flex-1 max-w-md mx-4">
             <div className="relative w-full group">
               <div className="absolute -inset-0.5 rounded-xl bg-gradient-to-r from-primary/30 to-accent/30 opacity-0 group-focus-within:opacity-100 blur transition-opacity" />
@@ -207,9 +204,7 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
             </div>
           </div>
 
-          {/* Right Side Actions */}
           <div className="flex items-center gap-2">
-            {/* Mobile Search Toggle */}
             <Button
               variant="ghost"
               size="icon"
@@ -220,10 +215,8 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
               <span className="sr-only">Search</span>
             </Button>
 
-            {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Join Discord */}
             <Button
               asChild
               variant="ghost"
@@ -276,7 +269,6 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
               <>
                 <NotificationsMenu user={authUser} />
 
-                {/* User Menu */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button 
@@ -356,7 +348,6 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
               </div>
             )}
 
-            {/* Mobile Menu Toggle */}
             <Button
               variant="ghost"
               size="icon"
@@ -391,7 +382,6 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
           </div>
         </div>
 
-        {/* Mobile Search Bar */}
         <AnimatePresence>
           {isSearchOpen && (
             <motion.div 
@@ -420,7 +410,6 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
           )}
         </AnimatePresence>
 
-        {/* Mobile Navigation Menu */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.nav 

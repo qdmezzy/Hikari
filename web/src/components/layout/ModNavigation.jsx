@@ -61,7 +61,6 @@ export function ModNavigation() {
 
   return (
     <>
-      {/* Top Header */}
       <header
         className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-xl border-b border-border/50"
         style={{
@@ -69,7 +68,6 @@ export function ModNavigation() {
         }}
       >
         <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
-          {/* Logo & Back */}
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -96,7 +94,6 @@ export function ModNavigation() {
             </div>
           </div>
 
-          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center gap-1 bg-secondary/50 rounded-xl p-1">
             {modNavItems.map((item) => {
               const Icon = item.icon
@@ -133,7 +130,6 @@ export function ModNavigation() {
             })}
           </nav>
 
-          {/* Mod Profile & Mobile Menu */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-secondary/50">
               <div className="relative">
@@ -172,7 +168,6 @@ export function ModNavigation() {
           </div>
         </div>
 
-        {/* Mobile Dropdown */}
         <div
           className={cn(
             "md:hidden absolute top-full left-0 right-0 bg-card/95 backdrop-blur-xl border-b border-border/50 transition-all duration-500",
@@ -225,7 +220,6 @@ export function ModNavigation() {
         </div>
       </header>
 
-      {/* Spacer for fixed header */}
       <div className="h-16" />
     </>
   )

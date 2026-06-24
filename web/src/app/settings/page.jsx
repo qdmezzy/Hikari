@@ -803,7 +803,6 @@ export default function SettingsPage() {
       return (
         <div className="space-y-6">
           <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/60 backdrop-blur-sm">
-            {/* Banner */}
             <div
               className="relative h-32 bg-gradient-to-br from-primary/25 via-accent/15 to-card sm:h-44"
               style={
@@ -828,7 +827,6 @@ export default function SettingsPage() {
               </Button>
             </div>
 
-            {/* Identity + avatar actions */}
             <div className="flex flex-col gap-4 px-5 pb-5 sm:flex-row sm:items-end sm:justify-between">
               <div className="flex items-end gap-4">
                 <div className="relative -mt-12 shrink-0">

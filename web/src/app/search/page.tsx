@@ -177,7 +177,7 @@ export default function BrowsePage() {
       setTotal(pageData?.pageInfo?.total || nextResults.length)
     } catch (loadError) {
       if (id !== requestId.current) return
-      console.log("[v0] Failed to load browse results:", loadError)
+      console.error("Failed to load browse results:", loadError)
       if (!append) {
         setResults([])
         setHasMore(false)
@@ -290,7 +290,6 @@ export default function BrowsePage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="mx-auto max-w-7xl px-4 pb-8 pt-24 md:px-6 md:pb-10 lg:pt-28">
-        {/* Page header */}
         <header className="animate-rise">
           <p className="text-sm font-medium text-primary">Catalog</p>
           <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">Browse anime</h1>
@@ -299,7 +298,6 @@ export default function BrowsePage() {
           </p>
         </header>
 
-        {/* Prominent search bar */}
         <div className="mt-6 animate-rise">
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">
@@ -344,9 +342,7 @@ export default function BrowsePage() {
           </div>
         </div>
 
-        {/* Two-column: filters + content */}
         <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
-          {/* Mobile filter toggle */}
           <button
             type="button"
             onClick={() => setFiltersOpen((open) => !open)}
@@ -364,10 +360,8 @@ export default function BrowsePage() {
             <ChevronDown className={`size-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
           </button>
 
-          {/* Sidebar */}
           <aside className={`${filtersOpen ? "block" : "hidden"} lg:block`}>
             <div className="lg:sticky lg:top-24 space-y-6">
-              {/* Sort */}
               <div className="card-elevated p-4">
                 <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sort by</h2>
                 <div className="mt-3 space-y-1">
@@ -390,7 +384,6 @@ export default function BrowsePage() {
                 </div>
               </div>
 
-              {/* Genres */}
               <div className="card-elevated p-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Genres</h2>
@@ -437,9 +430,7 @@ export default function BrowsePage() {
             </div>
           </aside>
 
-          {/* Content */}
           <section>
-            {/* Results meta + view toggle */}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium text-foreground">{resultsLabel}</p>
@@ -473,7 +464,6 @@ export default function BrowsePage() {
               </div>
             </div>
 
-            {/* Active filter chips */}
             {hasActiveFilters ? (
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 {activeQuery ? (
@@ -495,7 +485,6 @@ export default function BrowsePage() {
               </div>
             ) : null}
 
-            {/* Results */}
             <div className="mt-5">
               {loading ? (
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

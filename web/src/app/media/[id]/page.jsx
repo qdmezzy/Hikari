@@ -1102,7 +1102,6 @@ export default function MediaPage() {
       <Navigation />
 
       <main className="pb-20 pt-16 md:pb-8 md:pt-0">
-        {/* Banner */}
         <div className="relative h-[50vh] overflow-hidden">
           <img
             src={bannerImage}
@@ -1118,9 +1117,7 @@ export default function MediaPage() {
           style={{ animationDuration: "220ms" }}
         >
           <div>
-            {/* Main Info */}
             <div className="flex flex-col gap-8 lg:flex-row">
-              {/* Poster */}
               <motion.div
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1284,7 +1281,6 @@ export default function MediaPage() {
                 </div>
               </motion.div>
 
-              {/* Info */}
               <motion.div
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1393,7 +1389,6 @@ export default function MediaPage() {
               </motion.div>
             </div>
 
-            {/* Tabs Content */}
             <Tabs defaultValue="overview" className="mt-8">
               <TabsList className="h-auto rounded-2xl border border-white/10 bg-[#08121d]/75 p-1.5 backdrop-blur-xl">
                 <TabsTrigger
@@ -1425,7 +1420,6 @@ export default function MediaPage() {
               <TabsContent value="overview" className="mt-6">
                 <div className="grid gap-8 lg:grid-cols-3">
                   <div className="lg:col-span-2 space-y-6">
-                    {/* Description */}
                     <Card className="rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl">
                       <CardHeader>
                         <CardTitle className="text-white">Synopsis</CardTitle>
@@ -1435,7 +1429,6 @@ export default function MediaPage() {
                       </CardContent>
                     </Card>
 
-                    {/* Trailers */}
                     <Card className="rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl">
                       <CardHeader>
                         <CardTitle className="text-white">Trailers & Videos</CardTitle>
@@ -1471,7 +1464,6 @@ export default function MediaPage() {
                     </Card>
                   </div>
 
-                  {/* Sidebar Info */}
                   <div className="space-y-6">
                     <Card className="rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl">
                       <CardHeader>
@@ -1589,7 +1581,6 @@ export default function MediaPage() {
 
               <TabsContent value="reviews" className="mt-6">
                 <div className="space-y-6">
-                  {/* Write Review */}
                   {user ? (
                     <Card className="rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl">
                       <CardHeader>
@@ -1647,7 +1638,6 @@ export default function MediaPage() {
                     </Card>
                   )}
 
-                  {/* Reviews List */}
                   {reviewsLoading ? (
                     <Card className="rounded-[28px] border-white/10 bg-[#08121d]/78 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl">
                       <CardContent className="py-8 text-center text-white/55">

@@ -37,7 +37,6 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
-      {/* Ambient background */}
       <div className="pointer-events-none fixed inset-0">
         <div
           className="absolute -left-1/3 -top-1/3 size-[70%] animate-pulse rounded-full bg-gradient-to-br from-primary/25 via-accent/15 to-transparent blur-3xl"
@@ -55,7 +54,6 @@ export default function ForgotPasswordPage() {
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         className="relative w-full max-w-md"
       >
-        {/* Brand */}
         <Link href="/" className="mb-8 flex justify-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-14 w-auto" />

@@ -222,14 +222,12 @@ export default function OnboardingPage() {
   return (
     <RequireAuth>
       <div className="relative min-h-screen overflow-hidden bg-background">
-        {/* ambient background */}
         <div className="pointer-events-none fixed inset-0 overflow-hidden">
           <div className="absolute -left-1/4 -top-1/4 size-[60%] rounded-full bg-gradient-to-br from-primary/20 to-transparent blur-3xl" />
           <div className="absolute -bottom-1/4 -right-1/4 size-[55%] rounded-full bg-gradient-to-tl from-accent/15 to-transparent blur-3xl" />
         </div>
 
         <div className="relative mx-auto flex min-h-screen max-w-xl flex-col px-4 py-8">
-          {/* progress */}
           <div className="mb-8">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -247,7 +245,6 @@ export default function OnboardingPage() {
           </div>
 
           <div key={step} className="flex flex-1 flex-col animate-rise">
-            {/* ---------- WELCOME ---------- */}
             {step === "welcome" && (
               <div className="flex flex-1 flex-col items-center justify-center text-center">
                 <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-lg">
@@ -265,7 +262,6 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ---------- ACCOUNT (OAuth only) ---------- */}
             {step === "account" && (
               <div className="flex flex-1 flex-col">
                 <h1 className="text-2xl font-bold tracking-tight">Finish your account</h1>
@@ -298,7 +294,6 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ---------- VIBE ---------- */}
             {step === "vibe" && (
               <div className="flex flex-1 flex-col">
                 <h1 className="text-2xl font-bold tracking-tight">What are you into?</h1>
@@ -349,7 +344,6 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ---------- IMPORT ---------- */}
             {step === "import" && (
               <div className="flex flex-1 flex-col">
                 <h1 className="text-2xl font-bold tracking-tight">Bring your anime with you</h1>
@@ -370,7 +364,6 @@ export default function OnboardingPage() {
                   </div>
                 ) : (
                   <div className="mt-6 space-y-3">
-                    {/* MAL */}
                     {malConnected ? (
                       <Button className="w-full justify-between gap-2 py-6" disabled={importing} onClick={() => runImport(importFromMal)}>
                         <span className="flex items-center gap-2">
@@ -388,7 +381,6 @@ export default function OnboardingPage() {
                       </Button>
                     )}
 
-                    {/* AniList */}
                     <div className="rounded-xl border border-border bg-card p-3">
                       <div className="mb-2 flex items-center gap-2 text-sm font-medium text-foreground">
                         <span className="flex size-5 items-center justify-center rounded bg-[#02a9ff] text-[10px] font-bold text-white">A</span>
@@ -438,7 +430,6 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* ---------- GOAL ---------- */}
             {step === "goal" && (
               <div className="flex flex-1 flex-col">
                 <h1 className="text-2xl font-bold tracking-tight">What&apos;s your goal?</h1>

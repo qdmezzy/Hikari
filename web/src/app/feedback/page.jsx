@@ -81,7 +81,6 @@ export default function FeedbackPage() {
       <Navigation />
 
       <main className="relative mx-auto max-w-2xl px-4 pb-24 pt-24 md:px-6 lg:pt-28">
-        {/* ambient glow */}
         <div className="pointer-events-none absolute left-1/2 top-10 h-64 w-64 -translate-x-1/2 rounded-full bg-primary/15 blur-3xl" />
 
         <header className="relative animate-rise text-center">
@@ -123,7 +122,6 @@ export default function FeedbackPage() {
             onSubmit={submit}
             className="relative mt-10 space-y-7 rounded-3xl border border-border/50 bg-card/60 p-6 shadow-xl shadow-black/5 backdrop-blur-sm md:p-8"
           >
-            {/* Category cards */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold">What's this about?</Label>
               <div className="grid gap-2.5 sm:grid-cols-3">
@@ -153,7 +151,6 @@ export default function FeedbackPage() {
               </div>
             </div>
 
-            {/* Message */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="message" className="text-sm font-semibold">
@@ -172,7 +169,6 @@ export default function FeedbackPage() {
               />
             </div>
 
-            {/* Email (logged out only) */}
             {!user ? (
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm font-semibold">

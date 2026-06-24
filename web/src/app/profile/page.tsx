@@ -810,7 +810,6 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <Header user={{ name: mockUser.name, avatar: mockUser.avatar, username: mockUser.username, isPremium: mockUser.isPremium }} />
       
-      {/* Banner Section */}
       <div className="relative h-56 sm:h-72 md:h-96 overflow-hidden">
         {mockUser.banner ? (
           <img
@@ -821,11 +820,9 @@ export default function ProfilePage() {
         ) : (
           <div className="h-full w-full bg-gradient-to-br from-primary/30 via-accent/20 to-background" />
         )}
-        {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-background/50 via-transparent to-background/50" />
         
-        {/* Animated particles */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {[...Array(6)].map((_, i) => (
             <motion.div
@@ -848,7 +845,6 @@ export default function ProfilePage() {
           ))}
         </div>
         
-        {/* Banner actions - positioned safely at top right with proper spacing */}
         <div className="absolute top-20 lg:top-24 right-4 flex items-center gap-2">
           <Button variant="secondary" size="sm" className="bg-background/80 backdrop-blur-xl border-border/50 hover:bg-background/90 text-foreground">
             <Camera className="h-4 w-4 mr-2" />
@@ -867,7 +863,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Profile Header */}
       <div className="container mx-auto px-4">
         <div className="relative -mt-24 sm:-mt-28 mb-8">
           <motion.div 
@@ -876,12 +871,9 @@ export default function ProfilePage() {
             transition={{ duration: 0.5 }}
             className="flex flex-col gap-6"
           >
-            {/* Left - Avatar & Quick Actions */}
             <div className="flex flex-col sm:flex-row items-start gap-6">
-              {/* Avatar */}
               <div className="relative group">
                 <div className="relative">
-                  {/* Avatar */}
                   <div className="relative w-36 h-36 sm:w-44 sm:h-44 rounded-2xl overflow-hidden bg-muted shadow-xl ring-1 ring-border/40">
                     {mockUser.avatar ? (
                       <img
@@ -896,26 +888,22 @@ export default function ProfilePage() {
                     )}
                   </div>
                   
-                  {/* Edit overlay */}
                   <button className="absolute inset-1 flex items-center justify-center bg-foreground/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
                     <Camera className="h-8 w-8 text-background" />
                   </button>
                   
-                  {/* Premium badge */}
                   {mockUser.isPremium && (
                     <div className="absolute -top-2 -right-2 w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/30">
                       <Crown className="h-5 w-5 text-white" />
                     </div>
                   )}
                   
-                  {/* Level badge */}
                   <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-gradient-to-r from-primary to-accent rounded-full shadow-lg">
                     <span className="text-sm font-bold text-white">Lvl {mockUser.level}</span>
                   </div>
                 </div>
               </div>
 
-              {/* User Info */}
               <div className="flex-1 pt-4 sm:pt-8">
                 <div className="flex flex-wrap items-center gap-3 mb-2">
                   <h1 className="text-3xl sm:text-4xl font-black text-foreground">{mockUser.name}</h1>
@@ -948,7 +936,6 @@ export default function ProfilePage() {
                   </Button>
                 </div>
                 
-                {/* XP Bar */}
                 <div className="max-w-xs mb-4">
                   <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                     <span>Level {mockUser.level}</span>
@@ -964,7 +951,6 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 
-                {/* Meta info */}
                 <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                   {mockUser.location && (
                     <span className="flex items-center gap-1.5">
@@ -1014,7 +1000,6 @@ export default function ProfilePage() {
             </div>
           </motion.div>
 
-          {/* Bio */}
           {mockUser.bio && (
             <motion.p 
               initial={{ opacity: 0 }}
@@ -1027,7 +1012,6 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Tabs */}
         <div className="sticky top-16 lg:top-20 z-30 -mx-4 px-4 bg-background/80 backdrop-blur-xl border-b border-border/50">
           <nav className="flex gap-1 overflow-x-auto py-1 scrollbar-hide">
             {tabs.map((tab) => {
@@ -1059,7 +1043,6 @@ export default function ProfilePage() {
           </nav>
         </div>
 
-        {/* Tab Content */}
         <div className="py-8">
           <AnimatePresence mode="wait">
             {activeTab === "overview" ? (
@@ -1071,7 +1054,6 @@ export default function ProfilePage() {
                 transition={{ duration: 0.3 }}
                 className="grid grid-cols-1 lg:grid-cols-3 gap-8"
               >
-                {/* Recent Activity */}
                 <div className="lg:col-span-2 space-y-6">
                   <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-6">
@@ -1165,7 +1147,6 @@ export default function ProfilePage() {
                     )}
                   </div>
 
-                  {/* Anime Distribution */}
                   <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
                     <div className="flex items-center gap-3 mb-6">
                       <BarChart3 className="h-5 w-5 text-purple-500" />
@@ -1212,9 +1193,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
 
-                {/* Sidebar */}
                 <div className="space-y-6">
-                  {/* Favorites */}
                   <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-bold flex items-center gap-2">
@@ -1264,7 +1243,6 @@ export default function ProfilePage() {
                     )}
                   </div>
 
-                  {/* Achievements */}
                   <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-bold flex items-center gap-2">
@@ -1299,7 +1277,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Stats Summary */}
                   <div className="bg-gradient-to-br from-primary/10 via-accent/5 to-primary/10 border border-primary/20 rounded-2xl p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <TrendingUp className="h-5 w-5 text-primary" />
@@ -1425,7 +1402,6 @@ export default function ProfilePage() {
                 transition={{ duration: 0.3 }}
                 className="max-w-3xl space-y-8"
               >
-                {/* Profile Settings */}
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 space-y-6">
                   <div className="flex items-center gap-3">
                     <User className="h-5 w-5 text-primary" />
@@ -1495,7 +1471,6 @@ export default function ProfilePage() {
                   </Button>
                 </div>
 
-                {/* Privacy Settings */}
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 space-y-6">
                   <div className="flex items-center gap-3">
                     <Shield className="h-5 w-5 text-green-500" />
@@ -1570,7 +1545,6 @@ export default function ProfilePage() {
                   </Button>
                 </div>
 
-                {/* Notification Settings */}
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 space-y-6">
                   <div className="flex items-center gap-3">
                     <Bell className="h-5 w-5 text-purple-500" />
@@ -1611,7 +1585,6 @@ export default function ProfilePage() {
                 transition={{ duration: 0.3 }}
                 className="max-w-3xl space-y-8"
               >
-                {/* Display Settings */}
                 <div className="bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl p-6 space-y-6">
                   <div className="flex items-center gap-3">
                     <Palette className="h-5 w-5 text-amber-500" />

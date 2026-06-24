@@ -311,7 +311,6 @@ export default function CalendarPage() {
 
       <main className="pb-16 pt-24 lg:pt-28">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          {/* Header */}
           <header className="animate-rise">
             <p className="font-jp text-sm font-medium tracking-[0.3em] text-primary/70">放送予定</p>
             <div className="mt-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -368,7 +367,6 @@ export default function CalendarPage() {
             </div>
           </header>
 
-          {/* Scope tabs: your list vs the whole season */}
           <div className="mt-8 flex w-fit items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
             {[
               { id: "mine", label: "My List" },

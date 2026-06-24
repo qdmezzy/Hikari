@@ -695,7 +695,6 @@ export default function HubPage() {
     <div className="min-h-screen bg-black text-white">
       <Navigation />
       <div className="pt-24 md:pt-20">
-        {/* Banner Background */}
         {anime.bannerImage && (
           <div
             className={cn(
@@ -715,7 +714,6 @@ export default function HubPage() {
           </div>
         )}
 
-        {/* Back Button */}
         <div className="relative z-10 p-4">
           <Link href="/discover">
             <Button
@@ -732,11 +730,9 @@ export default function HubPage() {
           </Link>
         </div>
 
-      {/* Hero Header */}
       <header className="relative z-10 px-4 pb-8 md:px-8 lg:px-12">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col gap-6 md:flex-row md:gap-8 lg:gap-12">
-            {/* Cover Image */}
             <div 
               className={cn(
                 "shrink-0 mx-auto md:mx-0 transition-all duration-700 ease-out",
@@ -755,7 +751,6 @@ export default function HubPage() {
               </div>
             </div>
 
-            {/* Info */}
             <div 
               className={cn(
                 "flex flex-1 flex-col justify-end text-center md:text-left transition-all duration-700 ease-out",
@@ -788,7 +783,6 @@ export default function HubPage() {
                 {anime.description?.replace(/<[^>]+>/g, "").slice(0, 200)}...
               </p>
 
-              {/* Genre Tags */}
               <div className="mb-4 flex flex-wrap justify-center gap-2 md:justify-start">
                 {anime.genres?.slice(0, 5).map((genre) => (
                   <Badge
@@ -800,7 +794,6 @@ export default function HubPage() {
                 ))}
               </div>
 
-              {/* Stats */}
               <div className="mb-6 flex flex-wrap items-center justify-center gap-4 text-sm md:justify-start md:gap-6">
                 {anime.averageScore && (
                   <div className="flex items-center gap-1.5">
@@ -824,7 +817,6 @@ export default function HubPage() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div 
                 className={cn(
                   "flex flex-wrap items-center justify-center gap-3 md:justify-start transition-all duration-700 ease-out",
@@ -952,7 +944,6 @@ export default function HubPage() {
         </div>
       </header>
 
-      {/* Tabs Section */}
       <section 
         className={cn(
           "relative z-10 border-t border-white/10 bg-black/80 backdrop-blur-xl transition-all duration-700 ease-out",
@@ -1096,10 +1087,8 @@ export default function HubPage() {
               )}
             </div>
 
-            {/* Filters Bar */}
             {(activeTab === "clips" || activeTab === "fandom") && (
               <div className="flex flex-wrap items-center gap-3 border-t border-white/10 py-4">
-                {/* Sort */}
                 <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
                   <SelectTrigger className="w-auto gap-2 bg-white/5 border-white/10 text-white/70 hover:bg-white/10">
                     <ArrowUpDown className="h-4 w-4" />
@@ -1117,7 +1106,6 @@ export default function HubPage() {
                   </SelectContent>
                 </Select>
 
-                {/* Vibe Filters */}
                 <div className="flex flex-wrap gap-2">
                   {vibeFilters.map((vibe) => (
                     <Badge
@@ -1137,7 +1125,6 @@ export default function HubPage() {
                   ))}
                 </div>
 
-                {/* Spoiler Shield */}
                 <div className="ml-auto flex items-center gap-2">
                   {spoilersOff ? (
                     <EyeOff className="h-4 w-4 text-amber-500" />
@@ -1154,7 +1141,6 @@ export default function HubPage() {
               </div>
             )}
 
-            {/* Clips Tab Content */}
             <TabsContent value="clips" className="mt-0">
               <div className="grid gap-4 py-6 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredClips.length === 0 ? (
@@ -1180,7 +1166,6 @@ export default function HubPage() {
               </div>
             </TabsContent>
 
-            {/* Fandom Tab Content */}
             <TabsContent value="fandom" className="mt-0">
               {fandomLoading ? (
                 <div className="py-12 text-center">
@@ -1268,7 +1253,6 @@ export default function HubPage() {
               )}
             </TabsContent>
 
-            {/* About Tab Content */}
             <TabsContent value="about" className="mt-0">
               <div className="max-w-3xl py-6">
                 <h2 className="mb-4 text-xl font-semibold text-white">About {title}</h2>
@@ -1366,7 +1350,6 @@ function ClipCard({
         visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       )}
     >
-      {/* Thumbnail */}
       <div
         className={cn("relative aspect-video overflow-hidden", onPlay && "cursor-pointer")}
         onClick={onPlay}
@@ -1378,10 +1361,8 @@ function ClipCard({
           className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
 
-        {/* Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
 
-        {/* Play Button */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-all duration-300 group-hover:opacity-100">
           <button
             type="button"
@@ -1395,7 +1376,6 @@ function ClipCard({
           </button>
         </div>
 
-        {/* Type Badge */}
         <Badge
           className={cn(
             "absolute left-3 top-3 border-0",
@@ -1407,7 +1387,6 @@ function ClipCard({
           {clip.type}
         </Badge>
 
-        {/* Spoiler Badge */}
         {clip.spoilerLevel !== "None" && (
           <Badge className="absolute right-3 top-3 border-0 bg-amber-500/90 text-black font-medium">
             {clip.spoilerLevel} Spoilers
@@ -1415,7 +1394,6 @@ function ClipCard({
           </Badge>
         )}
 
-        {/* Vibe Tags */}
         <div className="absolute bottom-3 left-3 flex flex-wrap gap-1.5">
           {clip.tags.slice(0, 2).map((tag) => {
             const vibe = vibeFilters.find((v) => v.id === tag)
@@ -1436,12 +1414,10 @@ function ClipCard({
         </div>
       </div>
 
-      {/* Content */}
       <div className="p-4">
         <h3 className="mb-1 font-medium line-clamp-1 text-white">{clip.clipTitle}</h3>
         <p className="mb-3 text-sm text-white/50 line-clamp-2">{clip.description}</p>
 
-        {/* Creator Info (for fandom posts) */}
         {showCreator && clip.creator && (
           <div className="mb-3 flex items-center gap-2 rounded-xl bg-white/5 p-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-pink-500 overflow-hidden">
@@ -1463,7 +1439,6 @@ function ClipCard({
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button

@@ -634,7 +634,6 @@ export default function DiscoverPage() {
         ref={containerRef}
         className="fixed inset-0 pt-16 lg:pt-20 overflow-hidden"
       >
-{/* Main Content */}
       {currentAnime ? (
         <AnimatePresence mode="wait" initial={false}>
           {(
@@ -646,7 +645,6 @@ export default function DiscoverPage() {
               transition={{ duration: 0.4, ease: "easeOut" }}
               className="absolute inset-0"
             >
-              {/* Video Background */}
               <div className="absolute inset-0 bg-black">
                 <Image
                   src={currentAnime.banner}
@@ -673,16 +671,13 @@ export default function DiscoverPage() {
                   </div>
                 ) : null}
                 
-                {/* Gradient overlays */}
                 <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/60 to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
               </div>
 
-              {/* Content */}
               <div className="relative h-full flex items-end pb-24 lg:pb-32">
                 <div className="container mx-auto px-4 lg:px-8">
                   <div className="max-w-xl space-y-4">
-                    {/* Badges */}
                     <div className="flex flex-wrap gap-2">
                       <Badge className="border border-white/10 bg-white/[0.08] text-white/[0.82]">
                         <Sparkles className="w-3 h-3 mr-1 text-white/[0.58]" />
@@ -694,12 +689,10 @@ export default function DiscoverPage() {
                       </Badge>
                     </div>
 
-                    {/* Title */}
                     <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md md:text-4xl lg:text-5xl">
                       {currentAnime.title}
                     </h1>
 
-                    {/* Genres */}
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       {currentAnime.genres.slice(0, 5).map(genre => (
                         <span key={genre} className="text-sm font-medium text-white/[0.68]">
@@ -708,7 +701,6 @@ export default function DiscoverPage() {
                       ))}
                     </div>
 
-                    {/* Description */}
                     {spoilerSafe ? (
                       <div className="max-w-lg rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/[0.76] backdrop-blur-md">
                         <div className="flex items-center gap-2 text-white">
@@ -725,7 +717,6 @@ export default function DiscoverPage() {
                       </p>
                     )}
 
-                    {/* Stats */}
                     <div className="flex items-center gap-4 text-sm text-white/70">
                       <span className="flex items-center gap-1.5">
                         <Play className="w-4 h-4" />
@@ -741,7 +732,6 @@ export default function DiscoverPage() {
                       </span>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex flex-wrap gap-3 pt-2">
                       <Button 
                         size="lg"
@@ -786,7 +776,6 @@ export default function DiscoverPage() {
         <PageLoader label="Loading discover feed..." />
       )}
 
-        {/* Side Actions */}
         {currentAnime ? (
         <motion.div 
           className="fixed bottom-28 right-5 z-30 flex flex-col gap-4 md:right-7 lg:bottom-36 lg:right-10"
@@ -794,7 +783,6 @@ export default function DiscoverPage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.3 }}
         >
-          {/* Like */}
           <div className="flex flex-col items-center gap-1">
             <Button
               size="icon"
@@ -816,7 +804,6 @@ export default function DiscoverPage() {
             </span>
           </div>
 
-          {/* Save */}
           <div className="flex flex-col items-center gap-1">
             <Button
               size="icon"
@@ -836,7 +823,6 @@ export default function DiscoverPage() {
             <span className="text-xs text-white/80 font-medium">Save</span>
           </div>
 
-          {/* Share */}
           <div className="flex flex-col items-center gap-1">
             <Button
               size="icon"
@@ -849,7 +835,6 @@ export default function DiscoverPage() {
             <span className="text-xs text-white/80 font-medium">Share</span>
           </div>
 
-          {/* Trailer Controls */}
           {currentAnime?.trailerId && !spoilerSafe ? (
             <div className="flex flex-col items-center gap-1">
               <Button
@@ -867,7 +852,6 @@ export default function DiscoverPage() {
             </div>
           ) : null}
 
-          {/* Audio */}
           <div className="flex flex-col items-center gap-1">
             <Button
               size="icon"
@@ -889,7 +873,6 @@ export default function DiscoverPage() {
         </motion.div>
         ) : null}
 
-        {/* Navigation Arrows */}
         {currentAnime ? (
         <div className="fixed bottom-9 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/32 px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.28)] backdrop-blur-xl">
           <Button

@@ -420,7 +420,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
-      {/* Animated Background Gradients — banana-forward brand glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute -top-[35%] -left-[15%] w-[75%] h-[75%] rounded-full bg-gradient-to-br from-primary/25 via-accent/12 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '8s' }} />
         <div className="absolute -bottom-[30%] -right-[20%] w-[70%] h-[70%] rounded-full bg-gradient-to-tl from-accent/18 via-primary/8 to-transparent blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '2s' }} />
@@ -430,9 +429,7 @@ export default function HomePage() {
       <Navigation />
       
       <main className="relative z-10">
-        {/* Epic Hero Section with Featured Anime */}
         <section className="relative min-h-[85vh] flex items-center overflow-hidden pt-20 md:pt-24 pb-10">
-          {/* Banner Background */}
           {featured ? (
             <AnimatePresence mode="wait">
               <motion.div
@@ -473,21 +470,17 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-card" />
           )}
 
-          {/* Brand sparkle field + banana wash fills the hero with logo energy */}
           <FloatingDecorations density="normal" className="z-[1] opacity-80" />
           <div className="brand-glow pointer-events-none absolute -left-24 top-1/3 z-[1] h-80 w-80 opacity-50 blur-2xl" />
 
-          {/* Decorative vertical kana accent */}
           <div className="pointer-events-none absolute right-6 top-1/2 z-[1] hidden -translate-y-1/2 select-none xl:block">
             <span className="writing-vertical font-jp text-[9rem] font-black leading-none tracking-tight text-primary/[0.08]">
               ヒカリ
             </span>
           </div>
 
-          {/* Hero Content */}
           <div className="container mx-auto px-4 relative z-10">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
-              {/* Left Side - Info */}
               <AnimatePresence mode="wait">
                 <motion.div
                   key={featured?.id || "featured-empty"}
@@ -637,7 +630,6 @@ export default function HomePage() {
                 </motion.div>
               </AnimatePresence>
 
-{/* Right Side - Featured Cover Card */}
           <div className="hidden lg:flex justify-center">
             {featured ? (
               <AnimatePresence mode="wait" initial={false}>
@@ -650,7 +642,6 @@ export default function HomePage() {
                   className="relative"
                 >
                   <Link href={getMediaHref(featured.id, featured.title)} className="block cursor-pointer">
-                    {/* Brand ray-burst + sparkles echo the Hikari logo */}
                     <div className="brand-rays pointer-events-none absolute -inset-20 -z-10 opacity-[0.16]" />
                     <StarBurst size={44} className="pointer-events-none absolute -left-7 -top-7 z-30 text-primary animate-spin-slow" />
                     <Sparkle size={28} className="pointer-events-none absolute -right-5 top-8 z-30 !text-primary" />
@@ -684,7 +675,6 @@ export default function HomePage() {
           </div>
             </div>
 
-            {/* Carousel Indicators */}
             <div className="flex items-center justify-center gap-3 mt-12">
               {(featuredAnime.length ? featuredAnime : Array.from({ length: 3 })).map((_, index) => (
                 <motion.button
@@ -715,7 +705,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Quick Search Bar - No keyboard shortcut */}
         <section className="relative mt-2 px-4 z-20">
           <div className="max-w-4xl mx-auto">
             <div className="relative group">
@@ -748,7 +737,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Continue Watching Section */}
         <section className="px-4 py-8">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
@@ -857,12 +845,9 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Recommended For You (personalized, signed-in only) */}
         <RecommendedForYou />
 
-        {/* Trending Section */}
         <section className="px-4 py-16 relative">
-          {/* Section Background */}
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent" />
           
           <div className="max-w-7xl mx-auto relative">
@@ -917,7 +902,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Airing Schedule Section */}
         <section className="px-4 py-16">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-8">
@@ -998,10 +982,8 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Discord + Extension promos */}
         <section className="px-4 py-12">
           <div className="mx-auto grid max-w-6xl gap-5 md:grid-cols-2">
-            {/* Discord */}
             <div className="group relative overflow-hidden rounded-2xl border border-[#5865F2]/25 bg-gradient-to-br from-[#5865F2]/12 to-card p-6 transition-all hover:border-[#5865F2]/40">
               <div className="flex items-start gap-4">
                 <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/15 text-[#5865F2]">
@@ -1025,7 +1007,6 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Browser extension */}
             <div className="group relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/12 to-card p-6 transition-all hover:border-primary/40">
               <span className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Coming soon
@@ -1053,7 +1034,6 @@ export default function HomePage() {
         </section>
       </main>
 
-      {/* Footer */}
       <footer className="relative z-10 border-t border-border/50 bg-card/30 backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-8">

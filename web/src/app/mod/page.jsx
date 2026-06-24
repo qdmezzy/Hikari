@@ -1021,7 +1021,6 @@ function Dashboard({ user }) {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto flex max-w-7xl flex-col lg:flex-row">
-        {/* Sidebar (desktop) */}
         <aside className="hidden w-60 flex-shrink-0 border-r border-border/50 lg:block">
           <div className="sticky top-0 flex h-screen flex-col p-4">
             <div className="mb-6 flex items-center gap-2.5 px-2">
@@ -1073,7 +1072,6 @@ function Dashboard({ user }) {
           </div>
         </aside>
 
-        {/* Mobile top bar */}
         <div className="sticky top-0 z-30 border-b border-border/50 bg-background/90 backdrop-blur-xl lg:hidden">
           <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-2">
@@ -1104,7 +1102,6 @@ function Dashboard({ user }) {
           </div>
         </div>
 
-        {/* Main content */}
         <main className="min-w-0 flex-1 px-4 py-6 md:px-8">
           <header className="mb-6 flex items-center gap-3">
             <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
