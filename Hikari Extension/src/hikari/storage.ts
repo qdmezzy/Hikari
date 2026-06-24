@@ -90,8 +90,6 @@ export async function setLastAutoUpdate(update: LastAutoUpdate) {
   await chrome.storage.local.set({ [LAST_AUTO_UPDATE_KEY]: update });
 }
 
-// Live "now watching" status the content script writes as you watch, so the
-// popup can show exactly what's happening (and self-heal state) in real time.
 export type LiveProgress = {
   at: number;
   episode?: number;
@@ -118,8 +116,6 @@ export async function getAutoUpdates(): Promise<LastAutoUpdate[]> {
   return (result[AUTO_UPDATES_KEY] as LastAutoUpdate[]) || [];
 }
 
-// Append an auto-tracked update to the running history (newest first, deduped
-// by media+episode so re-fires don't pile up). Also keeps lastAutoUpdate.
 export async function pushAutoUpdate(update: LastAutoUpdate) {
   const list = await getAutoUpdates();
   const filtered = list.filter(

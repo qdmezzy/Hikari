@@ -23,8 +23,6 @@ type RequestOptions = {
   body?: string;
 };
 
-// All Supabase REST calls go through the background worker (api.request.xhr) so
-// auto-tracking writes succeed from content scripts on CSP-locked sites too.
 async function request(path: string, options: RequestOptions = {}) {
   const { url, anonKey } = getHikariConfig();
   const session = await getValidSession();

@@ -14,8 +14,6 @@ type SessionResponse = {
   };
 };
 
-// Supabase auth via the background worker (api.request.xhr) so it works from
-// content scripts on CSP-restricted streaming sites and from the popup alike.
 async function authRequest(path: string, body: Record<string, unknown>): Promise<SessionResponse> {
   const { url, anonKey } = getHikariConfig();
   const response = await api.request.xhr('POST', {

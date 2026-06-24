@@ -1,8 +1,5 @@
 const ANILIST_ENDPOINT = 'https://graphql.anilist.co';
 
-// Route AniList calls through the background service worker (api.request.xhr)
-// rather than fetch(). Content scripts on strict-CSP streaming sites (e.g.
-// Crunchyroll) can't fetch cross-origin directly, but the background can.
 async function anilistPost(query: string, variables: Record<string, unknown>) {
   const response = await api.request.xhr('POST', {
     url: ANILIST_ENDPOINT,
@@ -64,9 +61,6 @@ query ($id: Int) {
 }
 `;
 
-// Persistent media cache. Covers/titles/episodes are stable, so caching them
-// in chrome.storage keeps us well under AniList's rate limit (the popup + the
-// scrobbler were re-fetching the same titles on every refresh and getting 429s).
 const MEDIA_CACHE_KEY = 'hikariMediaCache';
 const MEDIA_CACHE_TTL = 1000 * 60 * 60 * 24 * 7; // 7 days
 const MEDIA_CACHE_CAP = 600;
@@ -91,7 +85,6 @@ async function writeMediaCache(cache: Record<string, MediaCacheEntry>) {
     }
     await chrome.storage.local.set({ [MEDIA_CACHE_KEY]: toStore });
   } catch {
-    /* storage full / unavailable — non-fatal */
   }
 }
 
@@ -126,7 +119,6 @@ query ($ids: [Int], $perPage: Int) {
 }
 `;
 
-// Warm the cache for many ids in a single request (instead of one call per id).
 export async function prefetchMedia(ids: number[]) {
   const unique = Array.from(new Set(ids.map(Number).filter(Number.isFinite)));
   if (!unique.length) return;
@@ -177,8 +169,6 @@ const chunk = <T>(arr: T[], size: number): T[][] => {
   return out;
 };
 
-// Fetch next-airing info for a set of AniList ids. Only returns titles that
-// actually have an upcoming episode scheduled.
 export async function fetchAiringByIds(ids: number[]): Promise<AiringMedia[]> {
   const unique = Array.from(new Set(ids.map(Number).filter(Number.isFinite)));
   if (!unique.length) return [];

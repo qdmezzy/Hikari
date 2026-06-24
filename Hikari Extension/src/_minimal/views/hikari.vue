@@ -328,7 +328,6 @@
           </div>
         </section>
         <section v-if="view === 'detected'" class="hikari-view">
-          <!-- Compact current detection + live status + one-tap manual save -->
           <div class="detected-strip">
             <img :src="detectedImage || placeholder" alt="" />
             <div class="detected-strip-meta">
@@ -360,7 +359,6 @@
           <div v-if="liveActive" class="live-bar"><span :style="{ width: `${livePercent}%` }"></span></div>
           <div v-if="detectedError" class="hikari-error">{{ detectedError }}</div>
 
-          <!-- Running log of what Hikari auto-tracked -->
           <div class="hikari-section-header">
             <div class="section-title">
               <span class="material-icons">playlist_add_check</span>
@@ -816,7 +814,6 @@ const loadLiveProgress = async () => {
   liveProgress.value = await getLiveProgress();
 };
 
-// Live status only counts as "current" if it was updated very recently.
 const liveActive = computed(() => {
   nowTick.value; // re-evaluate as time passes so it expires
   const live = liveProgress.value;
@@ -894,9 +891,6 @@ const formatRelativeTime = (value?: string | number | null, now?: number) => {
   return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
 };
 
-// Countdown to an upcoming episode. Derived from the absolute airing time and
-// `nowMs` (the reactive minute tick) so the label stays accurate and counts down
-// live between refreshes.
 const formatCountdown = (airingAt: number, nowMs?: number) => {
   const nowSeconds = Math.floor((nowMs || Date.now()) / 1000);
   const seconds = Math.max(0, (airingAt || 0) - nowSeconds);
@@ -1076,8 +1070,6 @@ const resolveDetected = async () => {
         const entry = await fetchEntry(media.id);
         if (entry) {
           detectedStatus.value = entry.status;
-          // Show the episode detected on the *page* (so a wrong number is visible
-          // and one tap fixes it); fall back to saved progress if the page has none.
           const pageEp = clampValue(payload.episode || 0, detectedTotal.value);
           detectedProgress.value =
             pageEp > 0 ? pageEp : clampValue(entry.progress || 0, detectedTotal.value);
@@ -1164,8 +1156,6 @@ const loadDashboard = async () => {
       .filter((entry) => ['watching', 'rewatching'].includes(entry.status))
       .slice(0, 6);
 
-    // Warm the media cache for everything we're about to render in ONE batched
-    // request, so the per-item lookups below are cache hits (no rate limit).
     const recentEntries = sortedEntries.slice(0, 6);
     await prefetchMedia([...watching, ...recentEntries].map((e) => e.media_id));
 
@@ -1216,7 +1206,6 @@ const loadDashboard = async () => {
   }
 };
 
-// Build the "upcoming episodes" list from the user's currently-airing titles.
 const loadUpcoming = async (entries: any[]) => {
   const animeIds = Array.from(
     new Set(
@@ -1255,7 +1244,6 @@ const loadUpcoming = async (entries: any[]) => {
       };
     });
   } catch (error) {
-    // Non-fatal: keep the previous list; the popup refreshes on a timer.
   } finally {
     upcomingLoading.value = false;
   }
@@ -1357,9 +1345,6 @@ onMounted(async () => {
     nowTick.value = Date.now();
   }, 60 * 1000);
 
-  // Refresh on a relaxed cadence — media is cached, so we mainly need to pick up
-  // session changes. Auto-update + detection refresh instantly via storage/tab
-  // watchers, so a tight loop here just burned through the AniList rate limit.
   refreshTimer = window.setInterval(() => {
     loadSession().then(() => {
       loadLastAutoUpdate();
