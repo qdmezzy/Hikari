@@ -20,5 +20,3 @@ discord-bot/bot.log
 # Local tooling binaries
 .local-tools/
 
-# Editor / AI tooling config
-.continue/
