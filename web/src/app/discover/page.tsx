@@ -139,8 +139,6 @@ const DISCOVER_PAGE_SIZE = 50
 // via one server IP). Fewer pages per load + a shallow, cache-shareable start
 // range keeps Discover under budget instead of triggering upstream 500s.
 const DISCOVER_MIN_BUFFER = 8
-const DISCOVER_INITIAL_PAGE_MIN = 1
-const DISCOVER_INITIAL_PAGE_MAX = 4
 const DISCOVER_MAX_PAGE_HOPS = 2
 
 const shuffleDiscoverItems = <T,>(items: T[]) => {
@@ -177,12 +175,12 @@ export default function DiscoverPage() {
   const [isTrailerPlayerOpen, setIsTrailerPlayerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const loadMoreInFlightRef = useRef(false)
-  const discoverSortRef = useRef(
-    DISCOVER_SORT_PRESETS[Math.floor(Math.random() * DISCOVER_SORT_PRESETS.length)]
-  )
-  const discoverStartPageRef = useRef(
-    Math.floor(Math.random() * (DISCOVER_INITIAL_PAGE_MAX - DISCOVER_INITIAL_PAGE_MIN + 1)) + DISCOVER_INITIAL_PAGE_MIN
-  )
+  // Deterministic sort + start page so every visitor requests the SAME queries.
+  // That lets the proxy's shared cache absorb repeat loads instead of every load
+  // being a unique cache-miss that hits AniList (which blows the ~30 req/min limit).
+  // Per-session variety still comes from shuffleDiscoverItems.
+  const discoverSortRef = useRef(DISCOVER_SORT_PRESETS[0])
+  const discoverStartPageRef = useRef(1)
   // Personalization: top genres from the user's list + ids to exclude (already tracked).
   const activeVibeRef = useRef("all")
   const personalGenresRef = useRef<string[]>([])
