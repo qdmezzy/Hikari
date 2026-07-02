@@ -456,6 +456,13 @@ export default function DiscoverPage() {
     loadFeedPage(discoverStartPageRef.current)
   }, [tasteResolved, loadFeedPage])
 
+  // Safety net: never let Discover hang on the loader. If auth/taste hasn't
+  // resolved within a few seconds, fall back to the generic feed.
+  useEffect(() => {
+    const timer = setTimeout(() => setTasteResolved(true), 4000)
+    return () => clearTimeout(timer)
+  }, [])
+
   // Build a taste profile from the user's list: top genres (to bias the feed)
   // and the ids they already track (to exclude). Then refresh "For You".
   useEffect(() => {
