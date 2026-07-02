@@ -298,6 +298,9 @@ export default function DiscoverPage() {
     setSpoilerSafe((prev) => !prev)
   }
 
+  const [feedError, setFeedError] = useState(false)
+  const failuresRef = useRef(0)
+
   const loadFeedPage = useCallback(async (nextPage: number, append = false) => {
     if (loadMoreInFlightRef.current) return
     loadMoreInFlightRef.current = true
@@ -355,6 +358,10 @@ export default function DiscoverPage() {
         resolved = await requestPage(1)
       }
 
+      // Got a response — clear any error/backoff state.
+      failuresRef.current = 0
+      setFeedError(false)
+
       if (resolved.items.length) {
         setDiscoverFeed((prev) => {
           if (!append) return resolved.items
@@ -377,11 +384,24 @@ export default function DiscoverPage() {
       if (!append) {
         setDiscoverFeed([])
       }
+      // Circuit breaker: after repeated failures, stop auto-retrying so we don't
+      // hammer the API (which is what causes the upstream 500s in the first place).
+      failuresRef.current += 1
+      if (failuresRef.current >= 4) setFeedError(true)
     } finally {
       loadMoreInFlightRef.current = false
       setLoadingMore(false)
     }
   }, [])
+
+  const retryFeed = useCallback(() => {
+    failuresRef.current = 0
+    setFeedError(false)
+    setDiscoverFeed([])
+    setCurrentIndex(0)
+    setPage(1)
+    loadFeedPage(discoverStartPageRef.current)
+  }, [loadFeedPage])
 
   // Keyboard navigation
   useEffect(() => {
@@ -550,18 +570,18 @@ export default function DiscoverPage() {
   }, [user, authLoading])
 
   useEffect(() => {
-    if (!hasMore || loadingMore) return
+    if (feedError || !hasMore || loadingMore) return
     if (discoverFeed.length >= DISCOVER_MIN_BUFFER) return
     if (!discoverFeed.length && page !== 1) return
     loadFeedPage(page + 1, true)
-  }, [discoverFeed.length, hasMore, loadingMore, page, loadFeedPage])
+  }, [discoverFeed.length, hasMore, loadingMore, page, loadFeedPage, feedError])
 
   useEffect(() => {
-    if (!filteredFeed.length || !hasMore || loadingMore) return
+    if (feedError || !filteredFeed.length || !hasMore || loadingMore) return
     if (currentIndex >= filteredFeed.length - 6) {
       loadFeedPage(page + 1, true)
     }
-  }, [currentIndex, filteredFeed.length, hasMore, loadingMore, page, loadFeedPage])
+  }, [currentIndex, filteredFeed.length, hasMore, loadingMore, page, loadFeedPage, feedError])
 
   useEffect(() => {
     if (!filteredFeed.length) return
@@ -779,6 +799,16 @@ export default function DiscoverPage() {
             </motion.div>
           )}
         </AnimatePresence>
+      ) : feedError ? (
+        <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+          <p className="text-lg font-semibold text-foreground">Couldn&apos;t load the discover feed</p>
+          <p className="max-w-sm text-sm text-muted-foreground">
+            The catalog service is busy right now. Give it a moment, then try again.
+          </p>
+          <Button onClick={retryFeed} className="bg-primary text-primary-foreground hover:bg-primary/90">
+            Try again
+          </Button>
+        </div>
       ) : (
         <PageLoader label="Loading discover feed..." />
       )}

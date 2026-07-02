@@ -158,9 +158,13 @@ export async function POST(req: Request) {
         // Keep original payload if AniList returns non-JSON text.
       }
 
-      const ttlMs = res.status === 429 ? RATE_LIMIT_TTL_MS : CACHE_TTL_MS;
+      // Only cache successful responses. Caching errors (esp. 5xx) would turn a
+      // brief AniList hiccup into minutes of guaranteed failures for everyone.
+      let ttlMs = CACHE_TTL_MS;
+      if (res.status === 429) ttlMs = RATE_LIMIT_TTL_MS;
+      else if (!res.ok) ttlMs = 0;
       const entry: CacheEntry = { status: res.status, body: safeBody, cachedAt: Date.now(), ttlMs };
-      cache.set(key, entry);
+      if (ttlMs > 0) cache.set(key, entry);
       return entry;
     })();
 
