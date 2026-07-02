@@ -135,10 +135,13 @@ const mapMediaToDiscoverItem = (media: any): DiscoverItem | null => {
 
 const fallbackDiscoverFeed: DiscoverItem[] = []
 const DISCOVER_PAGE_SIZE = 50
-const DISCOVER_MIN_BUFFER = 18
+// Kept low to respect AniList's rate limit (~30 req/min, shared across all users
+// via one server IP). Fewer pages per load + a shallow, cache-shareable start
+// range keeps Discover under budget instead of triggering upstream 500s.
+const DISCOVER_MIN_BUFFER = 8
 const DISCOVER_INITIAL_PAGE_MIN = 1
-const DISCOVER_INITIAL_PAGE_MAX = 12
-const DISCOVER_MAX_PAGE_HOPS = 5
+const DISCOVER_INITIAL_PAGE_MAX = 4
+const DISCOVER_MAX_PAGE_HOPS = 2
 
 const shuffleDiscoverItems = <T,>(items: T[]) => {
   const copy = [...items]

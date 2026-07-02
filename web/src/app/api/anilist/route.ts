@@ -7,7 +7,7 @@ type CacheEntry = {
   ttlMs: number;
 };
 
-const CACHE_TTL_MS = 1000 * 60 * 2;
+const CACHE_TTL_MS = 1000 * 60 * 5;
 const RATE_LIMIT_TTL_MS = 1000 * 8;
 const CACHE_VERSION = "v2";
 // Rely on AniList's isAdult flag for NSFW filtering. A plain "adult" text match
