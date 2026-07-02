@@ -541,9 +541,8 @@ export default function MediaPage() {
           setHasEntry(true)
           setExistingProgress(data.progress || 0)
         }
-      } catch (err) {
+      } catch {
         // Entry doesn't exist yet, that's fine
-        console.log('No existing entry found')
       }
     }
 

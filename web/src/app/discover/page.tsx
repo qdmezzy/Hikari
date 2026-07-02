@@ -52,13 +52,10 @@ type DiscoverItem = {
   trailerId: string | null
 }
 
-const DISCOVER_SORT_PRESETS = [
-  ["TRENDING_DESC", "POPULARITY_DESC"],
-  ["POPULARITY_DESC", "TRENDING_DESC"],
-  ["SCORE_DESC", "POPULARITY_DESC"],
-  ["FAVOURITES_DESC", "POPULARITY_DESC"],
-  ["START_DATE_DESC", "POPULARITY_DESC"],
-]
+// One fixed sort for everyone: identical queries let the proxy's shared cache
+// absorb repeat loads instead of each visitor being a fresh AniList cache-miss.
+// Per-session variety comes from shuffleDiscoverItems.
+const DISCOVER_SORT = ["TRENDING_DESC", "POPULARITY_DESC"]
 
 const DISCOVER_QUERY = `
 query ($page: Int, $perPage: Int, $sort: [MediaSort], $genreIn: [String], $idNotIn: [Int]) {
@@ -133,7 +130,6 @@ const mapMediaToDiscoverItem = (media: any): DiscoverItem | null => {
   }
 }
 
-const fallbackDiscoverFeed: DiscoverItem[] = []
 const DISCOVER_PAGE_SIZE = 50
 // Kept low to respect AniList's rate limit (~30 req/min, shared across all users
 // via one server IP). Fewer pages per load + a shallow, cache-shareable start
@@ -175,17 +171,10 @@ export default function DiscoverPage() {
   const [isTrailerPlayerOpen, setIsTrailerPlayerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const loadMoreInFlightRef = useRef(false)
-  // Deterministic sort + start page so every visitor requests the SAME queries.
-  // That lets the proxy's shared cache absorb repeat loads instead of every load
-  // being a unique cache-miss that hits AniList (which blows the ~30 req/min limit).
-  // Per-session variety still comes from shuffleDiscoverItems.
-  const discoverSortRef = useRef(DISCOVER_SORT_PRESETS[0])
-  const discoverStartPageRef = useRef(1)
   // Personalization: top genres from the user's list + ids to exclude (already tracked).
   const activeVibeRef = useRef("all")
   const personalGenresRef = useRef<string[]>([])
   const personalExcludeRef = useRef<number[]>([])
-  const [personalizedReady, setPersonalizedReady] = useState(false)
   // Load the feed exactly once, after we know whether/how to personalize it,
   // so personalization never reloads (and cuts off) a trailer that's playing.
   const [tasteResolved, setTasteResolved] = useState(false)
@@ -315,7 +304,7 @@ export default function DiscoverPage() {
         const variables: Record<string, unknown> = {
           page: pageNumber,
           perPage: DISCOVER_PAGE_SIZE,
-          sort: discoverSortRef.current,
+          sort: DISCOVER_SORT,
         }
         if (usePersonal) {
           variables.genreIn = personalGenresRef.current
@@ -404,7 +393,7 @@ export default function DiscoverPage() {
     setDiscoverFeed([])
     setCurrentIndex(0)
     setPage(1)
-    loadFeedPage(discoverStartPageRef.current)
+    loadFeedPage(1)
   }, [loadFeedPage])
 
   // Keyboard navigation
@@ -477,7 +466,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     if (!tasteResolved || feedLoadedRef.current) return
     feedLoadedRef.current = true
-    loadFeedPage(discoverStartPageRef.current)
+    loadFeedPage(1)
   }, [tasteResolved, loadFeedPage])
 
   // Safety net: never let Discover hang on the loader. If auth/taste hasn't
@@ -495,7 +484,6 @@ export default function DiscoverPage() {
     if (!user) {
       personalGenresRef.current = []
       personalExcludeRef.current = []
-      setPersonalizedReady(false)
       setSavedStatus({})
       setSaved({})
       setTasteResolved(true) // signed out → load the generic feed
@@ -558,7 +546,6 @@ export default function DiscoverPage() {
           .map(([name]) => name)
         if (!active) return
         personalGenresRef.current = topGenres
-        if (topGenres.length) setPersonalizedReady(true)
       } catch {
         /* ignore — fall back to the generic feed */
       } finally {

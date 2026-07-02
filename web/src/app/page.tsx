@@ -230,6 +230,7 @@ export default function HomePage() {
   const [homeLoading, setHomeLoading] = useState(true)
   const [continueLoading, setContinueLoading] = useState(true)
   const [homeError, setHomeError] = useState("")
+  const [homeReloadKey, setHomeReloadKey] = useState(0)
   const [continueError, setContinueError] = useState("")
 
   const runSearch = () => {
@@ -291,7 +292,7 @@ export default function HomePage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [homeReloadKey])
 
   useEffect(() => {
     if (featuredAnime.length <= 1) return
@@ -624,7 +625,18 @@ export default function HomePage() {
                       <p className="text-lg text-muted-foreground max-w-xl leading-relaxed">
                         Discover new series, keep your list updated, and pick up where you left off.
                       </p>
-                      {homeError ? <p className="text-sm text-rose-400">{homeError}</p> : null}
+                      {homeError ? (
+                        <p className="text-sm text-rose-400">
+                          {homeError}{" "}
+                          <button
+                            type="button"
+                            onClick={() => setHomeReloadKey((key) => key + 1)}
+                            className="font-semibold underline underline-offset-2 hover:text-rose-300"
+                          >
+                            Try again
+                          </button>
+                        </p>
+                      ) : null}
                     </>
                   )}
                 </motion.div>
@@ -869,7 +881,18 @@ export default function HomePage() {
               </Link>
             </div>
             
-            {homeError ? <p className="mb-4 text-sm text-rose-400">{homeError}</p> : null}
+            {homeError ? (
+              <p className="mb-4 text-sm text-rose-400">
+                {homeError}{" "}
+                <button
+                  type="button"
+                  onClick={() => setHomeReloadKey((key) => key + 1)}
+                  className="font-semibold underline underline-offset-2 hover:text-rose-300"
+                >
+                  Try again
+                </button>
+              </p>
+            ) : null}
 
             {homeLoading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5">
