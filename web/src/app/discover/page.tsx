@@ -310,19 +310,22 @@ export default function DiscoverPage() {
     try {
       const requestPage = async (pageNumber: number) => {
         const usePersonal = activeVibeRef.current === "all" && personalGenresRef.current.length > 0
+        // AniList 500s on filter variables passed as explicit null, so only
+        // include genreIn/idNotIn when they carry real values.
+        const variables: Record<string, unknown> = {
+          page: pageNumber,
+          perPage: DISCOVER_PAGE_SIZE,
+          sort: discoverSortRef.current,
+        }
+        if (usePersonal) {
+          variables.genreIn = personalGenresRef.current
+          const excludeIds = personalExcludeRef.current.slice(0, 100)
+          if (excludeIds.length) variables.idNotIn = excludeIds
+        }
         const response = await fetch("/api/anilist", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: DISCOVER_QUERY,
-            variables: {
-              page: pageNumber,
-              perPage: DISCOVER_PAGE_SIZE,
-              sort: discoverSortRef.current,
-              genreIn: usePersonal ? personalGenresRef.current : null,
-              idNotIn: usePersonal ? personalExcludeRef.current.slice(0, 100) : null,
-            },
-          }),
+          body: JSON.stringify({ query: DISCOVER_QUERY, variables }),
         })
 
         const json = await response.json()

@@ -33,6 +33,11 @@ const sanitizeVariables = (value: unknown): unknown => {
   const out: Record<string, unknown> = {};
 
   for (const [key, raw] of Object.entries(input)) {
+    // AniList returns 500 "Internal Server Error" when filter arguments like
+    // genre_in / id_not_in are passed as explicit null. Omitting the key is
+    // equivalent for queries, so drop null/undefined variables entirely.
+    if (raw === null || raw === undefined) continue;
+
     if (/^isadult$/i.test(key) && raw === true) {
       out[key] = false;
       continue;
