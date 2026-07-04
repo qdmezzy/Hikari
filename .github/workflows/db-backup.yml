@@ -47,7 +47,10 @@ jobs:
         env:
           DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
-          pg_dump "$DB_URL" --no-owner --no-privileges --schema=public -f hikari-backup.sql
+          # Call the v17 binary directly: the runner preinstalls Postgres 16 and
+          # Ubuntu's pg_dump wrapper picks that over the newly installed 17,
+          # which fails against Supabase's newer server with a version mismatch.
+          /usr/lib/postgresql/17/bin/pg_dump "$DB_URL" --no-owner --no-privileges --schema=public -f hikari-backup.sql
           ls -la hikari-backup.sql
 
       - name: Encrypt dump
