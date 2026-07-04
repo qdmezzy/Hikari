@@ -1,8 +1,7 @@
 import type { MetadataRoute } from "next"
 
 // PWA manifest — makes Hikari installable to the home screen with the same
-// design (navy + banana). Icons reference the brand mark; swap in the kit's
-// PNG icon set (192/512 + maskable) when it lands for crisp store-quality icons.
+// design (navy + banana).
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Hikari — Anime Discovery & Tracking",
@@ -17,6 +16,24 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#0f1133",
     categories: ["entertainment", "lifestyle"],
     icons: [
+      {
+        src: "/icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "any",
+      },
+      {
+        src: "/icon-maskable-512.png",
+        sizes: "512x512",
+        type: "image/png",
+        purpose: "maskable",
+      },
       {
         src: "/icon.svg",
         sizes: "any",

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { isAllowedOrigin } from "@/lib/api-origin"
 
 // Your media API. The app calls this for media-by-ids hydration instead of
 // AniList directly. It serves from the media_cache table first and only hits
@@ -68,6 +69,10 @@ const fetchFromAniList = async (ids: number[]) => {
 
 export async function POST(req: Request) {
   try {
+    if (!isAllowedOrigin(req)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     const body = await req.json().catch(() => ({}))
     const ids = Array.from(
       new Set((Array.isArray(body?.ids) ? body.ids : []).map((v: unknown) => Number(v)).filter(Number.isFinite)),

@@ -6,6 +6,8 @@
 
 Discover what to watch next, track your progress, build lists, import from MyAnimeList & AniList, and auto-track episodes as you stream.
 
+[![CI](https://github.com/qdmezzy/Hikari/actions/workflows/ci.yml/badge.svg)](https://github.com/qdmezzy/Hikari/actions/workflows/ci.yml)
+
 </div>
 
 ---
@@ -56,7 +58,7 @@ web/db/            SQL schema + RLS policies for Supabase
 
 ### 2. Database
 
-In your Supabase project's **SQL Editor**, run the SQL files in [`web/db/`](web/db) to create the tables and Row-Level-Security policies.
+In your Supabase project's **SQL Editor**, run [`web/db/schema.sql`](web/db/schema.sql) to create all tables and Row-Level-Security policies in one go (the other files in [`web/db/`](web/db) are the same schema split per feature).
 
 ### 3. Environment
 
@@ -102,6 +104,11 @@ Then load it unpacked:
 2. Enable **Developer mode**
 3. **Load unpacked** → select `Hikari Extension/dist/webextension`
 4. Open the popup, sign in with your Hikari account, and start watching on a supported site.
+
+## CI & backups
+
+- **CI** — every push and PR runs a typecheck + production build ([`ci.yml`](.github/workflows/ci.yml)).
+- **Database backups** — a weekly GitHub Action dumps the Supabase database, encrypts it, and stores it as a 30-day artifact ([`db-backup.yml`](.github/workflows/db-backup.yml)). To enable it on a fork, set the `SUPABASE_DB_URL` and `BACKUP_PASSPHRASE` repo secrets; decrypt with `openssl enc -d -aes-256-cbc -pbkdf2 -in hikari-backup.sql.enc -out hikari-backup.sql`.
 
 ## Contributing
 

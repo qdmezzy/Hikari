@@ -2274,6 +2274,24 @@ using (bucket_id = 'avatars' and auth.uid() = owner);
 
 
 -- =============================================================================
+-- ANILIST QUERY CACHE (shared cache for the AniList proxy; service-role only)
+-- =============================================================================
+
+create table if not exists public.anilist_query_cache (
+  cache_key text primary key,
+  status integer not null,
+  body text not null,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.anilist_query_cache enable row level security;
+
+create index if not exists anilist_query_cache_expires_at_idx
+  on public.anilist_query_cache (expires_at);
+
+
+-- =============================================================================
 -- OPTIONAL: grant yourself moderator (replace the email, then run just this).
 -- =============================================================================
 -- UPDATE auth.users

@@ -1,0 +1,69 @@
+name: Database backup
+
+# Weekly encrypted Supabase backup. After the database was wiped once by an
+# external tool, this is the "restore from Sunday" safety net.
+#
+# Required repo secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL    — the Session pooler connection string from Supabase
+#                        (Project Settings → Database → Connection string)
+#   BACKUP_PASSPHRASE  — any long random string; you need it to decrypt dumps
+#
+# Restore a downloaded artifact:
+#   openssl enc -d -aes-256-cbc -pbkdf2 -in hikari-backup.sql.enc -out hikari-backup.sql
+#   psql "$SUPABASE_DB_URL" -f hikari-backup.sql
+
+on:
+  schedule:
+    - cron: "0 3 * * 0" # Sundays 03:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets
+        id: check
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SUPABASE_DB_URL / BACKUP_PASSPHRASE secrets not set — skipping backup."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install PostgreSQL client
+        if: steps.check.outputs.configured == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          yes '' | sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Dump database
+        if: steps.check.outputs.configured == 'true'
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          pg_dump "$DB_URL" --no-owner --no-privileges --schema=public -f hikari-backup.sql
+          ls -la hikari-backup.sql
+
+      - name: Encrypt dump
+        if: steps.check.outputs.configured == 'true'
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -salt \
+            -in hikari-backup.sql -out hikari-backup.sql.enc \
+            -pass env:PASSPHRASE
+          rm hikari-backup.sql
+
+      - name: Upload encrypted backup
+        if: steps.check.outputs.configured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hikari-db-backup-${{ github.run_id }}
+          path: hikari-backup.sql.enc
+          retention-days: 30

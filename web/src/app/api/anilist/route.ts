@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { createHash } from "crypto";
+import { isAllowedOrigin } from "@/lib/api-origin";
 
 type CacheEntry = {
   status: number;
@@ -118,11 +121,67 @@ const getCaches = () => {
   return { cache: g.__hikariAniListCache, inflight: g.__hikariAniListInflight };
 };
 
+// Durable cache layer in Supabase. The in-memory Map above only lives as long
+// as one serverless instance; this table is shared across instances and cold
+// starts, which is what actually keeps repeat queries off AniList's rate limit.
+const readFirstEnv = (...keys: string[]) => {
+  for (const key of keys) {
+    const value = String(process.env[key] || "").trim();
+    if (value) return value;
+  }
+  return "";
+};
+
+const getDbCacheClient = () => {
+  const url = readFirstEnv("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL");
+  const serviceKey = readFirstEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY");
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+};
+
+const readDbCache = async (key: string): Promise<CacheEntry | null> => {
+  const db = getDbCacheClient();
+  if (!db) return null;
+  try {
+    const { data } = await db
+      .from("anilist_query_cache")
+      .select("status, body, expires_at")
+      .eq("cache_key", key)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (!data) return null;
+    return { status: data.status, body: data.body, cachedAt: Date.now(), ttlMs: CACHE_TTL_MS };
+  } catch {
+    return null; // table missing / transient DB issue — fall through to AniList
+  }
+};
+
+const writeDbCache = (key: string, entry: CacheEntry) => {
+  const db = getDbCacheClient();
+  if (!db) return;
+  const expiresAt = new Date(Date.now() + entry.ttlMs).toISOString();
+  // Fire-and-forget: a failed cache write must never fail the request.
+  void db
+    .from("anilist_query_cache")
+    .upsert({ cache_key: key, status: entry.status, body: entry.body, expires_at: expiresAt })
+    .then(() => {
+      if (Math.random() < 0.02) {
+        void db.from("anilist_query_cache").delete().lt("expires_at", new Date(Date.now() - 3600_000).toISOString());
+      }
+    });
+};
+
 export async function POST(req: Request) {
   try {
+    if (!isAllowedOrigin(req)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const rawBody = await req.json();
     const body = sanitizeAniListRequest(rawBody);
-    const key = JSON.stringify({ v: CACHE_VERSION, body: body ?? {} });
+    const key = createHash("sha256")
+      .update(JSON.stringify({ v: CACHE_VERSION, body: body ?? {} }))
+      .digest("hex");
     const { cache, inflight } = getCaches();
 
     const cached = cache.get(key);
@@ -139,6 +198,15 @@ export async function POST(req: Request) {
       return new NextResponse(entry.body, {
         status: entry.status,
         headers: { "Content-Type": "application/json", "X-Hikari-Cache": "SHARED" },
+      });
+    }
+
+    const fromDb = await readDbCache(key);
+    if (fromDb) {
+      cache.set(key, fromDb);
+      return new NextResponse(fromDb.body, {
+        status: fromDb.status,
+        headers: { "Content-Type": "application/json", "X-Hikari-Cache": "DB" },
       });
     }
 
@@ -170,6 +238,7 @@ export async function POST(req: Request) {
       else if (!res.ok) ttlMs = 0;
       const entry: CacheEntry = { status: res.status, body: safeBody, cachedAt: Date.now(), ttlMs };
       if (ttlMs > 0) cache.set(key, entry);
+      if (res.ok) writeDbCache(key, entry);
       return entry;
     })();
 
