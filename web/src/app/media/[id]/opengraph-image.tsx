@@ -38,7 +38,9 @@ export default async function MediaOgImage({ params }: { params: Promise<{ id: s
     )
   }
 
-  const scoreLabel = media.score ? `★ ${(media.score / 10).toFixed(1)}` : ""
+  // Note: text stars (★) render as missing-glyph boxes in the OG runtime's
+  // default font, so the pill draws an SVG star instead.
+  const scoreLabel = media.score ? (media.score / 10).toFixed(1) : ""
   const countLabel =
     media.type === "Manga"
       ? media.chapters
@@ -107,6 +109,8 @@ export default async function MediaOgImage({ params }: { params: Promise<{ id: s
               <div
                 style={{
                   display: "flex",
+                  alignItems: "center",
+                  gap: 10,
                   background: BANANA,
                   color: NAVY,
                   fontSize: 30,
@@ -115,6 +119,9 @@ export default async function MediaOgImage({ params }: { params: Promise<{ id: s
                   borderRadius: 999,
                 }}
               >
+                <svg width="30" height="30" viewBox="0 0 24 24" fill={NAVY}>
+                  <path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7-6.2-3.7-6.2 3.7 1.6-7L2 9.2l7.1-.6z" />
+                </svg>
                 {scoreLabel}
               </div>
             ) : null}
