@@ -372,24 +372,38 @@ export const buildWatchNext = async ({ listEntries = [], limit = 10 }) => {
   }
 
   // Sequels of recently finished anime the user isn't already tracking.
+  // One pick per finished title and per franchise, preferring proper TV
+  // seasons over specials/OVAs — otherwise one show floods the row with
+  // "Special", "OVA", and "Season 2" cards all at once.
+  const SEQUEL_FORMAT_RANK = { TV: 0, TV_SHORT: 1, MOVIE: 2, ONA: 3, OVA: 4, SPECIAL: 5 }
   const recentCompleted = [...completed].sort((a, b) => tsFinished(b) - tsFinished(a)).slice(0, 14)
   const completedIds = recentCompleted.map((entry) => Number(entry.media_id)).filter(Number.isFinite)
   const sequels = []
   const seenSequel = new Set()
+  const seenFranchise = new Set()
   if (completedIds.length) {
     const relData = await fetchAniList(RELATIONS_QUERY, { ids: completedIds })
     ;(relData?.Page?.media || []).forEach((parent) => {
       const parentTitle = titleOf(parent)
-      ;(parent.relations?.edges || []).forEach((edge) => {
-        if (edge?.relationType !== "SEQUEL") return
-        const node = edge.node
-        if (!node || node.type !== "ANIME") return
-        if (node.status === "NOT_YET_RELEASED") return // can't watch it yet
-        const id = Number(node.id)
-        if (!Number.isFinite(id) || listedIds.has(id) || seenSequel.has(id)) return
-        seenSequel.add(id)
-        sequels.push(mapMediaToCard(node, `Next up after ${parentTitle}`, { kind: "sequel", type: "anime" }))
-      })
+      const best = (parent.relations?.edges || [])
+        .filter((edge) => edge?.relationType === "SEQUEL")
+        .map((edge) => edge.node)
+        .filter(
+          (node) =>
+            node &&
+            node.type === "ANIME" &&
+            node.status !== "NOT_YET_RELEASED" &&
+            Number.isFinite(Number(node.id)) &&
+            !listedIds.has(Number(node.id)) &&
+            !seenSequel.has(Number(node.id)),
+        )
+        .sort((a, b) => (SEQUEL_FORMAT_RANK[a.format] ?? 9) - (SEQUEL_FORMAT_RANK[b.format] ?? 9))[0]
+      if (!best) return
+      const franchise = getRootTitle(titleOf(best))
+      if (seenFranchise.has(franchise)) return
+      seenFranchise.add(franchise)
+      seenSequel.add(Number(best.id))
+      sequels.push(mapMediaToCard(best, `After ${parentTitle}`, { kind: "sequel", type: "anime" }))
     })
   }
 

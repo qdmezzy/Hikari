@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Sparkles, PlayCircle, ListPlus } from "lucide-react"
+import { Sparkles, PlayCircle } from "lucide-react"
 import { buildWatchNext } from "@/lib/ai-recommendations"
 
 // "Watch next" row for the Plan to Watch tab: the next season of anime you just
@@ -62,52 +62,54 @@ export function WatchNextSection({ entries = [] }) {
         </div>
       </div>
 
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 [scrollbar-width:thin]">
+      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {loading
           ? Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
-                className="h-56 w-32 flex-shrink-0 animate-pulse rounded-xl border border-white/5 bg-white/5"
+                className="h-60 w-36 flex-shrink-0 animate-pulse rounded-xl border border-white/5 bg-white/5"
               />
             ))
           : items.map((item) => (
               <Link
                 key={item.id}
                 href={`/media/${item.id}`}
-                className="group w-32 flex-shrink-0"
+                className="group w-36 flex-shrink-0"
               >
-                <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-secondary">
+                <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-secondary ring-1 ring-border/40 transition-shadow group-hover:ring-primary/40">
                   <Image
                     src={item.image || "/placeholder.svg"}
                     alt={item.title}
                     fill
-                    sizes="128px"
+                    sizes="144px"
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
-                  <span
-                    className={`absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold backdrop-blur-sm ${
-                      item.kind === "sequel"
-                        ? "bg-primary/90 text-primary-foreground"
-                        : "bg-background/85 text-foreground"
-                    }`}
-                  >
-                    {item.kind === "sequel" ? (
-                      <>
-                        <PlayCircle className="h-3 w-3" />
-                        Next season
-                      </>
-                    ) : (
-                      <>
-                        <ListPlus className="h-3 w-3" />
-                        Your list
-                      </>
-                    )}
-                  </span>
+                  <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent" />
+                  {item.kind === "sequel" ? (
+                    <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded-full bg-primary/90 px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-sm backdrop-blur-sm">
+                      <PlayCircle className="h-3 w-3" />
+                      Next season
+                    </span>
+                  ) : null}
+                  {item.score ? (
+                    <span className="absolute bottom-1.5 right-1.5 inline-flex items-center gap-0.5 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
+                      ★ {item.score.toFixed(1)}
+                    </span>
+                  ) : null}
                 </div>
-                <h3 className="mt-2 line-clamp-1 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug text-foreground transition-colors group-hover:text-primary">
                   {item.title}
                 </h3>
-                <p className="line-clamp-1 text-[11px] text-muted-foreground">{item.reason}</p>
+                <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                  {item.kind === "sequel"
+                    ? item.reason
+                    : [
+                        item.type === "manga" ? "Manga" : null,
+                        item.episodes ? `${item.episodes} ${item.type === "manga" ? "ch" : "eps"}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "On your list"}
+                </p>
               </Link>
             ))}
       </div>
