@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Sparkles, PlayCircle } from "lucide-react"
+import { ChevronLeft, ChevronRight, Sparkles, PlayCircle } from "lucide-react"
 import { buildWatchNext } from "@/lib/ai-recommendations"
 
 // "Watch next" row for the Plan to Watch tab: the next season of anime you just
@@ -48,21 +48,84 @@ export function WatchNextSection({ entries = [] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature])
 
+  const scrollerRef = useRef(null)
+  const [canLeft, setCanLeft] = useState(false)
+  const [canRight, setCanRight] = useState(false)
+
+  const updateArrows = useCallback(() => {
+    const el = scrollerRef.current
+    if (!el) return
+    setCanLeft(el.scrollLeft > 4)
+    setCanRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    updateArrows()
+    const el = scrollerRef.current
+    if (!el) return
+    el.addEventListener("scroll", updateArrows, { passive: true })
+    window.addEventListener("resize", updateArrows)
+    return () => {
+      el.removeEventListener("scroll", updateArrows)
+      window.removeEventListener("resize", updateArrows)
+    }
+  }, [updateArrows, items.length, loading])
+
+  const scrollByDir = (dir) => {
+    const el = scrollerRef.current
+    if (!el) return
+    el.scrollBy({ left: dir * Math.max(el.clientWidth - 160, 320), behavior: "smooth" })
+  }
+
   if (!loading && !items.length) return null
 
   return (
     <section className="mb-8 rounded-2xl border border-border/50 bg-card/40 p-5">
-      <div className="mb-4 flex items-center gap-2.5">
-        <Sparkles className="h-5 w-5 text-primary" />
-        <div>
-          <h2 className="text-lg font-bold text-foreground">Watch next</h2>
-          <p className="text-xs text-muted-foreground">
-            Next seasons of what you finished, and your best plan-to-watch picks.
-          </p>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Watch next</h2>
+            <p className="text-xs text-muted-foreground">
+              Next seasons of what you finished, and your best plan-to-watch picks.
+            </p>
+          </div>
         </div>
+        {canLeft || canRight ? (
+          <div className="hidden items-center gap-1.5 sm:flex">
+            <button
+              type="button"
+              aria-label="Scroll left"
+              disabled={!canLeft}
+              onClick={() => scrollByDir(-1)}
+              className="flex size-8 items-center justify-center rounded-full border border-border/60 bg-card text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-30 disabled:hover:border-border/60 disabled:hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              aria-label="Scroll right"
+              disabled={!canRight}
+              onClick={() => scrollByDir(1)}
+              className="flex size-8 items-center justify-center rounded-full border border-border/60 bg-card text-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-30 disabled:hover:border-border/60 disabled:hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        ) : null}
       </div>
 
-      <div className="-mx-1 flex gap-4 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative">
+        {canLeft ? (
+          <div className="pointer-events-none absolute inset-y-0 -left-1 z-10 w-12 bg-gradient-to-r from-background/85 to-transparent" />
+        ) : null}
+        {canRight ? (
+          <div className="pointer-events-none absolute inset-y-0 -right-1 z-10 w-12 bg-gradient-to-l from-background/85 to-transparent" />
+        ) : null}
+        <div
+          ref={scrollerRef}
+          className="-mx-1 flex snap-x gap-4 overflow-x-auto scroll-smooth px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
         {loading
           ? Array.from({ length: 6 }).map((_, index) => (
               <div
@@ -74,7 +137,7 @@ export function WatchNextSection({ entries = [] }) {
               <Link
                 key={item.id}
                 href={`/media/${item.id}`}
-                className="group w-36 flex-shrink-0"
+                className="group w-36 flex-shrink-0 snap-start"
               >
                 <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-secondary ring-1 ring-border/40 transition-shadow group-hover:ring-primary/40">
                   <Image
@@ -112,6 +175,7 @@ export function WatchNextSection({ entries = [] }) {
                 </p>
               </Link>
             ))}
+        </div>
       </div>
     </section>
   )
