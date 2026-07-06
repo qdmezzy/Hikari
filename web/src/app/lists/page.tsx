@@ -41,6 +41,7 @@ import client from "@/lib/client"
 import { fetchAniListMediaByIds, formatRelativeTime, getEpisodeCount, getMediaTitle } from "@/lib/anilist"
 import { logListActivity } from "@/lib/activity-service"
 import { CollectionsSection } from "@/components/lists/CollectionsSection"
+import { WatchNextSection } from "@/components/lists/WatchNextSection"
 
 const statusToTab = {
   watching: "watching",
@@ -625,6 +626,9 @@ function ListPageContent() {
 
             {tabs.map((tab) => (
               <TabsContent key={tab.id} value={tab.id} className="mt-0">
+                {tab.id === "planned" && !loadingEntries && entries.length ? (
+                  <WatchNextSection entries={entries} />
+                ) : null}
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

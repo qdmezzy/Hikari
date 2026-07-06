@@ -92,6 +92,57 @@ query ($season: MediaSeason, $seasonYear: Int, $perPage: Int) {
 }
 `
 
+// Completed titles + their relations, used to surface the next season/sequel
+// of something the user just finished.
+const RELATIONS_QUERY = `
+query ($ids: [Int]) {
+  Page(perPage: 50) {
+    media(id_in: $ids, type: ANIME) {
+      id
+      title { romaji english native }
+      relations {
+        edges {
+          relationType
+          node {
+            id
+            type
+            format
+            status
+            title { romaji english native }
+            coverImage { large }
+            averageScore
+            episodes
+            genres
+            popularity
+          }
+        }
+      }
+    }
+  }
+}
+`
+
+// Full details for the user's Plan to Watch entries so they can be ranked by
+// taste and rendered as cards.
+const WATCH_NEXT_POOL_QUERY = `
+query ($ids: [Int]) {
+  Page(perPage: 50) {
+    media(id_in: $ids) {
+      id
+      type
+      title { romaji english native }
+      coverImage { large }
+      averageScore
+      episodes
+      genres
+      tags { name rank }
+      format
+      popularity
+    }
+  }
+}
+`
+
 const normalizeToken = (value = "") =>
   String(value)
     .toLowerCase()
@@ -291,6 +342,91 @@ const buildExplain = ({ matchedGenres = [], matchedTags = [], seedTitles = [] })
   return bits.join(" | ")
 }
 
+const tsUpdated = (entry) => (entry?.updated_at ? new Date(entry.updated_at).getTime() : 0)
+const tsFinished = (entry) => {
+  const value = entry?.finished_at || entry?.updated_at
+  return value ? new Date(value).getTime() : 0
+}
+const titleOf = (media) =>
+  media?.title?.english || media?.title?.romaji || media?.title?.native || "this"
+
+// "Watch next" for the list page: the next season/sequel of anime you just
+// finished, plus your Plan to Watch backlog ranked by taste. Sequels lead since
+// they're the strongest signal; backlog fills the rest.
+export const buildWatchNext = async ({ listEntries = [], limit = 10 }) => {
+  const entries = Array.isArray(listEntries) ? listEntries : []
+  const completed = entries.filter((entry) => (entry.status || "") === "completed")
+  const planned = entries.filter((entry) => (entry.status || "") === "plan_to_watch")
+  if (!completed.length && !planned.length) return { items: [] }
+
+  const listedIds = new Set(entries.map((entry) => Number(entry.media_id)).filter(Number.isFinite))
+
+  // Taste profile from recent activity (genres + tags), reused to rank backlog.
+  const recent = [...entries].sort((a, b) => tsUpdated(b) - tsUpdated(a)).slice(0, 50)
+  const recentIds = recent.map((entry) => Number(entry.media_id)).filter(Number.isFinite)
+  let profile = { genreWeights: {}, tagWeights: {}, formatWeights: {}, seedTitles: {} }
+  if (recentIds.length) {
+    const detail = await fetchAniList(MEDIA_DETAILS_QUERY, { ids: recentIds })
+    const mediaById = new Map((detail?.Page?.media || []).map((item) => [item.id, item]))
+    profile = buildTasteProfile(recent, mediaById)
+  }
+
+  // Sequels of recently finished anime the user isn't already tracking.
+  const recentCompleted = [...completed].sort((a, b) => tsFinished(b) - tsFinished(a)).slice(0, 14)
+  const completedIds = recentCompleted.map((entry) => Number(entry.media_id)).filter(Number.isFinite)
+  const sequels = []
+  const seenSequel = new Set()
+  if (completedIds.length) {
+    const relData = await fetchAniList(RELATIONS_QUERY, { ids: completedIds })
+    ;(relData?.Page?.media || []).forEach((parent) => {
+      const parentTitle = titleOf(parent)
+      ;(parent.relations?.edges || []).forEach((edge) => {
+        if (edge?.relationType !== "SEQUEL") return
+        const node = edge.node
+        if (!node || node.type !== "ANIME") return
+        if (node.status === "NOT_YET_RELEASED") return // can't watch it yet
+        const id = Number(node.id)
+        if (!Number.isFinite(id) || listedIds.has(id) || seenSequel.has(id)) return
+        seenSequel.add(id)
+        sequels.push(mapMediaToCard(node, `Next up after ${parentTitle}`, { kind: "sequel", type: "anime" }))
+      })
+    })
+  }
+
+  // Backlog picks: the user's Plan to Watch, ranked by taste.
+  let backlog = []
+  if (planned.length) {
+    const plannedIds = planned.map((entry) => Number(entry.media_id)).filter(Number.isFinite).slice(0, 50)
+    if (plannedIds.length) {
+      const planData = await fetchAniList(WATCH_NEXT_POOL_QUERY, { ids: plannedIds })
+      const planMedia = (planData?.Page?.media || []).filter((item) => !seenSequel.has(item.id))
+      backlog = planMedia
+        .map((item) => ({
+          item,
+          score: scoreCandidate(
+            { ...item, tags: (item.tags || []).map((tag) => ({ name: tag.name, rank: tag.rank || 50 })) },
+            profile,
+          ),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map(({ item }) =>
+          mapMediaToCard(item, "From your Plan to Watch", {
+            kind: "backlog",
+            type: item.type === "MANGA" ? "manga" : "anime",
+          }),
+        )
+    }
+  }
+
+  // Sequels lead, backlog fills the rest; if backlog is thin, allow more sequels.
+  const sequelSlots = planned.length ? Math.min(sequels.length, Math.ceil(limit / 2)) : sequels.length
+  let items = dedupeById([...sequels.slice(0, sequelSlots), ...backlog])
+  if (items.length < limit) {
+    items = dedupeById([...items, ...sequels.slice(sequelSlots)])
+  }
+  return { items: items.slice(0, limit) }
+}
+
 export const buildAiRecommendations = async ({
   listEntries = [],
   excludeIds = new Set(),
@@ -372,26 +508,31 @@ export const buildAiRecommendations = async ({
   const seed = stableHash(`${sessionSeed}:${topGenres.join(",")}:${topTags.join(",")}:${topSeeds.join(",")}`)
   const rand = mulberry32(seed)
 
-  const scored = expandedCandidates.map((item) => {
-    const score = scoreCandidate(item, profile)
-    const jitter = rand() * 0.35
-    const boosted = score + jitter
-    return { item, score: boosted }
-  })
+  const scored = expandedCandidates
+    .map((item) => ({ item, score: Math.max(scoreCandidate(item, profile), 0) }))
+    .sort((a, b) => b.score - a.score)
 
-  scored.sort((a, b) => b.score - a.score)
-
-  // Pick from the top slice, but enforce variety (avoid 4 sequels in a row).
-  const pickFrom = scored.slice(0, Math.max(limit * 6, 60))
+  // Relevance shortlist: the strongest matches for this taste. Shuffle samples
+  // from THIS pool (weighted by relevance) so every shuffle stays on-taste but
+  // surfaces a genuinely different mix instead of the same top 12 each time.
+  const shortlist = scored.slice(0, Math.max(limit * 4, 48)).map((entry) => ({ ...entry }))
   const selected = []
   const usedIds = new Set()
   const usedRoots = {}
 
-  for (const entry of pickFrom) {
-    if (selected.length >= limit) break
+  while (selected.length < limit && shortlist.length) {
+    // Weighted pick: higher-relevance titles are likelier, but not guaranteed,
+    // so the section reshuffles into a fresh order every time.
+    const total = shortlist.reduce((sum, entry) => sum + entry.score + 0.15, 0)
+    let threshold = rand() * total
+    let index = 0
+    for (; index < shortlist.length - 1; index += 1) {
+      threshold -= shortlist[index].score + 0.15
+      if (threshold <= 0) break
+    }
+    const [entry] = shortlist.splice(index, 1)
     const media = entry.item
-    if (!media || usedIds.has(media.id)) continue
-    if (excludeIds.has(media.id)) continue
+    if (!media || usedIds.has(media.id) || excludeIds.has(media.id)) continue
     const root = getRootTitle(media.title?.english || media.title?.romaji || media.title?.native || "")
     usedRoots[root] = (usedRoots[root] || 0) + 1
     if (usedRoots[root] > 1) continue
