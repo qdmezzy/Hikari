@@ -381,9 +381,18 @@ export const buildWatchNext = async ({ listEntries = [], limit = 10 }) => {
   const sequels = []
   const seenSequel = new Set()
   const seenFranchise = new Set()
+  // Coarse franchise key: season subtitles differ ("New World Part 2" vs
+  // "SCIENCE FUTURE Cour 2"), so compare only the first words of the root
+  // title — that's what actually identifies the franchise.
+  const franchiseKeyOf = (title) => getRootTitle(title).split(" ").slice(0, 2).join(" ")
   if (completedIds.length) {
     const relData = await fetchAniList(RELATIONS_QUERY, { ids: completedIds })
-    ;(relData?.Page?.media || []).forEach((parent) => {
+    const parentById = new Map((relData?.Page?.media || []).map((m) => [Number(m.id), m]))
+    // Walk most-recently-finished first, so a franchise's one card is the
+    // sequel to the season the user just finished — not an older season's.
+    completedIds.forEach((completedId) => {
+      const parent = parentById.get(completedId)
+      if (!parent) return
       const parentTitle = titleOf(parent)
       const best = (parent.relations?.edges || [])
         .filter((edge) => edge?.relationType === "SEQUEL")
@@ -399,7 +408,7 @@ export const buildWatchNext = async ({ listEntries = [], limit = 10 }) => {
         )
         .sort((a, b) => (SEQUEL_FORMAT_RANK[a.format] ?? 9) - (SEQUEL_FORMAT_RANK[b.format] ?? 9))[0]
       if (!best) return
-      const franchise = getRootTitle(titleOf(best))
+      const franchise = franchiseKeyOf(titleOf(best))
       if (seenFranchise.has(franchise)) return
       seenFranchise.add(franchise)
       seenSequel.add(Number(best.id))

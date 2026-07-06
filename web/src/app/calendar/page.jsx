@@ -540,7 +540,7 @@ export default function CalendarPage() {
                 )
               })}
             </div>
-          ) : effectiveScope === "all" ? (
+          ) : (
             <div className="space-y-6">
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">Next 7 days</Badge>
@@ -602,78 +602,6 @@ export default function CalendarPage() {
                 </section>
               ) : null}
             </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">Next 7 days</Badge>
-                <span className="text-sm text-muted-foreground">
-                  {weekEpisodeCount} {weekEpisodeCount === 1 ? "episode" : "episodes"} airing this week
-                </span>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {weekSections.week.map((day) => (
-                  <div
-                    key={day.key}
-                    className={cn("card-elevated p-4", day.isToday && "border-primary/40 ring-1 ring-primary/15")}
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <div>
-                        <p className={cn("font-semibold", day.isToday ? "text-primary" : "text-foreground")}>
-                          {day.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{day.sub}</p>
-                      </div>
-                      {day.items.length ? (
-                        <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                          {day.items.length}
-                        </span>
-                      ) : null}
-                    </div>
-                    {day.items.length ? (
-                      <div className="space-y-1">
-                        {day.items.map((item) => (
-                          <ScheduleDayRow
-                            key={item.id}
-                            item={item}
-                            isNotified={notifySet.has(item.id)}
-                            notificationsEnabled={notificationsEnabled}
-                            onToggleNotify={toggleNotify}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="py-5 text-center text-xs text-muted-foreground/60">No episodes</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {weekSections.later.length ? (
-                <div className="card-elevated p-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-foreground">Later</p>
-                      <p className="text-xs text-muted-foreground">Beyond this week</p>
-                    </div>
-                    <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      {weekSections.later.length}
-                    </span>
-                  </div>
-                  <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {weekSections.later.map((item) => (
-                      <ScheduleDayRow
-                        key={item.id}
-                        item={item}
-                        withDate
-                        isNotified={notifySet.has(item.id)}
-                        notificationsEnabled={notificationsEnabled}
-                        onToggleNotify={toggleNotify}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
           )}
         </div>
       </main>
@@ -718,43 +646,6 @@ function SchedulePosterTile({ item, isNotified, notificationsEnabled, onToggleNo
         </p>
         <p className="text-[11px] text-muted-foreground">Ep {item.episode}</p>
       </Link>
-    </div>
-  )
-}
-
-function ScheduleDayRow({ item, isNotified, notificationsEnabled, onToggleNotify, withDate = false }) {
-  const timeLabel = item.date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-  const meta = withDate
-    ? `Ep ${item.episode} · ${item.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
-    : `Ep ${item.episode} · ${timeLabel}`
-  return (
-    <div className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted/40">
-      <Link
-        href={`/media/${item.id}`}
-        className="relative h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-secondary"
-      >
-        <img
-          src={item.cover || "/placeholder.svg"}
-          alt={item.title}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
-      </Link>
-      <Link href={`/media/${item.id}`} className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
-          {item.title}
-        </p>
-        <p className="text-xs text-muted-foreground">{meta}</p>
-      </Link>
-      <Button
-        variant={isNotified ? "secondary" : "ghost"}
-        size="icon"
-        className="size-8 flex-shrink-0"
-        aria-label={isNotified ? "Stop notifying" : "Notify me"}
-        disabled={!notificationsEnabled}
-        onClick={() => onToggleNotify(item.id)}
-      >
-        {isNotified ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-      </Button>
     </div>
   )
 }
