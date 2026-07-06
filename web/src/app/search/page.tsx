@@ -67,15 +67,18 @@ const sortLabels: Record<SortKey, string> = {
 }
 
 const SEARCH_QUERY = `
-query ($search: String, $page: Int, $perPage: Int, $genres: [String], $sort: [MediaSort]) {
+query ($type: MediaType, $search: String, $page: Int, $perPage: Int, $genres: [String], $sort: [MediaSort]) {
   Page(page: $page, perPage: $perPage) {
     pageInfo { currentPage hasNextPage total }
-    media(type: ANIME, search: $search, genre_in: $genres, sort: $sort, isAdult: false) {
+    media(type: $type, search: $search, genre_in: $genres, sort: $sort, isAdult: false) {
       id
+      type
+      format
       title { romaji english native }
       coverImage { extraLarge large color }
       averageScore
       episodes
+      chapters
       nextAiringEpisode { episode }
       status
       genres
@@ -89,8 +92,12 @@ query ($search: String, $page: Int, $perPage: Int, $genres: [String], $sort: [Me
 }
 `
 
+type MediaType = "ANIME" | "MANGA"
+
 type AniListMedia = {
   id: number
+  type?: string | null
+  format?: string | null
   title?: {
     romaji?: string | null
     english?: string | null
@@ -103,6 +110,7 @@ type AniListMedia = {
   } | null
   averageScore?: number | null
   episodes?: number | null
+  chapters?: number | null
   nextAiringEpisode?: {
     episode?: number | null
   } | null
@@ -130,6 +138,7 @@ export default function BrowsePage() {
   const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
   const [activeQuery, setActiveQuery] = useState("")
+  const [mediaType, setMediaType] = useState<MediaType>("ANIME")
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [selectedGenres, setSelectedGenres] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<SortKey>("popularity")
@@ -156,11 +165,17 @@ export default function BrowsePage() {
 
     try {
       const data = await fetchAniList(SEARCH_QUERY, {
+        type: mediaType,
         search: activeQuery || undefined,
         page: nextPage,
         perPage: 24,
         genres: selectedGenres.length ? selectedGenres : undefined,
-        sort: sortOptions[sortBy],
+        // With a text query, let AniList's relevance ranking lead (otherwise
+        // "popularity" buries the exact title you typed under bigger shows).
+        sort:
+          activeQuery && sortBy === "popularity"
+            ? ["SEARCH_MATCH", "POPULARITY_DESC"]
+            : sortOptions[sortBy],
       })
       if (id !== requestId.current) return
       const pageData = (data as { Page?: any })?.Page
@@ -194,7 +209,7 @@ export default function BrowsePage() {
   useEffect(() => {
     fetchPage(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeQuery, selectedGenres, sortBy])
+  }, [activeQuery, selectedGenres, sortBy, mediaType])
 
   // Pick up a search term passed in the URL (e.g. from the header search box,
   // which routes here as /search?query=...). Without this, those searches just
@@ -206,6 +221,9 @@ export default function BrowsePage() {
     if (incoming) {
       setSearchQuery(incoming)
       setActiveQuery(incoming)
+    }
+    if ((params.get("type") || "").toLowerCase() === "manga") {
+      setMediaType("MANGA")
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -236,11 +254,13 @@ export default function BrowsePage() {
 
     setQuickState((current) => ({ ...current, [mediaId]: "adding" }))
 
-    // Add to Plan to Watch without clobbering an existing entry.
+    // Add to Plan to Watch/Read without clobbering an existing entry. Use the
+    // media's own type (not the toggle) so a manga is never saved as an anime.
+    const entryType = anime?.type === "MANGA" ? "MANGA" : "ANIME"
     const { error } = await client
       .from("list_entries")
       .upsert(
-        { user_id: user.id, media_id: mediaId, media_type: "ANIME", status: "plan_to_watch", progress: 0 },
+        { user_id: user.id, media_id: mediaId, media_type: entryType, status: "plan_to_watch", progress: 0 },
         { onConflict: "user_id,media_id", ignoreDuplicates: true },
       )
 
@@ -254,13 +274,13 @@ export default function BrowsePage() {
       return
     }
 
-    toast.success(`Added "${getMediaTitle(anime)}" to Plan to Watch`)
+    toast.success(`Added "${getMediaTitle(anime)}" to Plan to ${entryType === "MANGA" ? "Read" : "Watch"}`)
 
     void logListActivity({
       user,
       media: anime,
       mediaId,
-      mediaType: "ANIME",
+      mediaType: entryType,
       status: "plan_to_watch",
       progress: 0,
     })
@@ -277,12 +297,12 @@ export default function BrowsePage() {
 
   const resultsLabel = useMemo(() => {
     if (loading) return "Searching the catalog..."
-    if (!results.length) return "No anime found"
+    if (!results.length) return `No ${mediaType === "MANGA" ? "manga" : "anime"} found`
     // AniList caps pageInfo.total at 5000, so it isn't a reliable match count for
     // searches — only show "X of N" when N is a real (sub-cap) total.
     if (total && total < 5000) return `${results.length} of ${total.toLocaleString()} titles`
     return `${results.length}${hasMore ? "+" : ""} ${results.length === 1 ? "title" : "titles"}`
-  }, [loading, results.length, total, hasMore])
+  }, [loading, results.length, total, hasMore, mediaType])
 
   const hasActiveFilters = selectedGenres.length > 0 || activeQuery.length > 0
 
@@ -292,19 +312,43 @@ export default function BrowsePage() {
       <main className="mx-auto max-w-7xl px-4 pb-8 pt-24 md:px-6 md:pb-10 lg:pt-28">
         <header className="animate-rise">
           <p className="text-sm font-medium text-primary">Catalog</p>
-          <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">Browse anime</h1>
+          <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">
+            Browse {mediaType === "MANGA" ? "manga" : "anime"}
+          </h1>
           <p className="mt-2 max-w-2xl text-pretty text-muted-foreground">
-            Search across every studio and season, filter by genre, and line up your next watch.
+            {mediaType === "MANGA"
+              ? "Search every series and one-shot, filter by genre, and line up your next read."
+              : "Search across every studio and season, filter by genre, and line up your next watch."}
           </p>
         </header>
 
         <div className="mt-6 animate-rise">
           <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="inline-flex self-start rounded-2xl border border-border bg-card p-1 shadow-sm sm:self-auto">
+              {(["ANIME", "MANGA"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setMediaType(type)}
+                  className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    mediaType === type
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {type === "ANIME" ? "Anime" : "Manga"}
+                </button>
+              ))}
+            </div>
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search anime, studios, characters..."
+                placeholder={
+                  mediaType === "MANGA"
+                    ? "Search manga, authors, one-shots..."
+                    : "Search anime, studios, characters..."
+                }
                 value={searchQuery}
                 onChange={(event) => {
                   const value = event.target.value
@@ -571,11 +615,13 @@ function ListRow({
   onQuickAdd: (anime: AniListMedia) => void
 }) {
   const title = getMediaTitle(anime)
+  const isManga = anime?.type === "MANGA"
   const rating = anime?.averageScore ? Number((anime.averageScore / 10).toFixed(1)) : null
-  const episodeCount = getEpisodeCount(anime)
+  const unitCount = isManga ? anime?.chapters : getEpisodeCount(anime)
+  const unitLabel = isManga ? "chapters" : "episodes"
   const studio = getPrimaryStudio(anime)
   const watchLink = getPreferredStreamingLink(anime)
-  const description = stripHtml(anime?.description)
+  const description = stripHtml(anime?.description || "")
 
   return (
     <div
@@ -584,8 +630,6 @@ function ListRow({
     >
       <a
         href={getMediaHref(anime)}
-        target="_blank"
-        rel="noreferrer"
         className="relative h-32 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-secondary"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -598,7 +642,7 @@ function ListRow({
       <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
         <div>
           <div className="flex items-start justify-between gap-3">
-            <a href={getMediaHref(anime)} target="_blank" rel="noreferrer" className="min-w-0">
+            <a href={getMediaHref(anime)} className="min-w-0">
               <h3 className="truncate text-lg font-semibold transition-colors group-hover:text-primary">{title}</h3>
             </a>
             {rating ? (
@@ -609,7 +653,7 @@ function ListRow({
             ) : null}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {[studio, anime?.startDate?.year, episodeCount ? `${episodeCount} episodes` : null]
+            {[studio, anime?.startDate?.year, unitCount ? `${unitCount} ${unitLabel}` : null]
               .filter(Boolean)
               .join(" - ")}
           </p>
