@@ -210,7 +210,7 @@ function PersonalitySlide({ data, year }) {
         initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 0.3, type: "spring", stiffness: 140, damping: 14 }}
-        className="mt-5 rounded-[2rem] border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.16),rgba(168,85,247,0.16))] px-8 py-10"
+        className="mt-5 rounded-[2rem] border border-primary/20 bg-gradient-to-br from-primary/15 via-transparent to-accent/20 px-8 py-10"
       >
         <Sparkles className="mx-auto h-8 w-8 text-primary" />
         <h2 className="mt-4 text-4xl font-black text-gradient md:text-5xl">{data.personality.title}</h2>
@@ -369,6 +369,131 @@ function FinaleSlide({ data, year, onShare, onReplay }) {
   )
 }
 
+// ---- share card ----------------------------------------------------------
+
+// Draws the story-format (1080x1920) share image: navy sky, sparkles, the
+// watcher type and the year's headline stats. Returns a PNG blob.
+async function renderShareCard(data, year) {
+  try {
+    const W = 1080
+    const H = 1920
+    const canvas = document.createElement("canvas")
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return null
+
+    const BANANA = "#f2d16b"
+    const CREAM = "#f7f0d8"
+
+    const bg = ctx.createLinearGradient(0, 0, 0, H)
+    bg.addColorStop(0, "#181f52")
+    bg.addColorStop(0.55, "#0f1133")
+    bg.addColorStop(1, "#0a0c26")
+    ctx.fillStyle = bg
+    ctx.fillRect(0, 0, W, H)
+
+    let s = 1013 + Number(year)
+    const rnd = () => {
+      s = (s * 1664525 + 1013904223) % 4294967296
+      return s / 4294967296
+    }
+    for (let i = 0; i < 110; i += 1) {
+      const x = rnd() * W
+      const y = rnd() * H
+      const r = rnd() * 2.4 + 0.4
+      ctx.fillStyle = `rgba(247,240,216,${(0.1 + rnd() * 0.28).toFixed(2)})`
+      ctx.beginPath()
+      ctx.arc(x, y, r, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    const wrapLines = (text, font, maxWidth) => {
+      ctx.font = font
+      const words = String(text || "").split(/\s+/).filter(Boolean)
+      const lines = []
+      let line = ""
+      words.forEach((word) => {
+        const next = line ? `${line} ${word}` : word
+        if (ctx.measureText(next).width > maxWidth && line) {
+          lines.push(line)
+          line = word
+        } else {
+          line = next
+        }
+      })
+      if (line) lines.push(line)
+      return lines
+    }
+
+    ctx.textAlign = "center"
+    ctx.fillStyle = "rgba(242,209,107,0.8)"
+    ctx.font = "600 42px Montserrat, sans-serif"
+    ctx.fillText("ひ か り", W / 2, 200)
+
+    ctx.fillStyle = BANANA
+    ctx.font = "800 56px Montserrat, sans-serif"
+    ctx.fillText("H I K A R I   W R A P P E D", W / 2, 292)
+
+    ctx.fillStyle = CREAM
+    ctx.font = "900 240px Montserrat, sans-serif"
+    ctx.fillText(String(year), W / 2, 560)
+
+    ctx.fillStyle = "rgba(247,240,216,0.6)"
+    ctx.font = "600 34px Montserrat, sans-serif"
+    ctx.fillText("W A T C H E R   T Y P E", W / 2, 705)
+
+    const titleFont = "800 76px Montserrat, sans-serif"
+    const titleLines = wrapLines(data.personality?.title || "Anime Fan", titleFont, 900)
+    ctx.fillStyle = BANANA
+    ctx.font = titleFont
+    titleLines.slice(0, 2).forEach((line, i) => {
+      ctx.fillText(line, W / 2, 810 + i * 88)
+    })
+
+    const t = data.totals
+    const stats = [
+      [`${t.hoursWatched}h`, "WATCHED"],
+      [`${t.episodesWatched.toLocaleString()}`, "EPISODES"],
+      [`${t.completed}`, "COMPLETED"],
+      [data.topGenres?.[0]?.name || "—", "TOP GENRE"],
+    ]
+    const boxW = 470
+    const boxH = 290
+    const gap = 40
+    const x0 = (W - boxW * 2 - gap) / 2
+    const y0 = 1050
+    stats.forEach(([value, label], i) => {
+      const bx = x0 + (i % 2) * (boxW + gap)
+      const by = y0 + Math.floor(i / 2) * (boxH + gap)
+      ctx.fillStyle = "rgba(255,255,255,0.055)"
+      ctx.strokeStyle = "rgba(242,209,107,0.3)"
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      if (typeof ctx.roundRect === "function") ctx.roundRect(bx, by, boxW, boxH, 36)
+      else ctx.rect(bx, by, boxW, boxH)
+      ctx.fill()
+      ctx.stroke()
+
+      const isLong = String(value).length > 8
+      ctx.fillStyle = CREAM
+      ctx.font = `900 ${isLong ? 58 : 92}px Montserrat, sans-serif`
+      ctx.fillText(String(value), bx + boxW / 2, by + (isLong ? 165 : 178))
+      ctx.fillStyle = "rgba(247,240,216,0.55)"
+      ctx.font = "600 30px Montserrat, sans-serif"
+      ctx.fillText(label, bx + boxW / 2, by + 242)
+    })
+
+    ctx.fillStyle = "rgba(247,240,216,0.6)"
+    ctx.font = "500 36px Montserrat, sans-serif"
+    ctx.fillText("hikari.raycodes.net/wrapped", W / 2, H - 120)
+
+    return await new Promise((resolve) => canvas.toBlob(resolve, "image/png"))
+  } catch {
+    return null
+  }
+}
+
 // ---- story player ------------------------------------------------------
 
 function WrappedStory({ data, year, years, onYearChange, onClose }) {
@@ -384,6 +509,35 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
   const handleShare = useCallback(async () => {
     const text = `My ${year} Hikari Wrapped 🌸 — ${t.completed} titles, ${t.episodesWatched} episodes, ${t.hoursWatched}h watched. I'm "${data.personality.title}". Make yours:`
     const url = typeof window !== "undefined" ? `${window.location.origin}/wrapped` : "/wrapped"
+
+    // Preferred path: share the rendered story card as an image. Fall back to
+    // downloading it (with the caption copied), then to plain text sharing.
+    const blob = await renderShareCard(data, year)
+    if (blob) {
+      const file = new File([blob], `hikari-wrapped-${year}.png`, { type: "image/png" })
+      try {
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ title: "Hikari Wrapped", text, url, files: [file] })
+          return
+        }
+      } catch {
+        return // user cancelled the share sheet
+      }
+      try {
+        const href = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = href
+        a.download = `hikari-wrapped-${year}.png`
+        a.click()
+        URL.revokeObjectURL(href)
+        await navigator.clipboard.writeText(`${text} ${url}`).catch(() => {})
+        toast.success("Card saved & caption copied — post it anywhere!")
+        return
+      } catch {
+        /* fall through to text */
+      }
+    }
+
     try {
       if (navigator.share) {
         await navigator.share({ title: "Hikari Wrapped", text, url })
@@ -416,7 +570,7 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
     }
     list.push({
       key: "hours",
-      grad: "from-cyan-500/20 via-background to-background",
+      grad: "from-primary/20 via-background to-background",
       render: () => (
         <BigStatSlide
           icon={CalendarDays}
@@ -434,13 +588,13 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
     })
     list.push({
       key: "episodes",
-      grad: "from-violet-500/20 via-background to-background",
+      grad: "from-accent/20 via-background to-background",
       render: () => <BigStatSlide icon={Film} eyebrow="You watched" value={t.episodesWatched} label="episodes, start to finish" />,
     })
     if (data.longestStreak >= 2) {
       list.push({
         key: "streak",
-        grad: "from-rose-500/20 via-background to-background",
+        grad: "from-chart-3/25 via-background to-background",
         render: () => (
           <BigStatSlide icon={Flame} eyebrow="Your longest streak" value={data.longestStreak} suffix=" days" label="in a row tracking anime" footnote="Discipline of a true protagonist." />
         ),
@@ -448,7 +602,7 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
     }
     list.push({
       key: "completed",
-      grad: "from-amber-500/20 via-background to-background",
+      grad: "from-accent/15 via-background to-background",
       render: () => (
         <BigStatSlide icon={Trophy} eyebrow="You completed" value={t.completed} label="titles" footnote={t.chaptersRead ? `and read ${t.chaptersRead.toLocaleString()} manga chapters.` : undefined} />
       ),
@@ -458,12 +612,12 @@ function WrappedStory({ data, year, years, onYearChange, onClose }) {
       list.push({ key: "genres", grad: "from-accent/15 via-background to-background", render: () => <GenresSlide data={data} /> })
     }
     if (data.topRated) {
-      list.push({ key: "rated", grad: "from-amber-500/15 via-background to-background", trailer: bd(data.topRated), render: () => <HighlightSlide eyebrow="Highest rated" icon={Star} item={data.topRated} /> })
+      list.push({ key: "rated", grad: "from-accent/15 via-background to-background", trailer: bd(data.topRated), render: () => <HighlightSlide eyebrow="Highest rated" icon={Star} item={data.topRated} /> })
     }
     if (data.mostBinged) {
-      list.push({ key: "binged", grad: "from-rose-500/15 via-background to-background", trailer: bd(data.mostBinged), render: () => <HighlightSlide eyebrow="Most binged" icon={Flame} item={data.mostBinged} /> })
+      list.push({ key: "binged", grad: "from-chart-3/20 via-background to-background", trailer: bd(data.mostBinged), render: () => <HighlightSlide eyebrow="Most binged" icon={Flame} item={data.mostBinged} /> })
     }
-    list.push({ key: "months", grad: "from-cyan-500/15 via-background to-background", render: () => <MonthsSlide data={data} /> })
+    list.push({ key: "months", grad: "from-primary/15 via-background to-background", render: () => <MonthsSlide data={data} /> })
     list.push({
       key: "finale",
       grad: "from-primary/25 via-background to-accent/15",
