@@ -5,7 +5,6 @@ import Link from "next/link"
 import { Navigation } from "@/components/layout/Navigation"
 import { EmptyState } from "@/components/common/EmptyState"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Bell, BellOff, Clock, Calendar as CalendarIcon } from "lucide-react"
@@ -14,7 +13,6 @@ import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 
 export default function CalendarPage() {
-  const [currentMonth, setCurrentMonth] = useState("")
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [viewMode, setViewMode] = useState("calendar")
   const [statusFilters, setStatusFilters] = useState(["watching", "rewatching", "on_hold"])
@@ -94,6 +92,10 @@ export default function CalendarPage() {
     if (!user || typeof window === "undefined") return
     const storedFilters = window.localStorage.getItem(`hikari-calendar-statuses-${user.id}`)
     const storedNotify = window.localStorage.getItem(`hikari-calendar-notify-${user.id}`)
+    const storedNotifsEnabled = window.localStorage.getItem(`hikari-calendar-notifs-${user.id}`)
+    if (storedNotifsEnabled !== null) {
+      setNotificationsEnabled(storedNotifsEnabled !== "0")
+    }
 
     if (storedFilters) {
       try {
@@ -129,6 +131,11 @@ export default function CalendarPage() {
       JSON.stringify(notifyIds),
     )
   }, [notifyIds, user])
+
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return
+    window.localStorage.setItem(`hikari-calendar-notifs-${user.id}`, notificationsEnabled ? "1" : "0")
+  }, [notificationsEnabled, user])
 
   useEffect(() => {
     let isActive = true
@@ -170,8 +177,6 @@ export default function CalendarPage() {
           const upcoming = toUpcoming(json?.data?.Page?.media ?? [])
           if (isActive) {
             setSchedule(upcoming)
-            const nextDate = upcoming[0]?.airingAt ? new Date(upcoming[0].airingAt * 1000) : new Date()
-            setCurrentMonth(nextDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }))
             setLoadingSchedule(false)
           }
         } catch (err) {
@@ -255,8 +260,6 @@ export default function CalendarPage() {
 
         if (isActive) {
           setSchedule(upcoming)
-          const nextDate = upcoming[0]?.airingAt ? new Date(upcoming[0].airingAt * 1000) : new Date()
-          setCurrentMonth(nextDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }))
           setLoadingSchedule(false)
         }
       } catch (err) {
@@ -276,21 +279,38 @@ export default function CalendarPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, statusFilters, scheduleScope])
 
-  const groupedSchedule = useMemo(() => {
-    const grouped = schedule.reduce((acc, item) => {
+  // A true week structure: one section per day for the next 7 days (empty days
+  // included, today first), plus a "Later" bucket for everything beyond.
+  const weekSections = useMemo(() => {
+    const now = new Date()
+    const week = []
+    const byKey = new Map()
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
+      const section = {
+        key: d.toDateString(),
+        label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : d.toLocaleDateString("en-US", { weekday: "long" }),
+        sub: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        isToday: i === 0,
+        items: [],
+      }
+      week.push(section)
+      byKey.set(section.key, section)
+    }
+    const later = []
+    schedule.forEach((item) => {
       const date = new Date(item.airingAt * 1000)
-      const key = date.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-      })
-      if (!acc[key]) acc[key] = []
-      acc[key].push({ ...item, date })
-      return acc
-    }, {})
-
-    return Object.entries(grouped)
+      const section = byKey.get(date.toDateString())
+      if (section) section.items.push({ ...item, date })
+      else later.push({ ...item, date })
+    })
+    return { week, later }
   }, [schedule])
+
+  const weekEpisodeCount = useMemo(
+    () => weekSections.week.reduce((sum, day) => sum + day.items.length, 0),
+    [weekSections],
+  )
 
   const toggleStatusFilter = (status) => {
     setStatusFilters((prev) =>
@@ -447,9 +467,9 @@ export default function CalendarPage() {
           ) : viewMode === "list" ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">{currentMonth}</Badge>
+                <Badge variant="secondary">Next up</Badge>
                 <span className="text-sm text-muted-foreground">
-                  {notificationsEnabled ? "Notifications on" : "Notifications off"}
+                  {weekEpisodeCount} {weekEpisodeCount === 1 ? "episode" : "episodes"} airing this week
                 </span>
               </div>
               {schedule.map((item) => {
@@ -461,15 +481,20 @@ export default function CalendarPage() {
                 })
                 const timeLabel = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
                 const isNotified = notifySet.has(item.id)
-                const hours = Math.round(item.timeUntilAiring / 3600)
-                const countdown = hours >= 24 ? `${Math.round(hours / 24)}d` : `${Math.max(hours, 0)}h`
+                const minutes = Math.max(Math.round(item.timeUntilAiring / 60), 0)
+                const countdown =
+                  minutes >= 1440
+                    ? `${Math.round(minutes / 1440)}d`
+                    : minutes >= 60
+                      ? `${Math.round(minutes / 60)}h`
+                      : `${minutes}m`
                 return (
                   <div
                     key={item.id}
                     className="card-elevated group flex flex-col gap-4 p-3 transition-all hover:-translate-y-0.5 hover:border-primary/30 sm:flex-row sm:items-center"
                   >
                     <Link
-                      href={`/media/${item.mediaId || item.id}`}
+                      href={`/media/${item.id}`}
                       className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-secondary"
                     >
                       <img
@@ -479,7 +504,7 @@ export default function CalendarPage() {
                       />
                     </Link>
                     <div className="min-w-0 flex-1">
-                      <Link href={`/media/${item.mediaId || item.id}`} className="min-w-0">
+                      <Link href={`/media/${item.id}`} className="min-w-0">
                         <h3 className="truncate font-semibold text-foreground transition-colors group-hover:text-primary">
                           {item.title}
                         </h3>
@@ -518,68 +543,115 @@ export default function CalendarPage() {
           ) : (
             <div className="space-y-6">
               <div className="flex items-center gap-2">
-                <Badge variant="secondary">{currentMonth}</Badge>
-                <span className="text-sm text-muted-foreground">Upcoming episodes</span>
+                <Badge variant="secondary">Next 7 days</Badge>
+                <span className="text-sm text-muted-foreground">
+                  {weekEpisodeCount} {weekEpisodeCount === 1 ? "episode" : "episodes"} airing this week
+                </span>
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
-                {groupedSchedule.map(([dateLabel, items]) => (
-                  <div key={dateLabel} className="card-elevated p-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {weekSections.week.map((day) => (
+                  <div
+                    key={day.key}
+                    className={cn("card-elevated p-4", day.isToday && "border-primary/40 ring-1 ring-primary/15")}
+                  >
                     <div className="mb-3 flex items-center justify-between">
-                      <p className="font-semibold text-foreground">{dateLabel}</p>
-                      <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                        {items.length} {items.length === 1 ? "episode" : "episodes"}
-                      </span>
+                      <div>
+                        <p className={cn("font-semibold", day.isToday ? "text-primary" : "text-foreground")}>
+                          {day.label}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{day.sub}</p>
+                      </div>
+                      {day.items.length ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                          {day.items.length}
+                        </span>
+                      ) : null}
                     </div>
-                    <div className="space-y-1">
-                      {items.map((item) => {
-                        const isNotified = notifySet.has(item.id)
-                        return (
-                          <div
+                    {day.items.length ? (
+                      <div className="space-y-1">
+                        {day.items.map((item) => (
+                          <ScheduleDayRow
                             key={item.id}
-                            className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted/40"
-                          >
-                            <Link
-                              href={`/media/${item.mediaId || item.id}`}
-                              className="relative h-16 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-secondary"
-                            >
-                              <img
-                                src={item.cover || "/placeholder.svg"}
-                                alt={item.title}
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                              />
-                            </Link>
-                            <Link href={`/media/${item.mediaId || item.id}`} className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
-                                {item.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground">Episode {item.episode}</p>
-                            </Link>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-muted-foreground">
-                                {item.date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                              </span>
-                              <Button
-                                variant={isNotified ? "secondary" : "ghost"}
-                                size="icon"
-                                className="size-8"
-                                aria-label={isNotified ? "Stop notifying" : "Notify me"}
-                                disabled={!notificationsEnabled}
-                                onClick={() => toggleNotify(item.id)}
-                              >
-                                {isNotified ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-                              </Button>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                            item={item}
+                            isNotified={notifySet.has(item.id)}
+                            notificationsEnabled={notificationsEnabled}
+                            onToggleNotify={toggleNotify}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="py-5 text-center text-xs text-muted-foreground/60">No episodes</p>
+                    )}
                   </div>
                 ))}
               </div>
+
+              {weekSections.later.length ? (
+                <div className="card-elevated p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-foreground">Later</p>
+                      <p className="text-xs text-muted-foreground">Beyond this week</p>
+                    </div>
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      {weekSections.later.length}
+                    </span>
+                  </div>
+                  <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {weekSections.later.map((item) => (
+                      <ScheduleDayRow
+                        key={item.id}
+                        item={item}
+                        withDate
+                        isNotified={notifySet.has(item.id)}
+                        notificationsEnabled={notificationsEnabled}
+                        onToggleNotify={toggleNotify}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
       </main>
       </div>
+  )
+}
+
+function ScheduleDayRow({ item, isNotified, notificationsEnabled, onToggleNotify, withDate = false }) {
+  const timeLabel = item.date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+  const meta = withDate
+    ? `Ep ${item.episode} · ${item.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+    : `Ep ${item.episode} · ${timeLabel}`
+  return (
+    <div className="group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-muted/40">
+      <Link
+        href={`/media/${item.id}`}
+        className="relative h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg bg-secondary"
+      >
+        <img
+          src={item.cover || "/placeholder.svg"}
+          alt={item.title}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      </Link>
+      <Link href={`/media/${item.id}`} className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground transition-colors group-hover:text-primary">
+          {item.title}
+        </p>
+        <p className="text-xs text-muted-foreground">{meta}</p>
+      </Link>
+      <Button
+        variant={isNotified ? "secondary" : "ghost"}
+        size="icon"
+        className="size-8 flex-shrink-0"
+        aria-label={isNotified ? "Stop notifying" : "Notify me"}
+        disabled={!notificationsEnabled}
+        onClick={() => onToggleNotify(item.id)}
+      >
+        {isNotified ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+      </Button>
+    </div>
   )
 }
