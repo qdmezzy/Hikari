@@ -37,7 +37,6 @@ Hikari is a modern anime & manga tracker built for speed and a clean, spoiler-sa
 | Web | Next.js (App Router), React, Tailwind CSS, Framer Motion |
 | Backend | Supabase (Postgres, Auth, Storage, RLS) |
 | Data | AniList GraphQL, MangaDex, MyAnimeList OAuth |
-| AI | OpenAI / OpenRouter (optional) |
 | Extension | TypeScript + Vue, MV3 (Chrome & Firefox) |
 
 ## Repository layout
