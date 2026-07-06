@@ -2,7 +2,7 @@
 
 <img src="web/public/brand/hikari-wordmark.png" alt="Hikari" width="300" />
 
-**Anime & manga discovery and tracking — spoiler-free.**
+**Anime & manga discovery and tracking**
 
 Discover what to watch next, track your progress, build lists, import from MyAnimeList & AniList, and auto-track episodes as you stream.
 
