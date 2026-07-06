@@ -954,6 +954,13 @@ function CommunityExperience({ user, isMod }) {
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24">
+        <div className="mb-8">
+          <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">コミュニティ</p>
+          <h1 className="mt-1 text-3xl font-bold text-foreground md:text-4xl">Community</h1>
+          <p className="mt-2 text-muted-foreground">
+            See what everyone&apos;s watching, posting, and talking about.
+          </p>
+        </div>
         <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
           <section>
             <div className="mb-4 flex items-center justify-between">
@@ -985,10 +992,18 @@ function CommunityExperience({ user, isMod }) {
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => <ActivitySkeleton key={i} />)
               ) : visibleActivities.length === 0 ? (
-                <div className="p-10 text-center text-sm text-muted-foreground">
-                  {activeFeed === "following"
-                    ? "Nothing from people you follow yet."
-                    : "No activity yet. Write a status or update your list to start the feed!"}
+                <div className="flex flex-col items-center p-12 text-center">
+                  <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <MessageCircle className="size-5" />
+                  </div>
+                  <p className="mt-3 text-sm font-medium text-foreground">
+                    {activeFeed === "following" ? "It's quiet in here" : "No activity yet"}
+                  </p>
+                  <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                    {activeFeed === "following"
+                      ? "Follow people to fill this feed with their watching activity."
+                      : "Write a status or update your list to start the feed!"}
+                  </p>
                 </div>
               ) : (
                 visibleActivities.map((post) => (
@@ -1042,7 +1057,9 @@ function CommunityExperience({ user, isMod }) {
 
             <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-semibold text-foreground">Forum Activity</h3>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Forum activity
+                </h3>
                 {isMod ? (
                   <Button
                     size="sm"
@@ -1075,9 +1092,11 @@ function CommunityExperience({ user, isMod }) {
             </div>
 
             <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
-              <h3 className="mb-4 font-semibold text-foreground">Recent Reviews</h3>
+              <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                Recent reviews
+              </h3>
               {reviewsLoading ? (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   {Array.from({ length: 2 }).map((_, i) => (
                     <div key={i} className="space-y-2">
                       <div className="aspect-video animate-pulse rounded-lg bg-muted/40" />
@@ -1091,7 +1110,7 @@ function CommunityExperience({ user, isMod }) {
                   No reviews yet. Be the first to review a title.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-4">
                   {reviews.map((review) => (
                     <ReviewCard key={review.id} review={review} />
                   ))}
