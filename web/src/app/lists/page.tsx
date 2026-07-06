@@ -542,13 +542,29 @@ function ListPageContent() {
             </p>
           </div>
 
-          {(tabId === "watching" || tabId === "paused") && episodeCount ? (
-            <div className="mt-3">
-              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>Progress</span>
-                <span>{Math.round(progressValue)}%</span>
-              </div>
-              <Progress value={progressValue} className="h-1.5" />
+          {tabId === "watching" || tabId === "paused" ? (
+            <div className="mt-3 flex items-end gap-3">
+              {episodeCount ? (
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                    <span>Progress</span>
+                    <span>{Math.round(progressValue)}%</span>
+                  </div>
+                  <Progress value={progressValue} className="h-1.5" />
+                </div>
+              ) : (
+                <div className="flex-1" />
+              )}
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={isPending}
+                onClick={() => handleIncrement(entry)}
+                className="h-7 flex-shrink-0 gap-1 rounded-full px-3 text-xs"
+              >
+                {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                1 {shortUnitLabel}
+              </Button>
             </div>
           ) : null}
         </div>
