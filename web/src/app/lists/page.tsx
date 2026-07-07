@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
 import { Navigation } from "@/components/layout/Navigation"
@@ -139,6 +139,7 @@ const formatEntryScore = (value) => {
 }
 
 function ListPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const statusParam = searchParams.get("status")
@@ -318,7 +319,19 @@ function ListPageContent() {
         on_hold: "On Hold",
         dropped: "Dropped",
       }
-      if (updates.progress !== undefined && updates.status !== "completed") {
+      if (updates.status === "completed" && !Number(entry.score)) {
+        // Finishing something unrated is the moment people actually rate —
+        // and every score makes the recommendations smarter.
+        const title = getMediaTitle(entry.media)
+        toast.success(`Finished ${title}! 🎉`, {
+          description: "How was it? Give it a score.",
+          action: {
+            label: "Rate it",
+            onClick: () => router.push(`/media/${entry.media_id}`),
+          },
+          duration: 8000,
+        })
+      } else if (updates.progress !== undefined && updates.status !== "completed") {
         toast.success("Progress updated")
       } else if (updates.status) {
         toast.success(`Moved to ${statusLabel[updates.status] || "your list"}`)

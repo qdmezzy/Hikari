@@ -1,0 +1,30 @@
+name: Episode push notifications
+
+# Pings the airing-check endpoint so episode alerts go out as web pushes.
+# Requires the CRON_SECRET repo secret to match the CRON_SECRET env var on
+# Vercel. Runs every 30 minutes (episode alerts fire within a ~40min window).
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger airing check
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::warning::CRON_SECRET secret not set — skipping."
+            exit 0
+          fi
+          response=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "x-cron-key: $CRON_SECRET" \
+            "https://hikari.raycodes.net/api/push/airing-check")
+          body=$(echo "$response" | head -n -1)
+          code=$(echo "$response" | tail -n 1)
+          echo "HTTP $code: $body"
+          [ "$code" = "200" ] || exit 1

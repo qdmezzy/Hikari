@@ -18,9 +18,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import client from "@/lib/client"
+import { fetchAniListMediaByIds } from "@/lib/anilist"
 
 export function CollectionsSection({ user }) {
   const [lists, setLists] = useState([])
+  const [listMeta, setListMeta] = useState({})
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
@@ -45,10 +47,55 @@ export function CollectionsSection({ user }) {
     if (error) {
       console.error("Failed to load collections:", error)
       setLists([])
-    } else {
-      setLists(data || [])
+      setLoading(false)
+      return
     }
+    setLists(data || [])
     setLoading(false)
+
+    // Cover stacks + counts: first three items of each list, newest first.
+    const listIds = (data || []).map((list) => list.id)
+    if (!listIds.length) {
+      setListMeta({})
+      return
+    }
+    try {
+      const { data: items } = await client
+        .from("custom_list_items")
+        .select("list_id, media_id, added_at")
+        .in("list_id", listIds)
+        .order("added_at", { ascending: false })
+      const grouped = {}
+      ;(items || []).forEach((item) => {
+        const group = grouped[item.list_id] || (grouped[item.list_id] = { count: 0, mediaIds: [] })
+        group.count += 1
+        if (group.mediaIds.length < 3) group.mediaIds.push(Number(item.media_id))
+      })
+      const coverIds = Object.values(grouped).flatMap((group) => group.mediaIds)
+      let mediaById = new Map()
+      if (coverIds.length) {
+        try {
+          mediaById = await fetchAniListMediaByIds(coverIds)
+        } catch {
+          /* covers are decoration — counts still render */
+        }
+      }
+      const meta = {}
+      Object.entries(grouped).forEach(([listId, group]) => {
+        meta[listId] = {
+          count: group.count,
+          covers: group.mediaIds
+            .map((id) => {
+              const media = mediaById.get(id)
+              return media?.coverImage?.large || media?.coverImage?.extraLarge || null
+            })
+            .filter(Boolean),
+        }
+      })
+      setListMeta(meta)
+    } catch {
+      setListMeta({})
+    }
   }, [user])
 
   useEffect(() => {
@@ -124,20 +171,42 @@ export function CollectionsSection({ user }) {
         </div>
       ) : lists.length ? (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {lists.map((list) => (
+          {lists.map((list) => {
+            const meta = listMeta[list.id]
+            return (
             <div key={list.id} className="glass-card group relative flex flex-col gap-2 p-4 transition-all hover:border-accent/50">
-              <Link href={`/lists/${list.id}`} className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                  <BookMarked className="h-5 w-5" />
-                </div>
+              <Link href={`/lists/${list.id}`} className="flex items-center gap-3">
+                {meta?.covers?.length ? (
+                  <div
+                    className="relative h-16 shrink-0"
+                    style={{ width: `${44 + (meta.covers.length - 1) * 14}px` }}
+                  >
+                    {meta.covers.map((cover, index) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={index}
+                        src={cover}
+                        alt=""
+                        className="absolute top-0 h-16 w-11 rounded-lg object-cover shadow-md ring-2 ring-background"
+                        style={{ left: `${index * 14}px`, zIndex: 3 - index }}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
+                    <BookMarked className="h-5 w-5" />
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold text-foreground group-hover:text-accent">{list.name}</p>
                   <p className="line-clamp-1 text-xs text-muted-foreground">
                     {list.description || "No description"}
                   </p>
-                  <span className="mt-1 inline-flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
                     {list.is_public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
                     {list.is_public ? "Public" : "Private"}
+                    <span aria-hidden="true">·</span>
+                    {meta ? `${meta.count} ${meta.count === 1 ? "title" : "titles"}` : "Empty"}
                   </span>
                 </div>
               </Link>
@@ -151,7 +220,8 @@ export function CollectionsSection({ user }) {
                 {deletingId === list.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
               </button>
             </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <button

@@ -11,6 +11,8 @@ import { Bell, BellOff, Clock, Calendar as CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { toast } from "sonner"
+import { ensurePushSubscription } from "@/lib/push-client"
 
 export default function CalendarPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
@@ -114,6 +116,33 @@ export default function CalendarPage() {
         }
       } catch {}
     }
+
+    // The episode_alerts table is what the push cron reads, so it's the
+    // source of truth — merge it with any older localStorage-only bells and
+    // migrate those up.
+    const syncAlerts = async () => {
+      try {
+        const { data } = await client.from("episode_alerts").select("media_id").eq("user_id", user.id)
+        const dbIds = (data || []).map((row) => Number(row.media_id)).filter(Number.isFinite)
+        let localIds = []
+        try {
+          localIds = (JSON.parse(storedNotify || "[]") || []).map(Number).filter(Number.isFinite)
+        } catch {}
+        const merged = Array.from(new Set([...dbIds, ...localIds]))
+        if (merged.length) setNotifyIds(merged)
+        const missing = merged.filter((id) => !dbIds.includes(id))
+        if (missing.length) {
+          void client
+            .from("episode_alerts")
+            .upsert(missing.map((media_id) => ({ user_id: user.id, media_id })), {
+              onConflict: "user_id,media_id",
+            })
+        }
+      } catch {
+        /* table may not exist yet — bells still work locally */
+      }
+    }
+    syncAlerts()
   }, [user])
 
   useEffect(() => {
@@ -319,7 +348,35 @@ export default function CalendarPage() {
   }
 
   const toggleNotify = (id) => {
+    const enabling = !notifyIds.includes(id)
     setNotifyIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
+    if (!user) return
+
+    if (enabling) {
+      void client
+        .from("episode_alerts")
+        .upsert({ user_id: user.id, media_id: id }, { onConflict: "user_id,media_id" })
+      void ensurePushSubscription().then((status) => {
+        if (status === "subscribed") {
+          toast.success("You'll get a notification when the episode airs.")
+        } else if (status === "denied") {
+          toast.error("Notifications are blocked for this site — allow them in your browser settings.")
+        }
+      })
+    } else {
+      void client.from("episode_alerts").delete().eq("user_id", user.id).eq("media_id", id)
+    }
+  }
+
+  const handleNotificationsToggle = (enabled) => {
+    setNotificationsEnabled(enabled)
+    if (enabled) {
+      void ensurePushSubscription().then((status) => {
+        if (status === "denied") {
+          toast.error("Notifications are blocked for this site — allow them in your browser settings.")
+        }
+      })
+    }
   }
 
   // Signed-out visitors always see the public "All Airing" view.
@@ -379,7 +436,7 @@ export default function CalendarPage() {
                   )}
                   <Switch
                     checked={notificationsEnabled}
-                    onCheckedChange={setNotificationsEnabled}
+                    onCheckedChange={handleNotificationsToggle}
                     aria-label={notificationsEnabled ? "Disable notifications" : "Enable notifications"}
                   />
                 </div>
