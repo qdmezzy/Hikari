@@ -201,8 +201,8 @@ function ActivityItem({ post, coverImage, user }) {
   )
 
   return (
-    <article className="overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm transition-colors hover:border-border">
-      <div className="flex items-start gap-3 px-4 py-3.5">
+    <article className="overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm transition-all hover:border-primary/30 hover:bg-card/60">
+      <div className="flex items-start gap-3 px-4 py-4">
         {profileHref ? (
           <Link href={profileHref} className="flex-shrink-0">
             {avatar}
@@ -247,20 +247,27 @@ function ActivityItem({ post, coverImage, user }) {
           {!isStatus && mediaHref ? (
             <Link
               href={mediaHref}
-              className="mt-2.5 flex items-center gap-3 rounded-xl border border-border/50 bg-secondary/40 p-2 pr-3 transition-colors hover:border-primary/40 hover:bg-secondary/60"
+              className="group/media mt-3 flex items-center gap-3.5 overflow-hidden rounded-xl border border-border/50 bg-secondary/30 p-2.5 pr-4 transition-all hover:border-primary/50 hover:bg-secondary/50"
             >
-              <div className="relative h-16 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+              <div className="relative h-[72px] w-[52px] flex-shrink-0 overflow-hidden rounded-lg bg-muted shadow-md">
                 {coverImage ? (
-                  <img src={coverImage} alt="" className="h-full w-full object-cover" />
+                  <img
+                    src={coverImage}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover/media:scale-105"
+                  />
                 ) : (
                   <div className="h-full w-full bg-muted/60" />
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-foreground">
+                <p className="truncate text-sm font-semibold text-foreground transition-colors group-hover/media:text-primary">
                   {post.attached_media_title || "View title"}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Open details</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  View details
+                  <span className="ml-1 inline-block transition-transform group-hover/media:translate-x-0.5">→</span>
+                </p>
               </div>
             </Link>
           ) : null}
@@ -552,9 +559,10 @@ function ThreadEditorDialog({ open, onOpenChange, initial, onSave }) {
 
 function AnnouncementCard({ announcement, isMod, onEdit, onDelete }) {
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 to-accent/5 p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-primary/70">
+    <div className="group relative overflow-hidden rounded-xl border border-primary/25 bg-card/60 p-4 backdrop-blur-sm">
+      <div className="absolute inset-y-0 left-0 w-1 bg-primary/60" aria-hidden="true" />
+      <div className="flex items-start justify-between gap-2 pl-1.5">
+        <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-primary">
           <Megaphone className="size-3" />
           Announcement
           {announcement.is_published === false ? (
@@ -582,9 +590,11 @@ function AnnouncementCard({ announcement, isMod, onEdit, onDelete }) {
           </div>
         ) : null}
       </div>
-      <h3 className="mt-1 font-semibold text-foreground">{announcement.title}</h3>
+      <h3 className="mt-1.5 pl-1.5 text-sm font-semibold leading-snug text-foreground">{announcement.title}</h3>
       {announcement.body ? (
-        <p className="selectable mt-1 whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">{announcement.body}</p>
+        <p className="selectable mt-1 whitespace-pre-wrap pl-1.5 text-xs leading-relaxed text-muted-foreground">
+          {announcement.body}
+        </p>
       ) : null}
     </div>
   )
@@ -592,9 +602,9 @@ function AnnouncementCard({ announcement, isMod, onEdit, onDelete }) {
 
 function ForumThreadItem({ thread, isMod, onEdit, onDelete }) {
   return (
-    <div className="group border-b border-border/30 pb-4 last:border-0 last:pb-0">
+    <div className="group -mx-2 rounded-lg border-b border-border/30 px-2 pb-4 pt-2 transition-colors first:pt-0 last:border-0 last:pb-0 hover:bg-muted/20">
       <div className="flex items-start justify-between gap-2">
-        <h4 className="line-clamp-2 flex items-start gap-1.5 text-sm font-medium text-foreground">
+        <h4 className="line-clamp-2 flex items-start gap-1.5 text-sm font-semibold leading-snug text-foreground">
           {thread.is_pinned ? <Pin className="mt-0.5 size-3 flex-shrink-0 text-primary" /> : null}
           {thread.title}
         </h4>
@@ -651,29 +661,34 @@ function ReviewCard({ review }) {
   const ratingLabel = rating > 10 ? (rating / 10).toFixed(1) : rating.toFixed(rating % 1 === 0 ? 0 : 1)
 
   return (
-    <div className="space-y-2">
+    <div className="group/review space-y-2.5">
       {mediaHref ? (
-        <Link href={mediaHref} className="block aspect-video overflow-hidden rounded-lg bg-muted/50">
+        <Link href={mediaHref} className="relative block aspect-video overflow-hidden rounded-lg bg-muted/50">
           {review.cover_image ? (
-            <img src={review.cover_image} alt="" className="h-full w-full object-cover" />
+            <img
+              src={review.cover_image}
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-300 group-hover/review:scale-105"
+            />
+          ) : null}
+          {rating > 0 ? (
+            <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-sm">
+              <Star className="size-3 fill-chart-3 text-chart-3" />
+              {ratingLabel}
+            </span>
           ) : null}
         </Link>
       ) : (
         <div className="aspect-video overflow-hidden rounded-lg bg-muted/50" />
       )}
       <div>
-        <h4 className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
-          Review of {review.media_title || "this title"} by {review.user_display_name || "User"}
+        <h4 className="line-clamp-2 text-xs font-semibold leading-snug text-foreground">
+          {review.media_title || "This title"}
+          <span className="font-normal text-muted-foreground"> · {review.user_display_name || "User"}</span>
         </h4>
-        <p className="selectable mt-1 line-clamp-4 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="selectable mt-1 line-clamp-3 text-[11px] leading-relaxed text-muted-foreground">
           {review.review_text}
         </p>
-        {rating > 0 ? (
-          <div className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
-            <Star className="size-3 fill-chart-3 text-chart-3" />
-            <span>{ratingLabel}</span>
-          </div>
-        ) : null}
       </div>
     </div>
   )
@@ -714,9 +729,9 @@ function StatusComposer({ user, onPosted }) {
   }
 
   return (
-    <div className="px-4 py-3.5">
+    <div className="px-4 py-4">
       <div className="flex items-start gap-3">
-        <Avatar className="size-9 flex-shrink-0 ring-2 ring-border/30">
+        <Avatar className="size-10 flex-shrink-0 ring-2 ring-primary/20">
           {profile?.avatarUrl ? <AvatarImage src={profile.avatarUrl} alt="You" /> : null}
           <AvatarFallback className="text-xs">{initial}</AvatarFallback>
         </Avatar>
@@ -730,12 +745,20 @@ function StatusComposer({ user, onPosted }) {
                 handlePost()
               }
             }}
-            placeholder="Write a status..."
-            className="min-h-11 resize-none border-border/50 bg-muted/30 text-sm"
+            placeholder="What are you watching?"
+            className="min-h-11 resize-none border-transparent bg-muted/30 text-sm transition-colors focus-visible:border-primary/40 focus-visible:bg-muted/50"
           />
           {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
-          <div className="mt-2 flex items-center justify-end">
-            <Button size="sm" className="h-8 gap-1.5" onClick={handlePost} disabled={posting || !content.trim()}>
+          <div className="mt-2.5 flex items-center justify-between gap-3">
+            <p className="hidden text-[11px] text-muted-foreground/60 sm:block">
+              {"Ctrl+Enter to post"}
+            </p>
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 rounded-full px-4"
+              onClick={handlePost}
+              disabled={posting || !content.trim()}
+            >
               {posting ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
               Post
             </Button>
@@ -936,20 +959,28 @@ function CommunityExperience({ user, isMod }) {
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-24">
-        <div className="mb-8">
-          <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">コミュニティ</p>
-          <h1 className="mt-1 text-3xl font-bold text-foreground md:text-4xl">Community</h1>
-          <p className="mt-2 text-muted-foreground">
-            See what everyone&apos;s watching, posting, and talking about.
-          </p>
+        <div className="relative mb-10">
+          <div className="pointer-events-none absolute -top-16 left-0 h-48 w-96 rounded-full bg-primary/8 blur-3xl" aria-hidden="true" />
+          <div className="relative">
+            <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">コミュニティ</p>
+            <h1 className="mt-1.5 text-balance text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+              Community
+            </h1>
+            <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-muted-foreground md:text-base">
+              See what everyone&apos;s watching, posting, and talking about.
+            </p>
+          </div>
         </div>
         <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
           <section>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Activity
-              </h2>
-              <div className="flex items-center gap-1 rounded-lg border border-border/50 bg-card/40 p-0.5">
+              <div className="flex items-center gap-2.5">
+                <span className="h-4 w-1 rounded-full bg-primary" aria-hidden="true" />
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Activity
+                </h2>
+              </div>
+              <div className="flex items-center rounded-full border border-border/60 bg-card/60 p-1 backdrop-blur-sm">
                 {[
                   { id: "following", label: "Following" },
                   { id: "global", label: "Global" },
@@ -958,9 +989,9 @@ function CommunityExperience({ user, isMod }) {
                     key={tab.id}
                     type="button"
                     onClick={() => setActiveFeed(tab.id)}
-                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                    className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
                       activeFeed === tab.id
-                        ? "bg-primary/15 text-primary"
+                        ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
@@ -970,7 +1001,7 @@ function CommunityExperience({ user, isMod }) {
               </div>
             </div>
             <div className="space-y-3">
-              <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm">
+              <div className="rounded-xl border border-border/60 bg-card/60 shadow-sm backdrop-blur-sm transition-colors focus-within:border-primary/40">
                 <StatusComposer user={user} onPosted={handlePostStatus} />
               </div>
               {loading ? (
@@ -1006,9 +1037,12 @@ function CommunityExperience({ user, isMod }) {
             {announcements.length > 0 || isMod ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Announcements
-                  </h3>
+                  <div className="flex items-center gap-2.5">
+                    <span className="h-3.5 w-1 rounded-full bg-primary/60" aria-hidden="true" />
+                    <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                      Announcements
+                    </h3>
+                  </div>
                   {isMod ? (
                     <Button
                       size="sm"
@@ -1041,9 +1075,12 @@ function CommunityExperience({ user, isMod }) {
 
             <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Forum activity
-                </h3>
+                <div className="flex items-center gap-2.5">
+                  <span className="h-3.5 w-1 rounded-full bg-primary/60" aria-hidden="true" />
+                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                    Forum activity
+                  </h3>
+                </div>
                 {isMod ? (
                   <Button
                     size="sm"
@@ -1076,9 +1113,12 @@ function CommunityExperience({ user, isMod }) {
             </div>
 
             <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Recent reviews
-              </h3>
+              <div className="mb-4 flex items-center gap-2.5">
+                <span className="h-3.5 w-1 rounded-full bg-primary/60" aria-hidden="true" />
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Recent reviews
+                </h3>
+              </div>
               {reviewsLoading ? (
                 <div className="space-y-4">
                   {Array.from({ length: 2 }).map((_, i) => (
