@@ -5,6 +5,7 @@ import { buildErrorEmbed } from "./lib/embeds.js";
 import { resolveCustomEmojis } from "./lib/emojis.js";
 import { startHeartbeat } from "./services/heartbeat.js";
 import { startAiringBroadcast } from "./services/scheduler.js";
+import { startEpisodeAlerts } from "./services/episodeAlerts.js";
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -33,6 +34,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`[hikari-bot] Ready as ${readyClient.user.tag}`);
   await resolveCustomEmojis(readyClient);
   startAiringBroadcast(readyClient);
+  startEpisodeAlerts(readyClient);
   startHeartbeat(readyClient);
 });
 

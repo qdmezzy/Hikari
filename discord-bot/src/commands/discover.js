@@ -39,14 +39,25 @@ const progressBar = (pct, width = 20) => {
   return `${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))}`;
 };
 
-const recommendationButtons = (media, trailerUrl) =>
+const discoverPrefix = "hikari_discover";
+const enc = (value) => encodeURIComponent(String(value || "")).slice(0, 55);
+
+const recommendationButtons = (media, trailerUrl, { mood, tagsCsv } = {}) =>
   new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${discoverPrefix}:rec:${enc(mood)}:${enc(tagsCsv)}`)
+      .setLabel("Next Pick")
+      .setEmoji("🎲")
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`${discoverPrefix}:share:${Number(media.id)}`)
+      .setLabel("Share")
+      .setEmoji("📣")
+      .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
       .setLabel("Add to List")
       .setURL(`${config.hikariWebBaseUrl}/media/${media.id}`),
-    new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Skip").setURL(`${config.hikariWebBaseUrl}/discover`),
-    new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Another").setURL(`${config.hikariWebBaseUrl}/discover`),
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
       .setLabel("Trailer")
@@ -71,9 +82,12 @@ const recommendCommand = {
     )
     .addStringOption((option) => option.setName("tags").setDescription("Comma-separated tags")),
   async execute(interaction) {
-    const mood = interaction.options.getString("mood");
-    const tags = parseTags(interaction.options.getString("tags"));
+    return runRecommend(interaction, interaction.options.getString("mood"), interaction.options.getString("tags"));
+  },
+};
 
+const runRecommend = async (interaction, mood, tagsCsv) => {
+    const tags = parseTags(tagsCsv);
     try {
       let genres = mood ? moodToGenres[mood] || [] : [];
       if (!genres.length && !tags.length) {
@@ -93,7 +107,7 @@ const recommendCommand = {
         return;
       }
 
-      const pick = pool[0];
+      const pick = pool[Math.floor(Math.random() * Math.min(pool.length, 5))];
       const score10 = Number.isFinite(Number(pick?.averageScore))
         ? (Number(pick.averageScore) / 10).toFixed(1)
         : "N/A";
@@ -127,11 +141,10 @@ const recommendCommand = {
       if (cover) embed.setThumbnail(cover);
 
       const trailerUrl = buildTrailerUrl(pick);
-      await respond(interaction, { embeds: [embed], components: [recommendationButtons(pick, trailerUrl)] });
+      await respond(interaction, { embeds: [embed], components: [recommendationButtons(pick, trailerUrl, { mood, tagsCsv })] });
     } catch (error) {
       await replyError(interaction, error?.message || "Failed to fetch recommendations.");
     }
-  },
 };
 
 const randomCommand = {
@@ -140,7 +153,11 @@ const randomCommand = {
     .setDescription("Get a random anime recommendation.")
     .addStringOption((option) => option.setName("tag").setDescription("Genre or tag filter")),
   async execute(interaction) {
-    const tag = interaction.options.getString("tag");
+    return runRandom(interaction, interaction.options.getString("tag"));
+  },
+};
+
+const runRandom = async (interaction, tag) => {
     try {
       const pool = await getRecommendationPool({ genres: tag ? [tag] : [], tags: tag ? [tag] : [], perPage: 25 });
       if (!pool.length) {
@@ -156,15 +173,23 @@ const randomCommand = {
       );
       const trailerUrl = buildTrailerUrl(pick);
       const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`${discoverPrefix}:rand:${enc(tag)}`)
+          .setLabel("Another Random")
+          .setEmoji("🎲")
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId(`${discoverPrefix}:share:${Number(pick.id)}`)
+          .setLabel("Share")
+          .setEmoji("📣")
+          .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Add to List").setURL(`${config.hikariWebBaseUrl}/media/${pick.id}`),
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Another Random").setURL(`${config.hikariWebBaseUrl}/discover`),
         new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Trailer").setURL(trailerUrl || pick?.siteUrl || "https://anilist.co"),
       );
       await respond(interaction, { embeds: [embed], components: [row] });
     } catch (error) {
       await replyError(interaction, error?.message || "Failed to fetch random anime.");
     }
-  },
 };
 
 const compareCommand = {
@@ -282,6 +307,37 @@ const discoverCommand = {
       ? randomCommand.execute(interaction)
       : recommendCommand.execute(interaction);
   },
+};
+
+export const isDiscoverComponent = (interaction) =>
+  String(interaction.customId || "").startsWith(`${discoverPrefix}:`);
+
+export const handleDiscoverComponent = async (interaction) => {
+  const [, action, a, b] = String(interaction.customId || "").split(":");
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferUpdate();
+  }
+  if (action === "rand") {
+    await runRandom(interaction, decodeURIComponent(a || "") || null);
+    return true;
+  }
+  if (action === "rec") {
+    await runRecommend(interaction, decodeURIComponent(a || "") || null, decodeURIComponent(b || "") || null);
+    return true;
+  }
+  if (action === "share") {
+    const mediaId = Number(a);
+    if (!Number.isFinite(mediaId)) return true;
+    const [media] = (await getAnimeByIds([mediaId]).catch(() => [])) || [];
+    if (media && interaction.channel?.send) {
+      await interaction.channel.send({
+        content: `📣 <@${interaction.user.id}> thinks you should watch this:`,
+        embeds: [buildAnimeEmbed(media)],
+      }).catch(() => {});
+    }
+    return true;
+  }
+  return false;
 };
 
 export { compareCommand };
