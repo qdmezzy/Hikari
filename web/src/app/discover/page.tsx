@@ -171,6 +171,9 @@ export default function DiscoverPage() {
   const [isTrailerPlayerOpen, setIsTrailerPlayerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const loadMoreInFlightRef = useRef(false)
+  // ?focus=<mediaId> (e.g. from the Discord bot's Trailer button) puts that
+  // title at the top of the feed so its trailer plays first.
+  const focusIdRef = useRef<number | null>(null)
   // Personalization: top genres from the user's list + ids to exclude (already tracked).
   const activeVibeRef = useRef("all")
   const personalGenresRef = useRef<string[]>([])
@@ -354,6 +357,20 @@ export default function DiscoverPage() {
       // Got a response — clear any error/backoff state.
       failuresRef.current = 0
       setFeedError(false)
+
+      if (!append && focusIdRef.current) {
+        const focusId = focusIdRef.current
+        focusIdRef.current = null
+        try {
+          const mediaById = await fetchAniListMediaByIds([focusId])
+          const focusItem = mapMediaToDiscoverItem(mediaById.get(focusId))
+          if (focusItem) {
+            resolved.items = [focusItem, ...resolved.items.filter((item) => item.id !== focusItem.id)]
+          }
+        } catch {
+          /* focus is best-effort — feed still loads */
+        }
+      }
 
       if (resolved.items.length) {
         setDiscoverFeed((prev) => {
@@ -595,6 +612,14 @@ export default function DiscoverPage() {
     }, 700)
     return () => window.clearTimeout(timeout)
   }, [isTrailerLoaded, currentAnime?.trailerId, spoilerSafe])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const focusParam = Number(new URLSearchParams(window.location.search).get("focus"))
+    if (Number.isFinite(focusParam) && focusParam > 0) {
+      focusIdRef.current = focusParam
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return

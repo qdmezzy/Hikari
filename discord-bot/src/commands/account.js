@@ -41,6 +41,7 @@ const buildAccountView = async (user) => {
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(config.hikariWebBaseUrl),
       new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link").setURL(url),
+      new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("Refresh"),
       new ButtonBuilder().setCustomId(`${accountPrefix}:unlink`).setStyle(ButtonStyle.Danger).setLabel("Unlink"),
     );
     return { embeds: [embed], components: [row] };
@@ -52,6 +53,7 @@ const buildAccountView = async (user) => {
   });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Link Hikari").setURL(url),
+    new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("I linked it — refresh"),
   );
   return { embeds: [embed], components: [row] };
 };
@@ -70,6 +72,10 @@ export const handleAccountComponent = async (interaction) => {
   const [, action] = String(interaction.customId || "").split(":");
   if (!interaction.deferred && !interaction.replied) {
     await interaction.deferUpdate();
+  }
+  if (action === "refresh") {
+    await respond(interaction, await buildAccountView(interaction.user));
+    return true;
   }
   if (action === "unlink") {
     try {

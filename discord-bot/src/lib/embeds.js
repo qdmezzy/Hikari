@@ -178,19 +178,30 @@ const STATUS_EMOJI = {
 
 export const buildListEmbed = ({ handle, displayName, statusLabel: label, previewItems }) => {
   const safeName = displayName || handle || "User";
-  const lines = (previewItems || [])
-    .slice(0, 10)
-    .map((item, index) => {
-      const emoji = STATUS_EMOJI[item.status] || "•";
-      return `\`${String(index + 1).padStart(2, " ")}\` ${emoji} **${item.title}** · Ep ${item.progress}`;
-    });
+  const items = (previewItems || []).slice(0, 10);
+  const lines = items.map((item) => {
+    const emoji = STATUS_EMOJI[item.status] || "•";
+    // Planned titles haven't been started — show the show's length, not "Ep 0".
+    const isPlanned = /plan/i.test(String(item.status));
+    const meta = isPlanned
+      ? item.episodes
+        ? `${item.episodes} eps`
+        : "Not started"
+      : item.episodes
+        ? `Ep ${item.progress} / ${item.episodes}`
+        : `Ep ${item.progress}`;
+    return `${emoji} [**${item.title}**](${animeUrl(item.mediaId)}) — ${meta}`;
+  });
 
-  return buildBaseEmbed({
+  const embed = buildBaseEmbed({
     color: embedColors.brand,
     title: label ? `${label}` : "List",
     description: lines.length ? lines.join("\n") : "_No entries yet._",
     url: listUrl(handle),
   }).setAuthor({ name: safeName });
+  const cover = items.find((item) => item.cover)?.cover;
+  if (cover) embed.setThumbnail(cover);
+  return embed;
 };
 
 export const buildListButtons = ({ handle }) =>

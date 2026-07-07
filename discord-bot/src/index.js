@@ -40,7 +40,7 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
-    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+    if (interaction.isMessageComponent()) {
       const handled = await handleComponentInteraction(interaction);
       if (handled) return;
     }

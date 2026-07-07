@@ -127,6 +127,8 @@ export const buildListPreview = async (entries, max = 10) => {
       title,
       status: statusLabel,
       progress: Number(row.progress || 0),
+      episodes: Number(item?.episodes || 0) || null,
+      cover: item?.coverImage?.large || item?.coverImage?.medium || null,
     };
   });
 };

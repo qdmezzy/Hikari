@@ -5,6 +5,22 @@ import { getRecommendationPool, mediaTitle, searchAnime, buildTrailerUrl, getAni
 import { getListEntriesByUser, getTopGenres } from "../services/profiles.js";
 import { resolveTarget } from "../services/targets.js";
 import { config } from "../config.js";
+import { supabase } from "../lib/supabase.js";
+import { getLinkByDiscordId } from "../services/links.js";
+import { UserSelectMenuBuilder } from "discord.js";
+
+// Everything already on the user's list (any status) - recommendations
+// should never suggest what they've seen or planned.
+const getUserMediaIdSet = async (discordUserId) => {
+  try {
+    const link = await getLinkByDiscordId(discordUserId);
+    if (!link?.hikari_user_id) return new Set();
+    const { data } = await supabase.from("list_entries").select("media_id").eq("user_id", String(link.hikari_user_id));
+    return new Set((data || []).map((row) => Number(row.media_id)));
+  } catch {
+    return new Set();
+  }
+};
 
 const moodToGenres = {
   chill: ["Slice of Life", "Iyashikei"],
@@ -55,13 +71,13 @@ const recommendationButtons = (media, trailerUrl, { mood, tagsCsv } = {}) =>
       .setEmoji("📣")
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
-      .setStyle(ButtonStyle.Link)
+      .setCustomId(`${discoverPrefix}:add:${Number(media.id)}`)
       .setLabel("Add to List")
-      .setURL(`${config.hikariWebBaseUrl}/media/${media.id}`),
+      .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
       .setLabel("Trailer")
-      .setURL(trailerUrl || media?.siteUrl || "https://anilist.co"),
+      .setURL(`${config.hikariWebBaseUrl}/discover?focus=${Number(media.id)}`),
   );
 
 const recommendCommand = {
@@ -101,7 +117,10 @@ const runRecommend = async (interaction, mood, tagsCsv) => {
         }
       }
 
-      const pool = await getRecommendationPool({ genres, tags, perPage: 12 });
+      const owned = await getUserMediaIdSet(interaction.user.id);
+      const pool = (await getRecommendationPool({ genres, tags, perPage: 25 })).filter(
+        (item) => !owned.has(Number(item.id)),
+      );
       if (!pool.length) {
         await replyError(interaction, "No recommendations found for those filters.", { title: "No Results" });
         return;
@@ -159,7 +178,10 @@ const randomCommand = {
 
 const runRandom = async (interaction, tag) => {
     try {
-      const pool = await getRecommendationPool({ genres: tag ? [tag] : [], tags: tag ? [tag] : [], perPage: 25 });
+      const owned = await getUserMediaIdSet(interaction.user.id);
+      const pool = (await getRecommendationPool({ genres: tag ? [tag] : [], tags: tag ? [tag] : [], perPage: 25 })).filter(
+        (item) => !owned.has(Number(item.id)),
+      );
       if (!pool.length) {
         await replyError(interaction, "No random result for that tag.", { title: "No Results" });
         return;
@@ -183,8 +205,11 @@ const runRandom = async (interaction, tag) => {
           .setLabel("Share")
           .setEmoji("📣")
           .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Add to List").setURL(`${config.hikariWebBaseUrl}/media/${pick.id}`),
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Trailer").setURL(trailerUrl || pick?.siteUrl || "https://anilist.co"),
+        new ButtonBuilder()
+          .setCustomId(`${discoverPrefix}:add:${Number(pick.id)}`)
+          .setLabel("Add to List")
+          .setStyle(ButtonStyle.Success),
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Trailer").setURL(`${config.hikariWebBaseUrl}/discover?focus=${Number(pick.id)}`),
       );
       await respond(interaction, { embeds: [embed], components: [row] });
     } catch (error) {
@@ -328,13 +353,53 @@ export const handleDiscoverComponent = async (interaction) => {
   if (action === "share") {
     const mediaId = Number(a);
     if (!Number.isFinite(mediaId)) return true;
+    const menu = new UserSelectMenuBuilder()
+      .setCustomId(`${discoverPrefix}:sharedm:${mediaId}`)
+      .setPlaceholder("Who should watch this?")
+      .setMinValues(1)
+      .setMaxValues(3);
+    await interaction.followUp({
+      content: "Pick who to send this to - I'll DM them the card.",
+      components: [new ActionRowBuilder().addComponents(menu)],
+      ephemeral: true,
+    }).catch(() => {});
+    return true;
+  }
+  if (action === "sharedm") {
+    const mediaId = Number(a);
     const [media] = (await getAnimeByIds([mediaId]).catch(() => [])) || [];
-    if (media && interaction.channel?.send) {
-      await interaction.channel.send({
-        content: `📣 <@${interaction.user.id}> thinks you should watch this:`,
-        embeds: [buildAnimeEmbed(media)],
-      }).catch(() => {});
+    if (!media) return true;
+    let sent = 0;
+    for (const userId of interaction.values || []) {
+      try {
+        const user = await interaction.client.users.fetch(userId);
+        await user.send({
+          content: `📣 <@${interaction.user.id}> thinks you should watch this:`,
+          embeds: [buildAnimeEmbed(media)],
+        });
+        sent += 1;
+      } catch {
+        /* DMs closed */
+      }
     }
+    const doneMsg = sent ? `Sent to ${sent} ${sent === 1 ? "person" : "people"} ✅` : "Couldn't DM them (their DMs are closed).";
+    await interaction.editReply({ content: doneMsg, components: [] }).catch(() => {});
+    return true;
+  }
+  if (action === "add") {
+    const mediaId = Number(a);
+    if (!Number.isFinite(mediaId)) return true;
+    const link = await getLinkByDiscordId(interaction.user.id).catch(() => null);
+    if (!link?.hikari_user_id) {
+      await interaction.followUp({ content: "Link your account first with `/account`.", ephemeral: true }).catch(() => {});
+      return true;
+    }
+    const { error } = await supabase.from("list_entries").upsert(
+      { user_id: String(link.hikari_user_id), media_id: mediaId, media_type: "ANIME", status: "plan_to_watch", progress: 0 },
+      { onConflict: "user_id,media_id", ignoreDuplicates: true },
+    );
+    const addMsg = error ? "Couldn't add that - try again." : "Added to your **Plan to Watch** ✅";
+    await interaction.followUp({ content: addMsg, ephemeral: true }).catch(() => {});
     return true;
   }
   return false;

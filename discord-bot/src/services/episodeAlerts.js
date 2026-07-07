@@ -66,26 +66,39 @@ const run = async (client) => {
         .setTimestamp();
       if (media.coverImage?.large) embed.setThumbnail(media.coverImage.large);
 
+      const createdThreads = [];
       for (const guild of guilds) {
         try {
           const channel = await client.channels.fetch(guild.alert_channel_id);
           if (channel?.isTextBased?.()) {
             const message = await channel.send({ embeds: [embed] });
-            await message
+            const thread = await message
               .startThread({ name: `${title} · Ep ${schedule.episode} 💬`.slice(0, 100), autoArchiveDuration: 1440 })
-              .catch(() => {});
+              .catch(() => null);
+            if (thread) createdThreads.push(thread);
           }
         } catch {
           /* channel gone or missing perms — skip this guild */
         }
       }
 
-      const hikariUserIds = alerts
-        .filter((a) => Number(a.media_id) === Number(media.id))
-        .map((a) => String(a.user_id));
+      // Everyone with this title on their list joins the party, not just bells.
+      const { data: holders } = await supabase
+        .from("list_entries")
+        .select("user_id")
+        .eq("media_id", Number(media.id));
+      const hikariUserIds = [
+        ...new Set([
+          ...alerts.filter((al) => Number(al.media_id) === Number(media.id)).map((al) => String(al.user_id)),
+          ...(holders || []).map((row) => String(row.user_id)),
+        ]),
+      ];
       for (const hikariUserId of hikariUserIds) {
         const discordId = discordByHikari.get(hikariUserId);
         if (!discordId) continue;
+        for (const thread of createdThreads) {
+          await thread.members.add(discordId).catch(() => {});
+        }
         try {
           const user = await client.users.fetch(discordId);
           await user.send({ embeds: [embed] });
