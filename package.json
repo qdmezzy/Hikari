@@ -1,4 +1,11 @@
 {
+  "name": "hikari-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix web",
+    "build": "npm run build --prefix web",
+    "start": "npm run start --prefix web"
+  },
   "dependencies": {
     "@vercel/analytics": "^2.0.1"
   }
