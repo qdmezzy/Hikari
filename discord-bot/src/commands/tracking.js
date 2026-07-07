@@ -20,7 +20,7 @@ const rememberUndo = (discordUserId, action) => {
 const requireLinkedUser = async (interaction) => {
   const link = await getLinkByDiscordId(interaction.user.id);
   if (!link?.hikari_user_id) {
-    await replyError(interaction, "Your account is not linked. Use `/link` first.");
+    await replyError(interaction, "Your account is not linked. Use `/account` first.");
     return null;
   }
   return link;

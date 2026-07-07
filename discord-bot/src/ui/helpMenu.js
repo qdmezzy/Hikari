@@ -24,8 +24,8 @@ const categories = [
     label: "Account",
     description: "Link, unlink & view profiles",
     body: [
-      "`/link` — Connect your Discord to Hikari",
-      "`/unlink` — Disconnect your account",
+      "`/account` — Connect your Discord to Hikari",
+      "`/account` — Disconnect your account",
       "`/profile [user|username]` — View a profile",
       "`/favorites` — Show your saved favorites",
     ],
@@ -55,7 +55,7 @@ const categories = [
     body: [
       "`/discover recommend [mood] [tags]` — Tailored picks",
       "`/discover random [tag]` — Surprise me",
-      "`/stats compare @user` — Compatibility check",
+      "`/compare @user` — Compatibility check",
     ],
   },
   {

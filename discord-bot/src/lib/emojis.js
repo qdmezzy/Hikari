@@ -50,3 +50,33 @@ export const EMOJI = {
 
 // Small helper so callers can do emoji("completed") with a safe fallback.
 export const emoji = (key) => EMOJI[key] || ""
+
+// Auto-upgrade to custom emojis on boot: upload emojis to the bot's app
+// (Developer Portal -> Emojis) or any server the bot is in, named after the
+// keys above ("star", "completed", ...) or prefixed ("hikari_star",
+// "hikari_now_watching"). Matching keys get swapped in automatically -
+// no code changes needed.
+export const resolveCustomEmojis = async (client) => {
+  try {
+    const applied = [];
+    const appEmojis = await client.application?.emojis?.fetch?.().catch(() => null);
+    const pools = [...(appEmojis?.values?.() || []), ...client.emojis.cache.values()];
+    const keyByNorm = Object.fromEntries(Object.keys(EMOJI).map((key) => [key.toLowerCase(), key]));
+    for (const emoji of pools) {
+      const norm = String(emoji.name || "")
+        .toLowerCase()
+        .replace(/^hikari_/, "")
+        .replace(/_/g, "");
+      const key = keyByNorm[norm];
+      if (key) {
+        EMOJI[key] = emoji.toString();
+        applied.push(emoji.name);
+      }
+    }
+    if (applied.length) {
+      console.log(`[hikari-bot] Using ${applied.length} custom emoji(s): ${applied.join(", ")}`);
+    }
+  } catch (error) {
+    console.warn("[hikari-bot] Custom emoji resolution failed:", error?.message || error);
+  }
+};

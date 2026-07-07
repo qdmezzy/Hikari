@@ -205,11 +205,16 @@ const compareCommand = {
       const otherTopGenres = await getTopGenres(otherEntries, 5);
       const overlap = otherTopGenres.filter((genre) => selfGenres.has(genre.toLowerCase()));
 
-      const compatibility = Math.min(100, overlap.length * 18 + sharedIds.length * 6);
+      // Deterministic affinity: how much of the smaller list is shared (70%)
+      // plus top-genre overlap (30%).
+      const smallerList = Math.max(1, Math.min(selfEntries.length, otherEntries.length));
+      const sharedRatio = Math.min(1, sharedIds.length / smallerList);
+      const genreRatio = otherTopGenres.length ? overlap.length / otherTopGenres.length : 0;
+      const compatibility = Math.round(sharedRatio * 70 + genreRatio * 30);
       const avgSelf = sharedMedia.length
         ? sharedMedia.reduce((sum, media) => sum + Number(media?.averageScore || 0), 0) / sharedMedia.length / 10
         : 0;
-      const avgOther = Math.max(0, avgSelf + (Math.random() * 0.8 - 0.4));
+      const avgOther = avgSelf;
 
       const selfName = selfTarget.target.profile?.display_name || selfTarget.target.handle || interaction.user.username;
       const otherName = otherTarget.target.profile?.display_name || otherTarget.target.handle || targetUser.username;

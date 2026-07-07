@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
-import { buildHikariLinkUrl } from "../config.js";
+import { buildHikariLinkUrl, config } from "../config.js";
 import {
   buildInfoEmbed,
   buildProfileButtons,
@@ -21,48 +21,62 @@ const helpCommand = {
   },
 };
 
-const linkCommand = {
-  data: new SlashCommandBuilder().setName("link").setDescription("Link your Discord account to Hikari."),
-  async execute(interaction) {
-    const url = buildHikariLinkUrl(interaction.user.id, interaction.user.username);
-    const existing = await getLinkByDiscordId(interaction.user.id).catch(() => null);
-    let embed;
-    if (existing?.hikari_user_id) {
-      const entries = await getListEntriesByUser(existing.hikari_user_id, { limit: 500 }).catch(() => []);
-      embed = buildSuccessEmbed({
-        title: "Account linked",
-        description: "Your Discord is connected to Hikari — track anime right from here.",
-      }).addFields(
-        { name: "👤 Username", value: existing.hikari_username || "Linked user", inline: true },
-        { name: `${EMOJI.episodes} Entries`, value: `**${entries.length}**`, inline: true },
-      );
-    } else {
-      embed = buildInfoEmbed({
-        title: "Connect Discord to Hikari",
-        description: "Tap the button below to securely link your account — no passwords are entered in Discord.",
-      });
-    }
+const accountPrefix = "hikari_account";
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setStyle(ButtonStyle.Link)
-        .setEmoji("🔗")
-        .setLabel(existing ? "Re-link Account" : "Link Hikari")
-        .setURL(url),
+// One /account command: shows your link state with the right action buttons
+// instead of separate /link + /unlink commands.
+const buildAccountView = async (user) => {
+  const url = buildHikariLinkUrl(user.id, user.username);
+  const existing = await getLinkByDiscordId(user.id).catch(() => null);
+
+  if (existing?.hikari_user_id) {
+    const entries = await getListEntriesByUser(existing.hikari_user_id, { limit: 500 }).catch(() => []);
+    const embed = buildSuccessEmbed({
+      title: "Account linked",
+      description: "Your Discord is connected to Hikari - track anime right from here.",
+    }).addFields(
+      { name: "👤 Username", value: existing.hikari_username || "Linked user", inline: true },
+      { name: `${EMOJI.episodes} Entries`, value: `**${entries.length}**`, inline: true },
     );
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(config.hikariWebBaseUrl),
+      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link").setURL(url),
+      new ButtonBuilder().setCustomId(`${accountPrefix}:unlink`).setStyle(ButtonStyle.Danger).setLabel("Unlink"),
+    );
+    return { embeds: [embed], components: [row] };
+  }
 
-    await respond(interaction, { embeds: [embed], components: [row] });
+  const embed = buildInfoEmbed({
+    title: "Connect Discord to Hikari",
+    description: "Tap the button below to securely link your account - no passwords are entered in Discord.",
+  });
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Link Hikari").setURL(url),
+  );
+  return { embeds: [embed], components: [row] };
+};
+
+const accountCommand = {
+  data: new SlashCommandBuilder().setName("account").setDescription("Your Hikari link status - link or unlink."),
+  async execute(interaction) {
+    await respond(interaction, await buildAccountView(interaction.user));
   },
 };
 
-const unlinkCommand = {
-  data: new SlashCommandBuilder().setName("unlink").setDescription("Unlink your Discord account from Hikari."),
-  async execute(interaction) {
+export const isAccountComponent = (interaction) =>
+  String(interaction.customId || "").startsWith(`${accountPrefix}:`);
+
+export const handleAccountComponent = async (interaction) => {
+  const [, action] = String(interaction.customId || "").split(":");
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferUpdate();
+  }
+  if (action === "unlink") {
     try {
       const removed = await removeLinkByDiscordId(interaction.user.id);
       if (!removed) {
-        await replyError(interaction, "You do not currently have a linked Hikari account.", { title: "Nothing to Unlink" });
-        return;
+        await respond(interaction, await buildAccountView(interaction.user));
+        return true;
       }
       const relinkUrl = buildHikariLinkUrl(interaction.user.id, interaction.user.username);
       const embed = buildWarningEmbed({
@@ -76,7 +90,9 @@ const unlinkCommand = {
     } catch (error) {
       await replyError(interaction, safeLinkTableMessage(error));
     }
-  },
+    return true;
+  }
+  return false;
 };
 
 const profileCommand = {
@@ -128,4 +144,4 @@ const profileCommand = {
   },
 };
 
-export const accountCommands = [helpCommand, linkCommand, unlinkCommand, profileCommand];
+export const accountCommands = [helpCommand, accountCommand, profileCommand];

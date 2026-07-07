@@ -57,7 +57,7 @@ const announceCommand = {
   async execute(interaction) {
     const link = await getLinkByDiscordId(interaction.user.id).catch(() => null);
     if (!link?.hikari_user_id) {
-      await replyError(interaction, "Link your Hikari account first with `/link`.", { title: "Not Linked" });
+      await replyError(interaction, "Link your Hikari account first with `/account`.", { title: "Not Linked" });
       return;
     }
 

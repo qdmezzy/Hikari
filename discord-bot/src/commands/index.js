@@ -1,6 +1,6 @@
-import { accountCommands } from "./account.js";
+import { accountCommands, handleAccountComponent, isAccountComponent } from "./account.js";
 import { handleTrackingComponent, isTrackingComponent, trackingCommands } from "./tracking.js";
-import { discoverCommands } from "./discover.js";
+import { compareCommand, discoverCommands } from "./discover.js";
 import { shareCommands } from "./share.js";
 import { statsCommands } from "./stats.js";
 import { adminCommands } from "./admin.js";
@@ -11,6 +11,7 @@ export const commands = [
   ...accountCommands,
   ...trackingCommands,
   ...discoverCommands,
+  compareCommand,
   ...shareCommands,
   ...statsCommands,
   ...favoritesCommands,
@@ -23,6 +24,9 @@ export const handleComponentInteraction = async (interaction) => {
   }
   if (isTrackingComponent(interaction)) {
     return handleTrackingComponent(interaction);
+  }
+  if (isAccountComponent(interaction)) {
+    return handleAccountComponent(interaction);
   }
   return false;
 };

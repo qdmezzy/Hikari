@@ -2,6 +2,7 @@ import { Client, Collection, Events, GatewayIntentBits, REST, Routes } from "dis
 import { commands, handleComponentInteraction } from "./commands/index.js";
 import { config } from "./config.js";
 import { buildErrorEmbed } from "./lib/embeds.js";
+import { resolveCustomEmojis } from "./lib/emojis.js";
 import { startHeartbeat } from "./services/heartbeat.js";
 import { startAiringBroadcast } from "./services/scheduler.js";
 
@@ -28,8 +29,9 @@ const registerCommands = async () => {
   console.log(`[hikari-bot] Registered ${body.length} global commands.`);
 };
 
-client.once(Events.ClientReady, (readyClient) => {
+client.once(Events.ClientReady, async (readyClient) => {
   console.log(`[hikari-bot] Ready as ${readyClient.user.tag}`);
+  await resolveCustomEmojis(readyClient);
   startAiringBroadcast(readyClient);
   startHeartbeat(readyClient);
 });

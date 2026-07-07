@@ -1,4 +1,3 @@
-import { compareCommand } from "./discover.js";
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
 import { replyError, respond } from "../lib/interaction.js";
@@ -36,17 +35,10 @@ const leaderboardCommand = {
         ),
     )
     .addSubcommand((sub) => sub.setName("streak").setDescription("Approximate consistency streak leaderboard."))
-    .addSubcommand((sub) => sub.setName("server").setDescription("High-level Hikari server stats."))
-    .addSubcommand((sub) =>
-      sub
-        .setName("compare")
-        .setDescription("Compare your taste with another linked user.")
-        .addUserOption((option) => option.setName("user").setDescription("Discord user to compare with").setRequired(true)),
-    ),
+    .addSubcommand((sub) => sub.setName("server").setDescription("High-level Hikari server stats.")),
   async execute(interaction) {
     const sub = interaction.options.getSubcommand(true);
     if (sub === "server") return serverStatsCommand.execute(interaction);
-    if (sub === "compare") return compareCommand.execute(interaction);
     try {
       if (sub === "episodes") {
         const period = interaction.options.getString("period") || "weekly";
