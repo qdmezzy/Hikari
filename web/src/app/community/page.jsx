@@ -191,94 +191,85 @@ function ActivityItem({ post, coverImage, user }) {
     }
   }
 
+  const avatar = (
+    <Avatar className="size-10 flex-shrink-0 ring-2 ring-border/30">
+      {post.user_avatar_url ? (
+        <AvatarImage src={post.user_avatar_url} alt={post.user_display_name || "User"} />
+      ) : null}
+      <AvatarFallback className="text-xs">{initial}</AvatarFallback>
+    </Avatar>
+  )
+
   return (
-    <div className="border-b border-border/30 last:border-0">
-      <div className="flex items-start gap-4 px-5 py-4 transition-colors hover:bg-muted/20">
-        {isStatus ? (
-          profileHref ? (
-            <Link href={profileHref} className="flex-shrink-0">
-              <Avatar className="size-10 ring-2 ring-border/30">
-                {post.user_avatar_url ? (
-                  <AvatarImage src={post.user_avatar_url} alt={post.user_display_name || "User"} />
-                ) : null}
-                <AvatarFallback className="text-xs">{initial}</AvatarFallback>
-              </Avatar>
-            </Link>
-          ) : (
-            <Avatar className="size-10 flex-shrink-0 ring-2 ring-border/30">
-              {post.user_avatar_url ? (
-                <AvatarImage src={post.user_avatar_url} alt={post.user_display_name || "User"} />
-              ) : null}
-              <AvatarFallback className="text-xs">{initial}</AvatarFallback>
-            </Avatar>
-          )
-        ) : mediaHref ? (
-          <Link
-            href={mediaHref}
-            className="relative h-[72px] w-[52px] flex-shrink-0 overflow-hidden rounded-lg bg-muted shadow-sm"
-          >
-            {coverImage ? (
-              <img src={coverImage} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="h-full w-full bg-muted/60" />
-            )}
+    <article className="overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm transition-colors hover:border-border">
+      <div className="flex items-start gap-3 px-4 py-3.5">
+        {profileHref ? (
+          <Link href={profileHref} className="flex-shrink-0">
+            {avatar}
           </Link>
         ) : (
-          <div className="h-[72px] w-[52px] flex-shrink-0 overflow-hidden rounded-lg bg-muted/60" />
+          avatar
         )}
 
         <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            {profileHref ? (
+              <Link href={profileHref} className="truncate text-sm font-bold transition-colors hover:text-primary">
+                {post.user_display_name || "User"}
+              </Link>
+            ) : (
+              <span className="truncate text-sm font-bold">{post.user_display_name || "User"}</span>
+            )}
+            {profileHandle ? (
+              <span className="hidden truncate text-xs text-muted-foreground sm:inline">@{profileHandle}</span>
+            ) : null}
+            <span className="ml-auto flex-shrink-0 text-xs text-muted-foreground">
+              {formatRelativeTime(post.created_at)}
+            </span>
+          </div>
+
           {isStatus ? (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                {profileHref ? (
-                  <Link href={profileHref} className="font-bold transition-colors hover:text-primary">
-                    {post.user_display_name || "User"}
-                  </Link>
-                ) : (
-                  <span className="font-bold">{post.user_display_name || "User"}</span>
-                )}
-                <span className="flex-shrink-0 text-xs text-muted-foreground">
-                  {formatRelativeTime(post.created_at)}
-                </span>
-              </div>
-              <p className="selectable mt-1 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
-                {post.content}
-              </p>
-            </>
+            <p className="selectable mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {post.content}
+            </p>
           ) : (
-            <>
-              <p className="text-sm leading-relaxed text-foreground">
-                {profileHref ? (
-                  <Link href={profileHref} className="font-bold transition-colors hover:text-primary">
-                    {post.user_display_name || "User"}
-                  </Link>
-                ) : (
-                  <span className="font-bold">{post.user_display_name || "User"}</span>
-                )}{" "}
-                <span className="text-foreground/80">{post.content}</span>
-                {post.attached_media_title ? (
-                  <>
-                    {" "}
-                    of{" "}
-                    {mediaHref ? (
-                      <Link href={mediaHref} className="font-medium text-primary hover:underline">
-                        {post.attached_media_title}
-                      </Link>
-                    ) : (
-                      <span className="font-medium text-foreground">{post.attached_media_title}</span>
-                    )}
-                  </>
-                ) : null}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">{formatRelativeTime(post.created_at)}</p>
-            </>
+            <p className="mt-0.5 text-sm leading-relaxed text-foreground/80">
+              {post.content}
+              {post.attached_media_title && !mediaHref ? (
+                <>
+                  {" "}
+                  of <span className="font-medium text-foreground">{post.attached_media_title}</span>
+                </>
+              ) : null}
+            </p>
           )}
-          <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
+
+          {!isStatus && mediaHref ? (
+            <Link
+              href={mediaHref}
+              className="mt-2.5 flex items-center gap-3 rounded-xl border border-border/50 bg-secondary/40 p-2 pr-3 transition-colors hover:border-primary/40 hover:bg-secondary/60"
+            >
+              <div className="relative h-16 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+                {coverImage ? (
+                  <img src={coverImage} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full bg-muted/60" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-foreground">
+                  {post.attached_media_title || "View title"}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Open details</p>
+              </div>
+            </Link>
+          ) : null}
+
+          <div className="-ml-2 mt-2 flex items-center gap-1 text-xs text-muted-foreground">
             <button
               type="button"
               onClick={toggleComments}
-              className="flex items-center gap-1 transition-colors hover:text-primary"
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-colors hover:bg-muted/40 hover:text-primary"
             >
               <MessageCircle className="size-3.5" />
               <span>{commentCount}</span>
@@ -287,8 +278,8 @@ function ActivityItem({ post, coverImage, user }) {
               type="button"
               onClick={handleLike}
               disabled={!user}
-              className={`flex items-center gap-1 transition-colors ${
-                liked ? "text-rose-500" : "hover:text-rose-500"
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-colors ${
+                liked ? "text-rose-500" : "hover:bg-muted/40 hover:text-rose-500"
               } ${!user ? "cursor-not-allowed opacity-60" : ""}`}
               title={user ? "Like" : "Sign in to like"}
             >
@@ -300,8 +291,8 @@ function ActivityItem({ post, coverImage, user }) {
                 type="button"
                 onClick={handleReport}
                 disabled={reportState !== "idle"}
-                className={`ml-auto flex items-center gap-1 transition-colors ${
-                  reportState === "reported" ? "text-emerald-500" : "hover:text-amber-500"
+                className={`ml-auto flex items-center gap-1 rounded-full px-2.5 py-1.5 transition-colors ${
+                  reportState === "reported" ? "text-emerald-500" : "hover:bg-muted/40 hover:text-amber-500"
                 }`}
                 title={reportState === "reported" ? "Reported" : "Report this post"}
               >
@@ -316,15 +307,6 @@ function ActivityItem({ post, coverImage, user }) {
             ) : null}
           </div>
         </div>
-
-        {!isStatus ? (
-          <Avatar className="size-9 flex-shrink-0 ring-2 ring-border/30">
-            {post.user_avatar_url ? (
-              <AvatarImage src={post.user_avatar_url} alt={post.user_display_name || "User"} />
-            ) : null}
-            <AvatarFallback className="text-xs">{initial}</AvatarFallback>
-          </Avatar>
-        ) : null}
       </div>
 
       {showComments ? (
@@ -402,19 +384,19 @@ function ActivityItem({ post, coverImage, user }) {
           )}
         </div>
       ) : null}
-    </div>
+    </article>
   )
 }
 
 function ActivitySkeleton() {
   return (
-    <div className="flex items-start gap-4 border-b border-border/30 px-5 py-4 last:border-0">
-      <div className="h-[72px] w-[52px] flex-shrink-0 animate-pulse rounded-lg bg-muted/40" />
+    <div className="flex items-start gap-3 rounded-xl border border-border/50 bg-card/40 px-4 py-3.5">
+      <div className="size-10 flex-shrink-0 animate-pulse rounded-full bg-muted/40" />
       <div className="min-w-0 flex-1 space-y-2 pt-1">
-        <div className="h-4 w-3/4 animate-pulse rounded bg-muted/40" />
+        <div className="h-4 w-1/3 animate-pulse rounded bg-muted/40" />
+        <div className="h-3 w-3/4 animate-pulse rounded bg-muted/30" />
         <div className="h-3 w-1/4 animate-pulse rounded bg-muted/30" />
       </div>
-      <div className="size-9 flex-shrink-0 animate-pulse rounded-full bg-muted/40" />
     </div>
   )
 }
@@ -722,7 +704,7 @@ function StatusComposer({ user, onPosted }) {
 
   if (!user) {
     return (
-      <div className="border-b border-border/30 px-5 py-4 text-sm text-muted-foreground">
+      <div className="px-4 py-3.5 text-sm text-muted-foreground">
         <Link href="/login" className="text-primary hover:underline">
           Sign in
         </Link>{" "}
@@ -732,7 +714,7 @@ function StatusComposer({ user, onPosted }) {
   }
 
   return (
-    <div className="border-b border-border/30 px-5 py-4">
+    <div className="px-4 py-3.5">
       <div className="flex items-start gap-3">
         <Avatar className="size-9 flex-shrink-0 ring-2 ring-border/30">
           {profile?.avatarUrl ? <AvatarImage src={profile.avatarUrl} alt="You" /> : null}
@@ -987,12 +969,14 @@ function CommunityExperience({ user, isMod }) {
                 ))}
               </div>
             </div>
-            <div className="overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm">
-              <StatusComposer user={user} onPosted={handlePostStatus} />
+            <div className="space-y-3">
+              <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm">
+                <StatusComposer user={user} onPosted={handlePostStatus} />
+              </div>
               {loading ? (
                 Array.from({ length: 8 }).map((_, i) => <ActivitySkeleton key={i} />)
               ) : visibleActivities.length === 0 ? (
-                <div className="flex flex-col items-center p-12 text-center">
+                <div className="flex flex-col items-center rounded-xl border border-border/50 bg-card/40 p-12 text-center backdrop-blur-sm">
                   <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <MessageCircle className="size-5" />
                   </div>
