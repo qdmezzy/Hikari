@@ -1,4 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import { config } from "../config.js";
 import { getAnimeByIds, mediaTitle, searchAnime } from "../lib/anilist.js";
 import { listUrl } from "../lib/embeds.js";
 import { normalizeStatusForDisplay, normalizeStatusInput, statusChoices } from "../lib/status.js";
@@ -28,7 +29,7 @@ const requireLinkedUser = async (interaction) => {
 const getEntryByMediaId = async (hikariUserId, mediaId) => {
   const { data, error } = await supabase
     .from(listTable)
-    .select("id, user_id, media_id, media_type, status, progress, updated_at")
+    .select("id, user_id, media_id, media_type, status, progress, score, updated_at")
     .eq("user_id", String(hikariUserId))
     .eq("media_id", Number(mediaId))
     .maybeSingle();
@@ -96,6 +97,38 @@ const buildProgressActionRow = (mediaId) =>
       .setLabel("+1 Episode")
       .setStyle(ButtonStyle.Primary),
   );
+
+const shareCardUrl = (mediaId) => `${config.hikariWebBaseUrl}/media/${Number(mediaId)}/opengraph-image`;
+
+// 1-10 rating buttons shown when a title is completed without a score.
+const buildRatingRows = (mediaId) => {
+  const button = (score) =>
+    new ButtonBuilder()
+      .setCustomId(`${trackingPrefix}:rate:${Number(mediaId)}:${score}`)
+      .setLabel(String(score))
+      .setStyle(score >= 8 ? ButtonStyle.Primary : ButtonStyle.Secondary);
+  return [
+    new ActionRowBuilder().addComponents([1, 2, 3, 4, 5].map(button)),
+    new ActionRowBuilder().addComponents([6, 7, 8, 9, 10].map(button)),
+  ];
+};
+
+const buildCompletionPayload = ({ media, entry }) => {
+  const embed = new EmbedBuilder()
+    .setColor(0xf3d36b)
+    .setTitle("Completed! 🎉")
+    .setDescription(
+      [
+        `**${mediaTitle(media)}** — all ${Number(media?.episodes || entry?.progress || 0) || ""} episodes done.`.replace("  ", " "),
+        "",
+        "How was it? **Rate it below** — ratings tune your Hikari recommendations.",
+      ].join("\n"),
+    )
+    .setImage(shareCardUrl(media.id))
+    .setFooter({ text: "光 Hikari" })
+    .setTimestamp();
+  return { embeds: [embed], components: [buildProgressActionRow(media.id), ...buildRatingRows(media.id)] };
+};
 
 const buildProgressEmbed = ({ media, progress, status }) => {
   const totalEpisodes = Number(media?.episodes || 0);
@@ -339,6 +372,11 @@ const handleStatus = async (interaction) => {
       after: updated,
     });
 
+    if (String(stateInput) === "completed" && !Number(before?.score || 0)) {
+      await respond(interaction, buildCompletionPayload({ media, entry: updated }));
+      return;
+    }
+
     const statusEmbed = new EmbedBuilder()
       .setColor(0x22c55e)
       .setTitle("Status Updated")
@@ -390,9 +428,13 @@ const handleProgress = async (interaction) => {
       after: updated,
     });
 
-    const embed = buildProgressEmbed({ media, progress: progressValue, status: nextStatus });
-    const row = buildProgressActionRow(media.id);
-    await respond(interaction, { embeds: [embed], components: [row] });
+    if (nextStatus === "completed" && !Number(existing?.score || 0)) {
+      await respond(interaction, buildCompletionPayload({ media, entry: updated }));
+    } else {
+      const embed = buildProgressEmbed({ media, progress: progressValue, status: nextStatus });
+      const row = buildProgressActionRow(media.id);
+      await respond(interaction, { embeds: [embed], components: [row] });
+    }
   } catch (error) {
     await replyError(interaction, error?.message || "Failed to update progress.");
   }
@@ -442,9 +484,13 @@ const handleNext = async (interaction) => {
       after: updated,
     });
 
-    const embed = buildProgressEmbed({ media, progress: nextProgress, status: nextStatus });
-    const row = buildProgressActionRow(media.id);
-    await respond(interaction, { embeds: [embed], components: [row] });
+    if (nextStatus === "completed" && !Number(existing?.score || 0)) {
+      await respond(interaction, buildCompletionPayload({ media, entry: updated }));
+    } else {
+      const embed = buildProgressEmbed({ media, progress: nextProgress, status: nextStatus });
+      const row = buildProgressActionRow(media.id);
+      await respond(interaction, { embeds: [embed], components: [row] });
+    }
   } catch (error) {
     await replyError(interaction, error?.message || "Failed to increment progress.");
   }
@@ -611,9 +657,49 @@ export const handleTrackingComponent = async (interaction) => {
         after: updated,
       });
 
-      const embed = buildProgressEmbed({ media, progress: nextProgress, status: nextStatus });
-      const row = buildProgressActionRow(media.id);
-      await respond(interaction, { embeds: [embed], components: [row] });
+      if (nextStatus === "completed" && !Number(existing?.score || 0)) {
+        await respond(interaction, buildCompletionPayload({ media, entry: updated }));
+      } else {
+        const embed = buildProgressEmbed({ media, progress: nextProgress, status: nextStatus });
+        const row = buildProgressActionRow(media.id);
+        await respond(interaction, { embeds: [embed], components: [row] });
+      }
+      return true;
+    }
+
+    if (action === "rate") {
+      const [, , mediaIdPart, scorePart] = String(interaction.customId || "").split(":");
+      const mediaId = Number(mediaIdPart);
+      const score = Number(scorePart);
+      if (!Number.isFinite(mediaId) || !(score >= 1 && score <= 10)) {
+        await replyError(interaction, "Invalid rating.");
+        return true;
+      }
+
+      const link = await requireLinkedUser(interaction);
+      if (!link) return true;
+
+      const existing = await getEntryByMediaId(link.hikari_user_id, mediaId);
+      if (!existing) {
+        await replyError(interaction, "This title is no longer on your list.");
+        return true;
+      }
+
+      const { error } = await supabase.from(listTable).update({ score }).eq("id", existing.id);
+      if (error) throw error;
+
+      const mediaList = await getAnimeByIds([mediaId]);
+      const media = mediaList?.[0] || null;
+      const ratedEmbed = new EmbedBuilder()
+        .setColor(0xf3d36b)
+        .setTitle(`Rated ${score}/10 ${"★".repeat(Math.round(score / 2))}`)
+        .setDescription(`**${media ? mediaTitle(media) : `#${mediaId}`}** — saved to your Hikari list.`)
+        .setFooter({ text: "光 Hikari" })
+        .setTimestamp();
+      if (media?.coverImage?.medium || media?.coverImage?.large) {
+        ratedEmbed.setThumbnail(media.coverImage.medium || media.coverImage.large);
+      }
+      await respond(interaction, { embeds: [ratedEmbed], components: [] });
       return true;
     }
   } catch (error) {

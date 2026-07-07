@@ -25,7 +25,7 @@ const buildAiringEmbed = (schedules) => {
   });
 
   return new EmbedBuilder()
-    .setColor(0x6c5ce7)
+    .setColor(0xf3d36b)
     .setTitle(`${EMOJI.calendar} Airing in the next 24 hours`)
     .setDescription(lines.join("\n") || "Nothing scheduled right now.")
     .setFooter({ text: `Track everything on Hikari · ${config.hikariWebBaseUrl}` })

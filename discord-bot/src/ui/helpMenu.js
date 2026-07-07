@@ -53,9 +53,9 @@ const categories = [
     label: "Discover",
     description: "Find your next anime",
     body: [
-      "`/recommend [mood] [tags]` — Tailored picks",
-      "`/random [tag]` — Surprise me",
-      "`/compare @user` — Compatibility check",
+      "`/discover recommend [mood] [tags]` — Tailored picks",
+      "`/discover random [tag]` — Surprise me",
+      "`/stats compare @user` — Compatibility check",
     ],
   },
   {
@@ -76,7 +76,7 @@ const categories = [
     color: embedColors.success,
     label: "Stats",
     description: "Leaderboards & analytics",
-    body: ["`/leaderboard episodes [weekly|monthly]`", "`/leaderboard streak`", "`/serverstats`"],
+    body: ["`/stats episodes [weekly|monthly]`", "`/stats streak`", "`/stats server`"],
   },
   {
     key: "server",
@@ -85,8 +85,8 @@ const categories = [
     label: "Server (Admin)",
     description: "Bot configuration",
     body: [
-      "`/set-alerts <#channel>` — Daily airing broadcasts",
-      "`/announce <title> <message>` — Post a site announcement (mods)",
+      "`/admin alerts <#channel>` — Daily airing broadcasts",
+      "`/admin announce <title> <message>` — Post a site announcement (mods)",
     ],
   },
 ];

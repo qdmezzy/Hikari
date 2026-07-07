@@ -7,8 +7,8 @@ import { getLinkByDiscordId } from "../services/links.js";
 
 const setAlertsCommand = {
   data: new SlashCommandBuilder()
-    .setName("set-alerts")
-    .setDescription("Choose the channel for daily airing-anime broadcasts (server admin only).")
+    .setName("alerts")
+    .setDescription("Choose the channel for airing broadcasts & digests.")
     .addChannelOption((option) =>
       option
         .setName("channel")
@@ -47,7 +47,7 @@ const setAlertsCommand = {
 const announceCommand = {
   data: new SlashCommandBuilder()
     .setName("announce")
-    .setDescription("Post a site-wide Hikari announcement (Hikari moderators only).")
+    .setDescription("Post a site-wide Hikari announcement (moderators only).")
     .addStringOption((option) =>
       option.setName("title").setDescription("Announcement title").setRequired(true).setMaxLength(120),
     )
@@ -105,4 +105,44 @@ const announceCommand = {
   },
 };
 
-export const adminCommands = [setAlertsCommand, announceCommand];
+
+// Single /admin command (hidden from members without Manage Server) instead of
+// separate /set-alerts and /announce cluttering the picker for everyone.
+const adminCommand = {
+  data: new SlashCommandBuilder()
+    .setName("admin")
+    .setDescription("Hikari admin tools.")
+    .setDMPermission(false)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .addSubcommand((sub) =>
+      sub
+        .setName("alerts")
+        .setDescription("Choose the channel for airing broadcasts & digests.")
+        .addChannelOption((option) =>
+          option
+            .setName("channel")
+            .setDescription("Channel where the bot should post airing updates")
+            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+            .setRequired(true),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("announce")
+        .setDescription("Post a site-wide Hikari announcement (moderators only).")
+        .addStringOption((option) =>
+          option.setName("title").setDescription("Announcement title").setRequired(true).setMaxLength(120),
+        )
+        .addStringOption((option) =>
+          option.setName("message").setDescription("Announcement body").setRequired(true).setMaxLength(1000),
+        ),
+    ),
+  async execute(interaction) {
+    return interaction.options.getSubcommand() === "alerts"
+      ? setAlertsCommand.execute(interaction)
+      : announceCommand.execute(interaction);
+  },
+};
+
+export const adminCommands = [adminCommand];
+

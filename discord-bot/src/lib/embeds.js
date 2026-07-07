@@ -157,6 +157,8 @@ export const buildAnimeEmbed = (media) => {
   if (genres.length) embed.addFields({ name: `${EMOJI.genres} Genres`, value: genres.join("  •  "), inline: false });
   if (studios.length) embed.addFields({ name: `${EMOJI.studio} Studio`, value: studios.slice(0, 3).join(", "), inline: true });
   if (cover) embed.setThumbnail(cover);
+  // The site renders a branded share card per title — use it as the hero image.
+  if (media?.id) embed.setImage(`${config.hikariWebBaseUrl}/media/${media.id}/opengraph-image`);
 
   return embed;
 };

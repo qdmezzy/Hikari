@@ -242,4 +242,43 @@ const compareCommand = {
   },
 };
 
-export const discoverCommands = [recommendCommand, randomCommand, compareCommand];
+// One /discover command instead of separate /recommend + /random - fewer
+// top-level commands keeps the bot easy to scan. /compare lives under /stats.
+const discoverCommand = {
+  data: new SlashCommandBuilder()
+    .setName("discover")
+    .setDescription("Find something to watch.")
+    .addSubcommand((sub) =>
+      sub
+        .setName("recommend")
+        .setDescription("Personalized anime recommendations.")
+        .addStringOption((option) =>
+          option
+            .setName("mood")
+            .setDescription("Recommendation mood")
+            .addChoices(
+              { name: "Chill", value: "chill" },
+              { name: "Hype", value: "hype" },
+              { name: "Dark", value: "dark" },
+              { name: "Funny", value: "funny" },
+              { name: "Romance", value: "romance" },
+            ),
+        )
+        .addStringOption((option) => option.setName("tags").setDescription("Comma-separated tags")),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("random")
+        .setDescription("Get a random anime pick.")
+        .addStringOption((option) => option.setName("tag").setDescription("Genre or tag filter")),
+    ),
+  async execute(interaction) {
+    return interaction.options.getSubcommand() === "random"
+      ? randomCommand.execute(interaction)
+      : recommendCommand.execute(interaction);
+  },
+};
+
+export { compareCommand };
+export const discoverCommands = [discoverCommand];
+

@@ -1,3 +1,4 @@
+import { compareCommand } from "./discover.js";
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
 import { replyError, respond } from "../lib/interaction.js";
@@ -21,8 +22,8 @@ const rankLine = (index, username, value, suffix) => `${index + 1}. @${username 
 
 const leaderboardCommand = {
   data: new SlashCommandBuilder()
-    .setName("leaderboard")
-    .setDescription("Show leaderboards.")
+    .setName("stats")
+    .setDescription("Leaderboards, server stats, and taste comparisons.")
     .addSubcommand((sub) =>
       sub
         .setName("episodes")
@@ -34,9 +35,18 @@ const leaderboardCommand = {
             .addChoices({ name: "Weekly", value: "weekly" }, { name: "Monthly", value: "monthly" }),
         ),
     )
-    .addSubcommand((sub) => sub.setName("streak").setDescription("Approximate consistency streak leaderboard.")),
+    .addSubcommand((sub) => sub.setName("streak").setDescription("Approximate consistency streak leaderboard."))
+    .addSubcommand((sub) => sub.setName("server").setDescription("High-level Hikari server stats."))
+    .addSubcommand((sub) =>
+      sub
+        .setName("compare")
+        .setDescription("Compare your taste with another linked user.")
+        .addUserOption((option) => option.setName("user").setDescription("Discord user to compare with").setRequired(true)),
+    ),
   async execute(interaction) {
     const sub = interaction.options.getSubcommand(true);
+    if (sub === "server") return serverStatsCommand.execute(interaction);
+    if (sub === "compare") return compareCommand.execute(interaction);
     try {
       if (sub === "episodes") {
         const period = interaction.options.getString("period") || "weekly";
@@ -230,4 +240,4 @@ const serverStatsCommand = {
   },
 };
 
-export const statsCommands = [leaderboardCommand, serverStatsCommand];
+export const statsCommands = [leaderboardCommand];
