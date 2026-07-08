@@ -83,7 +83,7 @@ const progressBar = (value, total, width = 14) => {
   if (!Number.isFinite(total) || total <= 0) return "No episode total available";
   const pct = Math.max(0, Math.min(1, Number(value || 0) / total));
   const filled = Math.round(pct * width);
-  return `[${"#".repeat(filled)}${"-".repeat(Math.max(0, width - filled))}] ${Math.round(pct * 100)}%`;
+  return `${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))} ${Math.round(pct * 100)}%`;
 };
 
 const buildProgressActionRow = (mediaId) =>
@@ -121,7 +121,7 @@ const buildCompletionPayload = ({ media, entry }) => {
       [
         `**${mediaTitle(media)}** — all ${Number(media?.episodes || entry?.progress || 0) || ""} episodes done.`.replace("  ", " "),
         "",
-        "How was it? **Rate it below** — ratings tune your Hikari recommendations.",
+        "How was it? **Rate it below** (ノ◕ヮ◕)ノ*:・゚✧",
       ].join("\n"),
     )
     .setImage(shareCardUrl(media.id))
