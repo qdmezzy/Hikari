@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Hikari",
+    "slug": "hikari",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "hikari",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0f1133"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "net.raycodes.hikari",
+      "backgroundColor": "#0f1133",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      },
+      "userInterfaceStyle": "dark"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0f1133"
+      },
+      "package": "net.raycodes.hikari"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-router", "expo-font"],
+    "experiments": {
+      "typedRoutes": true,
+      "tsconfigPaths": true
+    }
+  }
+}
