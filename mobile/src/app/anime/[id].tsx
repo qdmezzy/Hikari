@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react"
-import { View, Pressable, ScrollView, Dimensions, ActivityIndicator } from "react-native"
+import { View, Pressable, ScrollView, Dimensions, ActivityIndicator, Linking } from "react-native"
 import { Image } from "expo-image"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@expo/vector-icons"
@@ -21,6 +21,17 @@ import {
   type AniListMedia,
 } from "@/lib/anilist"
 import { formatCompactNumber, formatRelativeTime } from "@/lib/utils"
+import { supabase } from "@/lib/supabase"
+import { useAuth } from "@/hooks/useAuth"
+
+const STATUS_LABELS: Record<string, string> = {
+  watching: "Watching",
+  rewatching: "Rewatching",
+  completed: "Completed",
+  plan_to_watch: "Plan to Watch",
+  on_hold: "On Hold",
+  dropped: "Dropped",
+}
 
 const SCREEN = Dimensions.get("window").width
 
@@ -29,9 +40,53 @@ export default function AnimeDetailScreen() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { tokens } = useTheme()
+  const { user } = useAuth()
   const [media, setMedia] = useState<AniListMedia | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  // null = not on the list; otherwise the entry's status.
+  const [listStatus, setListStatus] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    if (!user || !Number(id)) {
+      setListStatus(null)
+      return
+    }
+    supabase
+      .from("list_entries")
+      .select("status")
+      .eq("user_id", user.id)
+      .eq("media_id", Number(id))
+      .maybeSingle()
+      .then(({ data }) => {
+        if (active) setListStatus(data?.status ?? null)
+      })
+    return () => { active = false }
+  }, [user, id])
+
+  const handleAddToList = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
+    if (!user) {
+      router.push("/login")
+      return
+    }
+    if (listStatus || saving) return
+    setSaving(true)
+    const { error: addError } = await supabase.from("list_entries").upsert(
+      {
+        user_id: user.id,
+        media_id: Number(id),
+        media_type: media?.type === "MANGA" ? "MANGA" : "ANIME",
+        status: "plan_to_watch",
+        progress: 0,
+      },
+      { onConflict: "user_id,media_id", ignoreDuplicates: true },
+    )
+    if (!addError) setListStatus("plan_to_watch")
+    setSaving(false)
+  }
 
   useEffect(() => {
     let active = true
@@ -131,11 +186,25 @@ export default function AnimeDetailScreen() {
       >
         {/* CTAs — Add to list + Watch. */}
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <Button variant="gradient" size="lg" style={{ flex: 1 }} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})}>
-            <Ionicons name="add" size={18} color="#fff" /> Add to List
-          </Button>
-          {streaming ? (
-            <Button variant="outline" size="lg" style={{ flex: 1 }} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})}>
+          {listStatus ? (
+            <Button variant="outline" size="lg" style={{ flex: 1 }} onPress={() => router.push("/lists")}>
+              <Ionicons name="checkmark" size={18} color={tokens.primary} /> {STATUS_LABELS[listStatus] || "On your list"}
+            </Button>
+          ) : (
+            <Button variant="gradient" size="lg" style={{ flex: 1 }} onPress={handleAddToList} disabled={saving}>
+              <Ionicons name="add" size={18} color="#fff" /> {saving ? "Adding..." : "Add to List"}
+            </Button>
+          )}
+          {streaming?.url ? (
+            <Button
+              variant="outline"
+              size="lg"
+              style={{ flex: 1 }}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+                Linking.openURL(streaming.url).catch(() => {})
+              }}
+            >
               <Ionicons name="play" size={18} color={tokens.foreground} /> {streaming.site}
             </Button>
           ) : null}

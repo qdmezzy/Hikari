@@ -118,7 +118,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Continue Watching (placeholder for now — needs auth/supabase). */}
+        {/* Continue Watching — real data via useContinueWatching. */}
         <Section
           kana="視聴中"
           title="Continue Watching"
