@@ -1,5 +1,5 @@
 import React from "react"
-import { View, Pressable, type ViewStyle } from "react-native"
+import { View, Pressable } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { BlurView } from "expo-blur"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -9,7 +9,7 @@ import { useTheme } from "@/theme/ThemeProvider"
 import { Text } from "../primitives/Text"
 import { radii } from "@/theme/tokens"
 
-type TabKey = "index" | "discover" | "search" | "lists" | "calendar"
+type TabKey = "index" | "manga" | "discover" | "community" | "profile"
 
 interface TabDef {
   key: TabKey
@@ -21,11 +21,11 @@ interface TabDef {
 }
 
 const TABS: TabDef[] = [
-  { key: "index", href: "/", label: "Home", kana: "ホーム", icon: "home-outline", iconActive: "home" },
+  { key: "index", href: "/", label: "Anime", kana: "アニメ", icon: "tv-outline", iconActive: "tv" },
+  { key: "manga", href: "/manga", label: "Manga", kana: "漫画", icon: "book-outline", iconActive: "book" },
   { key: "discover", href: "/discover", label: "Discover", kana: "発見", icon: "sparkles-outline", iconActive: "sparkles" },
-  { key: "search", href: "/search", label: "Browse", kana: "検索", icon: "search-outline", iconActive: "search" },
-  { key: "lists", href: "/lists", label: "My List", kana: "リスト", icon: "list-outline", iconActive: "list" },
-  { key: "calendar", href: "/calendar", label: "Schedule", kana: "放送", icon: "calendar-outline", iconActive: "calendar" },
+  { key: "community", href: "/community", label: "Community", kana: "交流", icon: "people-outline", iconActive: "people" },
+  { key: "profile", href: "/profile", label: "Profile", kana: "プロフ", icon: "person-outline", iconActive: "person" },
 ]
 
 export function TabBar() {
@@ -34,7 +34,8 @@ export function TabBar() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
 
-  const activeKey = TABS.find((t) => (t.key === "index" ? pathname === "/" : pathname.startsWith(t.href as string)))?.key ?? "index"
+  const activeKey =
+    TABS.find((t) => (t.key === "index" ? pathname === "/" : pathname.startsWith(t.href as string)))?.key ?? "index"
 
   return (
     <View
@@ -69,17 +70,16 @@ export function TabBar() {
                   router.push(tab.href)
                 }
               }}
-              style={{ flex: 1, alignItems: "center", paddingVertical: 6 }}
+              style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}
             >
               <View
                 style={{
-                  paddingHorizontal: 14,
-                  paddingVertical: 6,
-                  borderRadius: radii.lg,
-                  backgroundColor: active ? `${tokens.primary}22` : "transparent",
-                  flexDirection: "row",
                   alignItems: "center",
-                  gap: 6,
+                  gap: 3,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: radii.lg,
+                  backgroundColor: active ? `${tokens.primary}1E` : "transparent",
                 }}
               >
                 <Ionicons
@@ -87,11 +87,13 @@ export function TabBar() {
                   size={22}
                   color={active ? tokens.primary : tokens.mutedForeground}
                 />
-                {active ? (
-                  <Text size="sm" weight="semibold" style={{ color: tokens.primary }}>
-                    {tab.label}
-                  </Text>
-                ) : null}
+                <Text
+                  size="xs"
+                  weight={active ? "semibold" : "medium"}
+                  style={{ color: active ? tokens.primary : tokens.mutedForeground, fontSize: 10 }}
+                >
+                  {tab.label}
+                </Text>
               </View>
             </Pressable>
           )

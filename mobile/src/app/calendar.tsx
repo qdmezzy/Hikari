@@ -7,6 +7,7 @@ import { useRouter } from "expo-router"
 import { useTheme } from "@/theme/ThemeProvider"
 import { radii, spacing } from "@/theme/tokens"
 import { Text, Button, Badge, Card } from "@/components/primitives"
+import { BackButton } from "@/components/layout/BackButton"
 import {
   fetchAniList,
   HOME_SEASONAL_QUERY,
@@ -86,10 +87,13 @@ export default function CalendarScreen() {
       contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: spacing[5], paddingBottom: 120, gap: spacing[5] }}
       showsVerticalScrollIndicator={false}
     >
-      <View>
-        <Text jp size="xs" style={{ color: tokens.primary, letterSpacing: 3, marginBottom: 2 }}>放送予定</Text>
-        <Text size="3xl" weight="black" style={{ color: tokens.foreground }}>Schedule</Text>
-        <Text size="sm" muted>Airing this season</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}>
+        <BackButton />
+        <View>
+          <Text jp size="xs" style={{ color: tokens.primary, letterSpacing: 3, marginBottom: 2 }}>放送予定</Text>
+          <Text size="3xl" weight="black" style={{ color: tokens.foreground }}>Schedule</Text>
+          <Text size="sm" muted>Airing this season</Text>
+        </View>
       </View>
 
       {loading ? (

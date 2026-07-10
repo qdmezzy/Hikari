@@ -23,6 +23,7 @@ import {
 import { formatCompactNumber, formatRelativeTime } from "@/lib/utils"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/hooks/useAuth"
+import { logListActivity } from "@/lib/social"
 
 const STATUS_LABELS: Record<string, string> = {
   watching: "Watching",
@@ -84,7 +85,18 @@ export default function AnimeDetailScreen() {
       },
       { onConflict: "user_id,media_id", ignoreDuplicates: true },
     )
-    if (!addError) setListStatus("plan_to_watch")
+    if (!addError) {
+      setListStatus("plan_to_watch")
+      // Mirror the web app: record the update to the community activity feed.
+      logListActivity({
+        user,
+        mediaId: Number(id),
+        mediaTitle: media ? getMediaTitle(media) : null,
+        mediaType: media?.type === "MANGA" ? "MANGA" : "ANIME",
+        status: "plan_to_watch",
+        progress: 0,
+      })
+    }
     setSaving(false)
   }
 
@@ -187,7 +199,12 @@ export default function AnimeDetailScreen() {
         {/* CTAs — Add to list + Watch. */}
         <View style={{ flexDirection: "row", gap: 10 }}>
           {listStatus ? (
-            <Button variant="outline" size="lg" style={{ flex: 1 }} onPress={() => router.push("/lists")}>
+            <Button
+              variant="outline"
+              size="lg"
+              style={{ flex: 1 }}
+              onPress={() => router.push(media?.type === "MANGA" ? "/manga" : "/")}
+            >
               <Ionicons name="checkmark" size={18} color={tokens.primary} /> {STATUS_LABELS[listStatus] || "On your list"}
             </Button>
           ) : (

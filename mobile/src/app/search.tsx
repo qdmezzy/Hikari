@@ -10,6 +10,7 @@ import { AnimeCard, type AnimeCardItem } from "@/components/media/AnimeCard"
 import { SectionHeader } from "@/components/media/SectionHeader"
 import { CardRail } from "@/components/media/CardRail"
 import { fetchAniList, SEARCH_QUERY, getMediaTitle, type AniListMedia } from "@/lib/anilist"
+import { BackButton } from "@/components/layout/BackButton"
 
 const SCREEN = Dimensions.get("window").width
 const CARD_W = (SCREEN - 48) / 3
@@ -56,9 +57,11 @@ export default function SearchScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: tokens.background, paddingTop: insets.top + 8 }}>
       {/* Search field. */}
-      <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[4] }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3], paddingHorizontal: spacing[5], marginBottom: spacing[4] }}>
+        <BackButton />
         <View
           style={{
+            flex: 1,
             flexDirection: "row",
             alignItems: "center",
             gap: 10,
