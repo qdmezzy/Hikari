@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "./useAuth"
 import { fetchAniList, getMediaTitle, type AniListMedia } from "@/lib/anilist"
+import { logListActivity } from "@/lib/social"
 
 const MEDIA_BY_IDS_QUERY = `
 query ($ids: [Int], $perPage: Int) {
@@ -26,6 +27,8 @@ export interface MyListEntry {
   cover: string
   /** Episodes for anime, chapters for manga. Null when unknown/ongoing. */
   total: number | null
+  /** Next airing episode (anime only) for "Ep X airs in Nd" pills. */
+  nextAiring: { episode: number; airingAt: number } | null
 }
 
 const chunk = <T,>(arr: T[], size: number): T[][] => {
@@ -91,6 +94,7 @@ export function useMyList() {
               title: media ? getMediaTitle(media) : `#${entry.media_id}`,
               cover: media?.coverImage?.extraLarge || media?.coverImage?.large || "",
               total: isManga ? media?.chapters ?? null : media?.episodes ?? null,
+              nextAiring: !isManga && media?.nextAiringEpisode ? media.nextAiringEpisode : null,
             }
           }),
         )
@@ -135,7 +139,17 @@ export function useMyList() {
       if (error) {
         console.warn("[hikari] plus one failed:", error)
         setEntries(previous)
+        return
       }
+      // Mirror the web app: record the update to the community activity feed.
+      logListActivity({
+        user,
+        mediaId: entry.mediaId,
+        mediaTitle: entry.title,
+        mediaType: entry.mediaType,
+        status: nextStatus,
+        progress: nextProgress,
+      })
     },
     [entries, user],
   )
