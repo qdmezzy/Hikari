@@ -1,5 +1,5 @@
 import React from "react"
-import { View, Pressable } from "react-native"
+import { View, Pressable, Platform } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { BlurView } from "expo-blur"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -7,7 +7,6 @@ import * as Haptics from "expo-haptics"
 import { type Href, usePathname, useRouter } from "expo-router"
 import { useTheme } from "@/theme/ThemeProvider"
 import { Text } from "../primitives/Text"
-import { radii } from "@/theme/tokens"
 
 type TabKey = "index" | "manga" | "discover" | "community" | "profile"
 
@@ -24,10 +23,15 @@ const TABS: TabDef[] = [
   { key: "index", href: "/", label: "Anime", kana: "アニメ", icon: "tv-outline", iconActive: "tv" },
   { key: "manga", href: "/manga", label: "Manga", kana: "漫画", icon: "book-outline", iconActive: "book" },
   { key: "discover", href: "/discover", label: "Discover", kana: "発見", icon: "sparkles-outline", iconActive: "sparkles" },
-  { key: "community", href: "/community", label: "Community", kana: "交流", icon: "people-outline", iconActive: "people" },
+  { key: "community", href: "/community", label: "Feed", kana: "交流", icon: "people-outline", iconActive: "people" },
   { key: "profile", href: "/profile", label: "Profile", kana: "プロフ", icon: "person-outline", iconActive: "person" },
 ]
 
+/**
+ * Floating "liquid glass" tab bar: a detached pill with a real blur behind it
+ * (only a faint tint on top, so content genuinely shows through), a hairline
+ * highlight border, and a soft drop shadow. Content scrolls underneath.
+ */
 export function TabBar() {
   const { tokens, isDark } = useTheme()
   const pathname = usePathname()
@@ -39,66 +43,85 @@ export function TabBar() {
 
   return (
     <View
+      pointerEvents="box-none"
       style={{
         position: "absolute",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingBottom: insets.bottom,
-        backgroundColor: isDark ? "rgba(21,22,58,0.82)" : "rgba(251,247,234,0.85)",
+        bottom: Math.max(insets.bottom, 12) + 4,
+        left: 16,
+        right: 16,
+        alignItems: "center",
       }}
     >
-      <BlurView
-        intensity={60}
-        tint={isDark ? "dark" : "light"}
+      <View
         style={{
-          flexDirection: "row",
-          paddingTop: 8,
-          paddingBottom: 8,
-          borderTopWidth: 1,
-          borderTopColor: tokens.border,
+          borderRadius: 32,
+          overflow: "hidden",
+          borderWidth: 1,
+          borderColor: isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.08)",
+          shadowColor: "#000",
+          shadowOpacity: 0.35,
+          shadowRadius: 24,
+          shadowOffset: { width: 0, height: 12 },
+          elevation: 12,
+          width: "100%",
         }}
       >
-        {TABS.map((tab) => {
-          const active = activeKey === tab.key
-          return (
-            <Pressable
-              key={tab.key}
-              onPress={() => {
-                if (!active) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
-                  router.push(tab.href)
-                }
-              }}
-              style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}
-            >
-              <View
-                style={{
-                  alignItems: "center",
-                  gap: 3,
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: radii.lg,
-                  backgroundColor: active ? `${tokens.primary}1E` : "transparent",
+        <BlurView
+          intensity={Platform.OS === "ios" ? 70 : 100}
+          tint={isDark ? "systemUltraThinMaterialDark" : "systemUltraThinMaterialLight"}
+          style={{
+            flexDirection: "row",
+            paddingVertical: 8,
+            paddingHorizontal: 6,
+            backgroundColor: isDark ? "rgba(15,17,51,0.35)" : "rgba(251,247,234,0.35)",
+          }}
+        >
+          {TABS.map((tab) => {
+            const active = activeKey === tab.key
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => {
+                  if (!active) {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {})
+                    router.push(tab.href)
+                  }
                 }}
+                style={{ flex: 1, alignItems: "center" }}
               >
-                <Ionicons
-                  name={active ? tab.iconActive : tab.icon}
-                  size={22}
-                  color={active ? tokens.primary : tokens.mutedForeground}
-                />
-                <Text
-                  size="xs"
-                  weight={active ? "semibold" : "medium"}
-                  style={{ color: active ? tokens.primary : tokens.mutedForeground, fontSize: 10 }}
+                <View
+                  style={{
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 2,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 24,
+                    backgroundColor: active
+                      ? isDark
+                        ? "rgba(255,255,255,0.14)"
+                        : "rgba(0,0,0,0.07)"
+                      : "transparent",
+                  }}
                 >
-                  {tab.label}
-                </Text>
-              </View>
-            </Pressable>
-          )
-        })}
-      </BlurView>
+                  <Ionicons
+                    name={active ? tab.iconActive : tab.icon}
+                    size={22}
+                    color={active ? tokens.primary : tokens.mutedForeground}
+                  />
+                  <Text
+                    size="xs"
+                    weight={active ? "semibold" : "medium"}
+                    style={{ color: active ? tokens.primary : tokens.mutedForeground, fontSize: 10 }}
+                  >
+                    {tab.label}
+                  </Text>
+                </View>
+              </Pressable>
+            )
+          })}
+        </BlurView>
+      </View>
     </View>
   )
 }
