@@ -1,5 +1,5 @@
 import React from "react"
-import { View, Pressable, ScrollView, Dimensions, KeyboardAvoidingView, Platform } from "react-native"
+import { View, Pressable, ScrollView, Dimensions } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@expo/vector-icons"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -7,7 +7,6 @@ import { useRouter } from "expo-router"
 import { useTheme } from "@/theme/ThemeProvider"
 import { spacing } from "@/theme/tokens"
 import { Text } from "../primitives/Text"
-import { BrandGlow } from "../primitives/Decorations"
 
 const SCREEN = Dimensions.get("window")
 
@@ -56,7 +55,6 @@ export function AuthShell({
         }}
       />
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -111,7 +109,6 @@ export function AuthShell({
 
         {children}
       </ScrollView>
-      </KeyboardAvoidingView>
     </View>
   )
 }

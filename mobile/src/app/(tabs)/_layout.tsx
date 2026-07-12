@@ -1,15 +1,24 @@
-import React from "react"
-import { Redirect, Tabs } from "expo-router"
+import React, { useEffect, useRef } from "react"
+import { Tabs, useRouter } from "expo-router"
 import { TabBar } from "@/components/layout/TabBar"
 import { useAuth } from "@/hooks/useAuth"
 
 export default function TabsLayout() {
   const { user, loading } = useAuth()
+  const router = useRouter()
+  const redirected = useRef(false)
 
-  // Signed-out users belong on the login screen — declarative redirect so
-  // navigation state is never mutated imperatively from a root effect.
-  if (loading) return null
-  if (!user) return <Redirect href="/login" />
+  // One-shot guard: fires at most once, so a re-render of this (possibly
+  // backgrounded) layout can never emit another navigation event — repeat
+  // navigations while the login screen is focused dismiss its keyboard.
+  useEffect(() => {
+    if (!loading && !user && !redirected.current) {
+      redirected.current = true
+      router.replace("/login")
+    }
+  }, [loading, user, router])
+
+  if (loading || !user) return null
 
   return (
     <Tabs

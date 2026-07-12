@@ -31,9 +31,9 @@ function AppShell() {
           <Stack.Screen name="search" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="calendar" options={{ animation: "slide_from_right" }} />
           <Stack.Screen name="settings" options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="login" options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="register" options={{ animation: "slide_from_right" }} />
-          <Stack.Screen name="forgot-password" options={{ animation: "slide_from_right" }} />
+          <Stack.Screen name="login" options={{ animation: "none" }} />
+          <Stack.Screen name="register" options={{ animation: "none" }} />
+          <Stack.Screen name="forgot-password" options={{ animation: "none" }} />
         </Stack>
       </AuthProvider>
     </GestureHandlerRootView>
