@@ -1,5 +1,6 @@
 import React, { useRef, useState } from "react"
 import { View, Pressable, Dimensions, FlatList } from "react-native"
+import { WebView } from "react-native-webview"
 import { Image } from "expo-image"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@expo/vector-icons"
@@ -38,7 +39,13 @@ export default function DiscoverScreen() {
   const router = useRouter()
   const [vibe, setVibe] = useState("all")
   const [liked, setLiked] = useState<Set<number>>(new Set())
+  const [activeIndex, setActiveIndex] = useState(0)
   const { items, loading } = useDiscoverFeed(vibe)
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems?.length) setActiveIndex(viewableItems[0].index ?? 0)
+  })
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 })
 
   const toggleLike = (id: number) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {})
@@ -112,12 +119,15 @@ export default function DiscoverScreen() {
         renderItem={({ item, index }) => (
           <DiscoverCard
             item={item}
+            isActive={index === activeIndex}
             isLiked={liked.has(item.id)}
             onLike={() => toggleLike(item.id)}
             onView={() => router.push(`/anime/${item.id}`)}
           />
         )}
         pagingEnabled
+        onViewableItemsChanged={onViewableItemsChanged.current}
+        viewabilityConfig={viewabilityConfig.current}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 100 }}
         scrollEventThrottle={16}
@@ -128,11 +138,13 @@ export default function DiscoverScreen() {
 
 function DiscoverCard({
   item,
+  isActive,
   isLiked,
   onLike,
   onView,
 }: {
   item: any
+  isActive: boolean
   isLiked: boolean
   onLike: () => void
   onView: () => void
@@ -140,15 +152,39 @@ function DiscoverCard({
   const { tokens } = useTheme()
   const title = getMediaTitle(item)
   const banner = item.bannerImage || item.coverImage?.extraLarge || item.coverImage?.large
+  const trailerId = item?.trailer?.site?.toLowerCase() === "youtube" ? item.trailer.id : null
+  // 16:9 video sized to COVER a portrait screen, centered horizontally.
+  const videoWidth = Math.ceil((FEED_HEIGHT * 16) / 9)
 
   return (
-    <View style={{ height: FEED_HEIGHT, width: SCREEN.width, position: "relative" }}>
+    <View style={{ height: FEED_HEIGHT, width: SCREEN.width, position: "relative", overflow: "hidden", backgroundColor: "#000" }}>
       <Image
         source={banner}
         style={{ position: "absolute", inset: 0 }}
         contentFit="cover"
         recyclingKey={String(item.id)}
       />
+      {isActive && trailerId ? (
+        <WebView
+          key={trailerId}
+          source={{
+            uri: `https://www.youtube-nocookie.com/embed/${trailerId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${trailerId}&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&fs=0`,
+          }}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: (SCREEN.width - videoWidth) / 2,
+            width: videoWidth,
+            height: FEED_HEIGHT,
+            backgroundColor: "transparent",
+          }}
+          allowsInlineMediaPlayback
+          mediaPlaybackRequiresUserAction={false}
+          javaScriptEnabled
+          scrollEnabled={false}
+          pointerEvents="none"
+        />
+      ) : null}
 
       {/* Dark scrim for legibility. */}
       <LinearGradient

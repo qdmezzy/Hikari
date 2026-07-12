@@ -1,5 +1,5 @@
 import React from "react"
-import { View, Pressable, ScrollView, Dimensions } from "react-native"
+import { View, Pressable, ScrollView, Dimensions, KeyboardAvoidingView, Platform } from "react-native"
 import { LinearGradient } from "expo-linear-gradient"
 import { Ionicons } from "@expo/vector-icons"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -56,6 +56,7 @@ export function AuthShell({
         }}
       />
 
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{
@@ -69,6 +70,7 @@ export function AuthShell({
       >
         {/* Back button + wordmark. */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing[8] }}>
+          {router.canGoBack() ? (
           <Pressable
             onPress={() => router.back()}
             hitSlop={12}
@@ -86,6 +88,9 @@ export function AuthShell({
           >
             <Ionicons name="chevron-back" size={22} color={tokens.foreground} />
           </Pressable>
+          ) : (
+            <View style={{ width: 40, height: 40 }} />
+          )}
 
           <View style={{ alignItems: "center", flex: 1, marginRight: 40 }}>
             <Text size="3xl" weight="black" brand>Hikari</Text>
@@ -106,6 +111,7 @@ export function AuthShell({
 
         {children}
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   )
 }
