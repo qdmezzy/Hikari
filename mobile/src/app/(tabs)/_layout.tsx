@@ -1,8 +1,16 @@
 import React from "react"
-import { Tabs } from "expo-router"
+import { Redirect, Tabs } from "expo-router"
 import { TabBar } from "@/components/layout/TabBar"
+import { useAuth } from "@/hooks/useAuth"
 
 export default function TabsLayout() {
+  const { user, loading } = useAuth()
+
+  // Signed-out users belong on the login screen — declarative redirect so
+  // navigation state is never mutated imperatively from a root effect.
+  if (loading) return null
+  if (!user) return <Redirect href="/login" />
+
   return (
     <Tabs
       tabBar={() => <TabBar />}
