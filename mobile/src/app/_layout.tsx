@@ -2,14 +2,33 @@ import React, { useCallback } from "react"
 import { View } from "react-native"
 import { useFonts } from "expo-font"
 import * as SplashScreen from "expo-splash-screen"
-import { Stack } from "expo-router"
+import { Stack, usePathname, useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 import { ThemeProvider, useTheme } from "@/theme/ThemeProvider"
-import { AuthProvider } from "@/hooks/useAuth"
+import { AuthProvider, useAuth } from "@/hooks/useAuth"
 
 SplashScreen.preventAutoHideAsync().catch(() => {})
+
+const AUTH_ROUTES = ["/login", "/register", "/forgot-password"]
+
+/** Signed-out users belong on the login screen — always. */
+function AuthGate() {
+  const { user, loading } = useAuth()
+  const pathname = usePathname()
+  const router = useRouter()
+
+  React.useEffect(() => {
+    if (loading) return
+    const onAuthRoute = AUTH_ROUTES.some((route) => pathname.startsWith(route))
+    if (!user && !onAuthRoute) {
+      router.replace("/login")
+    }
+  }, [user, loading, pathname, router])
+
+  return null
+}
 
 function AppShell() {
   const { tokens, isDark } = useTheme()
@@ -18,6 +37,7 @@ function AppShell() {
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: tokens.background }}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <AuthProvider>
+        <AuthGate />
         <Stack
           screenOptions={{
             headerShown: false,
