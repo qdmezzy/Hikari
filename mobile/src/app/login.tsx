@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react"
-import { View, Pressable, ActivityIndicator } from "react-native"
+import React, { useEffect, useRef, useState } from "react"
+import { View, Pressable, ActivityIndicator , TextInput } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useRouter } from "expo-router"
 import * as Haptics from "expo-haptics"
@@ -19,6 +19,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const passwordRef = useRef<TextInput>(null)
   const [submitting, setSubmitting] = useState(false)
   const [oauthLoading, setOauthLoading] = useState("")
   const [success, setSuccess] = useState(false)
@@ -140,6 +141,11 @@ export default function LoginScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoCorrect={false}
+          autoComplete="email"
+          textContentType="emailAddress"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => passwordRef.current?.focus()}
           value={email}
           onChangeText={setEmail}
           error={errors.email}
@@ -153,8 +159,13 @@ export default function LoginScreen() {
             </Pressable>
           </View>
           <TextField
+            ref={passwordRef}
             icon="lock-closed-outline"
             placeholder="Enter your password"
+            autoComplete="password"
+            textContentType="password"
+            returnKeyType="go"
+            onSubmitEditing={() => handleSubmit()}
             secure
             value={password}
             onChangeText={setPassword}

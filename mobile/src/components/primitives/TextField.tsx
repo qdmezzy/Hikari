@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { forwardRef, useState } from "react"
 import { View, TextInput, type TextInputProps, Pressable } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { useTheme } from "@/theme/ThemeProvider"
@@ -20,20 +20,23 @@ export interface TextFieldProps extends Omit<TextInputProps, "placeholderTextCol
  * Form text field mirroring the web's styled Input:
  * left icon, focus glow ring, password eye toggle, destructive error state.
  */
-export function TextField({
-  label,
-  icon,
-  secure = false,
-  error,
-  helper,
-  rightAccessory,
-  value,
-  onChangeText,
-  onFocus,
-  onBlur,
-  style,
-  ...rest
-}: TextFieldProps) {
+export const TextField = forwardRef<TextInput, TextFieldProps>(function TextField(
+  {
+    label,
+    icon,
+    secure = false,
+    error,
+    helper,
+    rightAccessory,
+    value,
+    onChangeText,
+    onFocus,
+    onBlur,
+    style,
+    ...rest
+  },
+  ref,
+) {
   const { tokens } = useTheme()
   const [focused, setFocused] = useState(false)
   const [reveal, setReveal] = useState(false)
@@ -76,6 +79,7 @@ export function TextField({
         ) : null}
 
         <TextInput
+          ref={ref}
           {...rest}
           value={value}
           onChangeText={onChangeText}
@@ -125,4 +129,4 @@ export function TextField({
       ) : null}
     </View>
   )
-}
+})
