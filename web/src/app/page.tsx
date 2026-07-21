@@ -7,7 +7,7 @@ import { Navigation } from "@/components/layout/Navigation"
 import { AnimeCard } from "@/components/media/AnimeCard"
 import {
   Search, Clock, Star, Play, Heart, Plus, ChevronRight,
-  Flame, Calendar, Eye, Zap, ExternalLink, Puzzle
+  Flame, Calendar, Eye, Zap, ExternalLink, Bot
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -1030,23 +1030,20 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="group relative overflow-hidden rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/12 to-card p-6 transition-all hover:border-primary/40">
-              <span className="absolute right-4 top-4 rounded-full border border-border/60 bg-background/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Coming soon
-              </span>
+            <div className="group relative overflow-hidden rounded-2xl border border-[#5865F2]/25 bg-gradient-to-br from-[#5865F2]/12 via-primary/5 to-card p-6 transition-all hover:border-[#5865F2]/45">
               <div className="flex items-start gap-4">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                  <Puzzle className="size-6" />
+                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/15 text-[#8b92f7]">
+                  <Bot className="size-6" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-jp text-xs tracking-[0.25em] text-primary/80">拡張機能</h3>
-                  <p className="mt-0.5 text-lg font-bold text-foreground">Auto-track as you watch</p>
+                  <h3 className="font-jp text-xs tracking-[0.25em] text-[#8b92f7]">ディスコードボット</h3>
+                  <p className="mt-0.5 text-lg font-bold text-foreground">Hikari for Discord</p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Our browser extension updates your progress automatically while you stream — no manual logging.
+                    Get anime recommendations, airing alerts, tracking, and server stats directly in Discord.
                   </p>
-                  <Button asChild variant="outline" className="mt-4 gap-2">
-                    <Link href="/extension">
-                      Learn more
+                  <Button asChild className="mt-4 gap-2 bg-[#5865F2] text-white hover:bg-[#4752c4]">
+                    <Link href="/discord-bot">
+                      Add to Discord
                       <ChevronRight className="size-4" />
                     </Link>
                   </Button>
@@ -1082,6 +1079,7 @@ export default function HomePage() {
               <h4 className="font-semibold text-foreground mb-3">Community</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/community" className="hover:text-accent transition-colors">Community</Link></li>
+                <li><Link href="/discord-bot" className="hover:text-accent transition-colors">Discord Bot</Link></li>
                 <li><Link href="/discord/link" className="hover:text-accent transition-colors flex items-center gap-1">Discord <ExternalLink className="w-3 h-3" /></Link></li>
                 <li><Link href="/feedback" className="hover:text-accent transition-colors">Feedback</Link></li>
               </ul>

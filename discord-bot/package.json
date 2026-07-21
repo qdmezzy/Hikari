@@ -5,8 +5,11 @@
   "type": "module",
   "description": "Discord bot for Hikari tracking, discovery, sharing, and watch parties.",
   "scripts": {
+    "build": "node scripts/check-source.js",
     "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "lint": "node scripts/check-source.js",
+    "start": "node src/index.js",
+    "test": "node --test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

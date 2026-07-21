@@ -1,5 +1,5 @@
-import { EmbedBuilder } from "discord.js";
-import { config } from "../config.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import { buildHikariUrl } from "../config.js";
 import { supabase } from "../lib/supabase.js";
 import { getGuildsWithAlerts } from "./guilds.js";
 
@@ -57,21 +57,27 @@ const run = async (client) => {
       notified.add(key);
 
       const title = media.title?.english || media.title?.romaji || "Anime";
+      const mediaUrl = buildHikariUrl(`/media/${media.id}`, "alerts");
       const embed = new EmbedBuilder()
         .setColor(0xf3d36b)
         .setTitle(`${title} — Episode ${schedule.episode}`)
         .setDescription(`Airing <t:${schedule.airingAt}:R> (<t:${schedule.airingAt}:t>).`)
-        .setURL(`${config.hikariWebBaseUrl}/media/${media.id}`)
+        .setURL(mediaUrl)
         .setFooter({ text: "光 Hikari" })
         .setTimestamp();
       if (media.coverImage?.large) embed.setThumbnail(media.coverImage.large);
+      const components = [
+        new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Open on Hikari").setEmoji("▶️").setURL(mediaUrl),
+        ),
+      ];
 
       const createdThreads = [];
       for (const guild of guilds) {
         try {
           const channel = await client.channels.fetch(guild.alert_channel_id);
           if (channel?.isTextBased?.()) {
-            const message = await channel.send({ embeds: [embed] });
+            const message = await channel.send({ embeds: [embed], components });
             const thread = await message
               .startThread({ name: `${title} · Ep ${schedule.episode} 💬`.slice(0, 100), autoArchiveDuration: 1440 })
               .catch(() => null);
@@ -101,7 +107,7 @@ const run = async (client) => {
         }
         try {
           const user = await client.users.fetch(discordId);
-          await user.send({ embeds: [embed] });
+          await user.send({ embeds: [embed], components });
         } catch {
           /* DMs closed — fine */
         }

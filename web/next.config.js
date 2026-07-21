@@ -15,7 +15,11 @@ const nextConfig = {
     ],
   },
   async redirects() {
-    return [{ source: "/schedule", destination: "/calendar", permanent: true }];
+    return [
+      { source: "/schedule", destination: "/calendar", permanent: true },
+      // Temporary until the browser extension is ready. Remove this entry to restore its landing page.
+      { source: "/extension", destination: "/discord-bot", permanent: false },
+    ];
   },
 };
 

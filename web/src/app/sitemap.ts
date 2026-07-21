@@ -9,7 +9,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/search", priority: 0.9 },
     { path: "/community", priority: 0.8 },
     { path: "/calendar", priority: 0.7 },
-    { path: "/extension", priority: 0.7 },
+    { path: "/discord-bot", priority: 0.8 },
     { path: "/register", priority: 0.6 },
     { path: "/login", priority: 0.5 },
     { path: "/status", priority: 0.3 },

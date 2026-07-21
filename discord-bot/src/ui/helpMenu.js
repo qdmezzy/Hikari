@@ -5,7 +5,12 @@ import {
   EmbedBuilder,
   StringSelectMenuBuilder,
 } from "discord.js";
-import { buildHikariLinkUrl, config } from "../config.js";
+import {
+  buildDiscordBotInviteUrl,
+  buildHikariLinkUrl,
+  buildHikariUrl,
+  getDiscordSupportUrl,
+} from "../config.js";
 import { embedColors } from "../lib/embeds.js";
 import { EMOJI } from "../lib/emojis.js";
 
@@ -94,11 +99,6 @@ const categories = [
 const helpCustomIdPrefix = "hikari_help";
 const categoryByKey = new Map(categories.map((item) => [item.key, item]));
 
-const inviteUrl = () =>
-  config.discordClientId
-    ? `https://discord.com/oauth2/authorize?client_id=${config.discordClientId}&permissions=379904&scope=bot%20applications.commands`
-    : config.hikariWebBaseUrl;
-
 const buildHomeEmbed = () =>
   new EmbedBuilder()
     .setColor(embedColors.brand)
@@ -139,9 +139,9 @@ const buildHomeComponents = (ownerId) => [
       ),
   ),
   new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(config.hikariWebBaseUrl),
-    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("➕").setLabel("Add to Server").setURL(inviteUrl()),
-    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("💬").setLabel("Support").setURL("https://discord.gg/hikari"),
+    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
+    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("➕").setLabel("Add to Server").setURL(buildDiscordBotInviteUrl()),
+    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("💬").setLabel("Support").setURL(getDiscordSupportUrl()),
   ),
 ];
 

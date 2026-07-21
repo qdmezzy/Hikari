@@ -1,10 +1,10 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
-import { buildAnimeEmbed } from "../lib/embeds.js";
+import { buildAnimeButtons, buildAnimeEmbed, buildInfoEmbed } from "../lib/embeds.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { getRecommendationPool, mediaTitle, searchAnime, buildTrailerUrl, getAnimeByIds } from "../lib/anilist.js";
 import { getListEntriesByUser, getTopGenres } from "../services/profiles.js";
 import { resolveTarget } from "../services/targets.js";
-import { config } from "../config.js";
+import { buildHikariUrl } from "../config.js";
 import { supabase } from "../lib/supabase.js";
 import { getLinkByDiscordId } from "../services/links.js";
 import { UserSelectMenuBuilder } from "discord.js";
@@ -76,8 +76,8 @@ const recommendationButtons = (media, trailerUrl, { mood, tagsCsv } = {}) =>
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
-      .setLabel("Trailer")
-      .setURL(`${config.hikariWebBaseUrl}/discover?focus=${Number(media.id)}`),
+      .setLabel("Open on Hikari")
+      .setURL(buildHikariUrl(`/discover?focus=${Number(media.id)}`, "recommendations")),
   );
 
 const recommendCommand = {
@@ -188,7 +188,7 @@ const runRandom = async (interaction, tag) => {
       }
 
       const pick = pool[Math.floor(Math.random() * pool.length)];
-      const embed = buildAnimeEmbed(pick).setDescription(
+      const embed = buildAnimeEmbed(pick, { campaign: "recommendations" }).setDescription(
         tag
           ? `${cleanText(pick?.description, 140)}\n\nTag: **${tag}**`
           : cleanText(pick?.description, 160) || "Random recommendation.",
@@ -209,7 +209,10 @@ const runRandom = async (interaction, tag) => {
           .setCustomId(`${discoverPrefix}:add:${Number(pick.id)}`)
           .setLabel("Add to List")
           .setStyle(ButtonStyle.Success),
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Trailer").setURL(`${config.hikariWebBaseUrl}/discover?focus=${Number(pick.id)}`),
+        new ButtonBuilder()
+          .setStyle(ButtonStyle.Link)
+          .setLabel("Open on Hikari")
+          .setURL(buildHikariUrl(`/discover?focus=${Number(pick.id)}`, "recommendations")),
       );
       await respond(interaction, { embeds: [embed], components: [row] });
     } catch (error) {
@@ -239,7 +242,23 @@ const compareCommand = {
         mentionDiscordId: targetUser.id,
       });
       if (!otherTarget.ok) {
-        await replyError(interaction, otherTarget.message);
+        const displayName = targetUser.globalName || targetUser.username;
+        const embed = buildInfoEmbed({
+          title: `${displayName} is not on Hikari yet`,
+          description: [
+            "They need their own Hikari account before you can compare anime taste.",
+            "They can create an account below, then run `/account` themselves to link it securely.",
+            "Hikari never creates an account-linking URL for someone else.",
+          ].join("\n\n"),
+        });
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setStyle(ButtonStyle.Link)
+            .setLabel("Create a Hikari Account")
+            .setEmoji("✨")
+            .setURL(buildHikariUrl("/register", "sharing")),
+        );
+        await respond(interaction, { embeds: [embed], components: [row] });
         return;
       }
 
@@ -288,7 +307,10 @@ const compareCommand = {
         .setFooter({ text: "光 Hikari" });
 
       const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("View Shared Anime").setURL(`${config.hikariWebBaseUrl}/discover`),
+        new ButtonBuilder()
+          .setStyle(ButtonStyle.Link)
+          .setLabel("View Shared Anime")
+          .setURL(buildHikariUrl("/discover", "sharing")),
       );
       await respond(interaction, { embeds: [embed], components: [row] });
     } catch (error) {
@@ -375,7 +397,8 @@ export const handleDiscoverComponent = async (interaction) => {
         const user = await interaction.client.users.fetch(userId);
         await user.send({
           content: `📣 <@${interaction.user.id}> thinks you should watch this:`,
-          embeds: [buildAnimeEmbed(media)],
+          embeds: [buildAnimeEmbed(media, { campaign: "recommendations" })],
+          components: [buildAnimeButtons(media, { campaign: "recommendations", includeInvite: true })],
         });
         sent += 1;
       } catch {
@@ -407,4 +430,3 @@ export const handleDiscoverComponent = async (interaction) => {
 
 export { compareCommand };
 export const discoverCommands = [discoverCommand];
-

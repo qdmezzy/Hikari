@@ -37,6 +37,7 @@ Required:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - Optional dev scope: `DISCORD_GUILD_ID`
+- Optional support server link: `DISCORD_SUPPORT_URL`
 
 3. Create link table in Supabase SQL editor:
 

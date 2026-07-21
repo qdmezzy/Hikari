@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
-import { config } from "../config.js";
+import { buildDiscordBotInviteUrl, buildHikariUrl, config } from "../config.js";
 import { EMOJI } from "./emojis.js";
 
 // Brand palette tuned to the Hikari web app (navy base, banana/cream accent).
@@ -65,15 +65,25 @@ export const buildWarningEmbed = ({ title, description, url } = {}) =>
 export const buildErrorEmbed = ({ title = "Request Failed", description } = {}) =>
   buildBaseEmbed({ color: embedColors.error, title: `${EMOJI.cross}  ${title}`, description });
 
-export const profileUrl = (handle) =>
-  handle ? `${config.hikariWebBaseUrl}/u/${encodeURIComponent(handle)}` : config.hikariWebBaseUrl;
+export const profileUrl = (handle, campaign = "sharing") =>
+  buildHikariUrl(handle ? `/u/${encodeURIComponent(handle)}` : "/", campaign);
 
-export const animeUrl = (mediaId) => `${config.hikariWebBaseUrl}/media/${encodeURIComponent(mediaId)}`;
+export const animeUrl = (mediaId, campaign = "sharing") =>
+  buildHikariUrl(`/media/${encodeURIComponent(mediaId)}`, campaign);
 
-export const listUrl = (handle) =>
-  handle ? `${config.hikariWebBaseUrl}/u/${encodeURIComponent(handle)}` : config.hikariWebBaseUrl;
+export const listUrl = (handle, campaign = "sharing") =>
+  buildHikariUrl(handle ? `/u/${encodeURIComponent(handle)}` : "/lists", campaign);
 
-export const buildProfileEmbed = ({ handle, displayName, avatarUrl, watchingLine, counts, topGenres, totalEpisodes = 0 }) => {
+export const buildProfileEmbed = ({
+  handle,
+  displayName,
+  avatarUrl,
+  watchingLine,
+  counts,
+  topGenres,
+  totalEpisodes = 0,
+  campaign = "sharing",
+}) => {
   const safeName = displayName || handle || "User";
   const nowWatching = watchingLine || "Nothing in progress";
   const c = counts || {};
@@ -94,7 +104,7 @@ export const buildProfileEmbed = ({ handle, displayName, avatarUrl, watchingLine
     color: embedColors.brand,
     title: safeName,
     description: `${EMOJI.nowWatching} **Now Watching**\n> ${nowWatching}`,
-    url: profileUrl(handle),
+    url: profileUrl(handle, campaign),
   }).addFields(
     { name: `${EMOJI.completed} Completed`, value: `\`\`\`\n${c.completed || 0}\n\`\`\``, inline: true },
     { name: `${EMOJI.watching} Watching`, value: `\`\`\`\n${c.watching || 0}\n\`\`\``, inline: true },
@@ -120,14 +130,14 @@ export const buildProfileEmbed = ({ handle, displayName, avatarUrl, watchingLine
   return embed;
 };
 
-export const buildProfileButtons = ({ handle }) =>
+export const buildProfileButtons = ({ handle, campaign = "sharing" }) =>
   new ActionRowBuilder().addComponents(
-    linkButton("View Profile", profileUrl(handle), "🌐"),
-    linkButton("My Lists", listUrl(handle), "📋"),
-    linkButton("Open Hikari", config.hikariWebBaseUrl, "✨"),
+    linkButton("View Profile", profileUrl(handle, campaign), "🌐"),
+    linkButton("My Lists", listUrl(handle, campaign), "📋"),
+    linkButton("Open Hikari", buildHikariUrl("/", campaign), "✨"),
   );
 
-export const buildAnimeEmbed = (media) => {
+export const buildAnimeEmbed = (media, { campaign = "sharing" } = {}) => {
   const title = media?.title?.english || media?.title?.romaji || "Unknown anime";
   const score10 = Number.isFinite(Number(media?.averageScore))
     ? `${EMOJI.star} ${(Number(media.averageScore) / 10).toFixed(1)} / 10`
@@ -145,7 +155,7 @@ export const buildAnimeEmbed = (media) => {
     color: embedColors.info,
     title,
     description: desc,
-    url: animeUrl(media?.id),
+    url: animeUrl(media?.id, campaign),
   }).addFields(
     { name: `${EMOJI.star} Rating`, value: score10, inline: true },
     { name: `${EMOJI.format} Format`, value: String(type), inline: true },
@@ -163,8 +173,11 @@ export const buildAnimeEmbed = (media) => {
   return embed;
 };
 
-export const buildAnimeButtons = (media) =>
-  new ActionRowBuilder().addComponents(linkButton("Open on Hikari", animeUrl(media?.id), "▶️"));
+export const buildAnimeButtons = (media, { campaign = "sharing", includeInvite = false } = {}) => {
+  const buttons = [linkButton("Open on Hikari", animeUrl(media?.id, campaign), "▶️")];
+  if (includeInvite) buttons.push(linkButton("Add Hikari to Server", buildDiscordBotInviteUrl(), "➕"));
+  return new ActionRowBuilder().addComponents(buttons);
+};
 
 const STATUS_EMOJI = {
   Watching: EMOJI.watching,
@@ -176,7 +189,7 @@ const STATUS_EMOJI = {
   Rewatching: EMOJI.rewatching,
 };
 
-export const buildListEmbed = ({ handle, displayName, statusLabel: label, previewItems }) => {
+export const buildListEmbed = ({ handle, displayName, statusLabel: label, previewItems, campaign = "sharing" }) => {
   const safeName = displayName || handle || "User";
   const items = (previewItems || []).slice(0, 10);
   const lines = items.map((item) => {
@@ -190,19 +203,19 @@ export const buildListEmbed = ({ handle, displayName, statusLabel: label, previe
       : item.episodes
         ? `Ep ${item.progress} / ${item.episodes}`
         : `Ep ${item.progress}`;
-    return `${emoji} [**${item.title}**](${animeUrl(item.mediaId)}) — ${meta}`;
+    return `${emoji} [**${item.title}**](${animeUrl(item.mediaId, campaign)}) — ${meta}`;
   });
 
   const embed = buildBaseEmbed({
     color: embedColors.brand,
     title: label ? `${label}` : "List",
     description: lines.length ? lines.join("\n") : "_No entries yet._",
-    url: listUrl(handle),
+    url: listUrl(handle, campaign),
   }).setAuthor({ name: safeName });
   const cover = items.find((item) => item.cover)?.cover;
   if (cover) embed.setThumbnail(cover);
   return embed;
 };
 
-export const buildListButtons = ({ handle }) =>
-  new ActionRowBuilder().addComponents(linkButton("View Full List", listUrl(handle), "📋"));
+export const buildListButtons = ({ handle, campaign = "sharing" }) =>
+  new ActionRowBuilder().addComponents(linkButton("View Full List", listUrl(handle, campaign), "📋"));

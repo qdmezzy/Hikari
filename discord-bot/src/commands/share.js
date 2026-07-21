@@ -4,7 +4,7 @@ import { replyError, respond } from "../lib/interaction.js";
 import { searchAnime, buildTrailerUrl } from "../lib/anilist.js";
 import { getListCounts, getListEntriesByUser, getTopGenres, buildWatchingLine, buildListPreview } from "../services/profiles.js";
 import { resolveTarget } from "../services/targets.js";
-import { config } from "../config.js";
+import { buildHikariUrl } from "../config.js";
 
 const shareCommand = {
   data: new SlashCommandBuilder()
@@ -59,11 +59,11 @@ const shareCommand = {
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
             .setLabel("Add to List")
-            .setURL(`${config.hikariWebBaseUrl}/media/${media.id}`),
+            .setURL(buildHikariUrl(`/media/${media.id}`, "sharing")),
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
             .setLabel("View Details")
-            .setURL(media.siteUrl || `${config.hikariWebBaseUrl}/media/${media.id}`),
+            .setURL(media.siteUrl || buildHikariUrl(`/media/${media.id}`, "sharing")),
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
             .setLabel("Trailer")

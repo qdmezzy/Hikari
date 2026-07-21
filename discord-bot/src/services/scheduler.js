@@ -1,5 +1,5 @@
 import { EmbedBuilder } from "discord.js";
-import { config } from "../config.js";
+import { buildHikariUrl, config } from "../config.js";
 import { getAiringSchedule, mediaTitle } from "../lib/anilist.js";
 import { EMOJI } from "../lib/emojis.js";
 import { getGuildsWithAlerts } from "./guilds.js";
@@ -22,7 +22,7 @@ const buildAiringEmbed = (schedules) => {
   const lines = schedules.slice(0, MAX_LINES).map((entry) => {
     const time = `<t:${entry.airingAt}:t>`;
     const title = mediaTitle(entry.media);
-    const url = `${config.hikariWebBaseUrl}/media/${entry.media.id}`;
+    const url = buildHikariUrl(`/media/${entry.media.id}`, "alerts");
     return `**${time}** · Ep ${entry.episode} — [${title}](${url})`;
   });
 

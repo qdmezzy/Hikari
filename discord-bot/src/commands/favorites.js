@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
-import { config } from "../config.js";
+import { buildHikariUrl } from "../config.js";
 import { buildInfoEmbed } from "../lib/embeds.js";
 import { respond, replyError } from "../lib/interaction.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
@@ -21,7 +21,7 @@ const favoritesCommand = {
         embeds: [
           buildInfoEmbed({
             title: "No favorites yet",
-            description: `Tap the heart on any title to favorite it.\n${config.hikariWebBaseUrl}/search`,
+            description: `Tap the heart on any title to favorite it.\n${buildHikariUrl("/search", "sharing")}`,
           }),
         ],
       });
@@ -34,7 +34,7 @@ const favoritesCommand = {
       .slice(0, 10)
       .map((id) => byId.get(Number(id)))
       .filter(Boolean)
-      .map((item) => `• [${mediaTitle(item)}](${config.hikariWebBaseUrl}/media/${item.id})`)
+      .map((item) => `• [${mediaTitle(item)}](${buildHikariUrl(`/media/${item.id}`, "sharing")})`)
       .join("\n");
 
     const embed = new EmbedBuilder()
@@ -52,7 +52,7 @@ const favoritesCommand = {
       new ButtonBuilder()
         .setStyle(ButtonStyle.Link)
         .setLabel("View on Hikari")
-        .setURL(handle ? `${config.hikariWebBaseUrl}/u/${encodeURIComponent(handle)}` : `${config.hikariWebBaseUrl}/lists`),
+        .setURL(buildHikariUrl(handle ? `/u/${encodeURIComponent(handle)}` : "/lists", "sharing")),
     );
 
     await respond(interaction, { embeds: [embed], components: [row] });

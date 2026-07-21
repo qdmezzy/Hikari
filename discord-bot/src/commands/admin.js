@@ -1,5 +1,5 @@
 import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
-import { config } from "../config.js";
+import { buildHikariUrl } from "../config.js";
 import { replyError, replySuccess } from "../lib/interaction.js";
 import { supabase, isMissingTableError } from "../lib/supabase.js";
 import { setAlertChannel, guildTableMessage } from "../services/guilds.js";
@@ -99,7 +99,7 @@ const announceCommand = {
 
     await replySuccess(
       interaction,
-      `**${title}** is now live on Hikari.\n${config.hikariWebBaseUrl}/community`,
+      `**${title}** is now live on Hikari.\n${buildHikariUrl("/community", "sharing")}`,
       { title: "Announcement Posted" },
     );
   },
@@ -145,4 +145,3 @@ const adminCommand = {
 };
 
 export const adminCommands = [adminCommand];
-

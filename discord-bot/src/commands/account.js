@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
-import { buildHikariLinkUrl, config } from "../config.js";
+import { buildHikariLinkUrl, buildHikariUrl } from "../config.js";
 import {
   buildInfoEmbed,
   buildProfileButtons,
@@ -39,7 +39,7 @@ const buildAccountView = async (user) => {
       { name: `${EMOJI.episodes} Entries`, value: `**${entries.length}**`, inline: true },
     );
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(config.hikariWebBaseUrl),
+      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
       new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link").setURL(url),
       new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("Refresh"),
       new ButtonBuilder().setCustomId(`${accountPrefix}:unlink`).setStyle(ButtonStyle.Danger).setLabel("Unlink"),
