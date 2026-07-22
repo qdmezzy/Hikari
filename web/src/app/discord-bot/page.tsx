@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 
 import { Navigation } from "@/components/layout/Navigation"
+import { Sparkle, StarBurst } from "@/components/common/anime-decorations"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -95,14 +96,14 @@ export default function DiscordBotPage() {
       <main>
         <section className="relative px-4 pb-24 pt-32 md:px-8 md:pb-28 md:pt-40">
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-            <div className="absolute left-[8%] top-24 size-72 rounded-full bg-[#5865F2]/20 blur-3xl md:size-[28rem]" />
-            <div className="absolute right-[4%] top-44 size-72 rounded-full bg-primary/15 blur-3xl md:size-[24rem]" />
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#5865F2]/50 to-transparent" />
+            <div className="absolute left-[8%] top-24 size-72 rounded-full bg-primary/18 blur-3xl md:size-[28rem]" />
+            <div className="absolute right-[4%] top-44 size-72 rounded-full bg-[#5865F2]/15 blur-3xl md:size-[24rem]" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
           </div>
 
           <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="animate-rise text-center lg:text-left">
-              <Badge className="mb-6 border-[#5865F2]/25 bg-[#5865F2]/12 px-4 py-1.5 text-[#a3a9f9] shadow-[0_12px_40px_-24px_rgba(88,101,242,0.9)]">
+              <Badge className="mb-6 border-primary/25 bg-primary/10 px-4 py-1.5 text-primary shadow-[0_12px_40px_-24px_rgba(243,211,107,0.8)]">
                 <DiscordMark className="size-4" />
                 Your anime companion, now in Discord
               </Badge>
@@ -139,36 +140,46 @@ export default function DiscordBotPage() {
             </div>
 
             <div className="animate-slide-in-right [animation-delay:160ms]">
-              <div className="relative mx-auto max-w-xl rounded-[28px] border border-white/10 bg-[#111827]/90 p-3 shadow-[0_32px_90px_-38px_rgba(0,0,0,0.9)] backdrop-blur-xl">
-                <div className="flex items-center gap-2 border-b border-white/8 px-4 py-3 text-xs font-medium text-white/45">
-                  <span className="size-2.5 rounded-full bg-red-400/80" />
-                  <span className="size-2.5 rounded-full bg-amber-300/80" />
-                  <span className="size-2.5 rounded-full bg-emerald-400/80" />
-                  <span className="ml-2"># anime-club</span>
-                </div>
-                <div className="space-y-5 p-4 sm:p-6">
-                  <div className="flex gap-3">
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground"><Bot className="size-5" /></div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2"><span className="font-bold text-white">Hikari</span><span className="rounded bg-[#5865F2] px-1 py-0.5 text-[9px] font-bold text-white">APP</span><span className="text-xs text-white/35">Today at 8:42 PM</span></div>
-                      <div className="mt-2 rounded-xl border-l-4 border-primary bg-[#0b1220] p-4">
-                        <p className="text-sm font-semibold text-primary">✨ Recommendation</p>
-                        <p className="mt-2 text-lg font-bold text-white">Frieren: Beyond Journey&apos;s End</p>
-                        <p className="mt-1 text-sm leading-6 text-white/55">A thoughtful fantasy journey with a strong match for your adventure and drama favorites.</p>
-                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-white/60">
-                          <span className="rounded-lg bg-white/5 px-3 py-2">Match <b className="text-white">94%</b></span>
-                          <span className="rounded-lg bg-white/5 px-3 py-2">Score <b className="text-white">9.0</b></span>
+              <div className="relative mx-auto max-w-xl">
+                <div className="brand-rays pointer-events-none absolute -inset-16 -z-10 opacity-[0.12]" aria-hidden="true" />
+                <StarBurst size={40} className="pointer-events-none absolute -left-6 -top-6 z-20 text-primary animate-spin-slow" />
+                <Sparkle size={24} className="pointer-events-none absolute -right-4 top-10 z-20 !text-primary" />
+                <Sparkle size={16} className="pointer-events-none absolute -left-3 bottom-16 z-20 !text-accent" delay={0.7} />
+
+                <div className="relative rounded-[28px] border border-white/10 bg-[#111827]/90 p-3 shadow-[0_32px_90px_-38px_rgba(0,0,0,0.9)] backdrop-blur-xl">
+                  <div className="flex items-center gap-2 border-b border-white/8 px-4 py-3 text-xs font-medium text-white/45">
+                    <span className="size-2.5 rounded-full bg-red-400/80" />
+                    <span className="size-2.5 rounded-full bg-amber-300/80" />
+                    <span className="size-2.5 rounded-full bg-emerald-400/80" />
+                    <span className="ml-2"># anime-club</span>
+                  </div>
+                  <div className="space-y-5 p-4 sm:p-6">
+                    <div className="flex gap-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-primary-foreground"><Bot className="size-5" /></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2"><span className="font-bold text-white">Hikari</span><span className="rounded bg-[#5865F2] px-1 py-0.5 text-[9px] font-bold text-white">APP</span><span className="text-xs text-white/35">Today at 8:42 PM</span></div>
+                        <div className="mt-2 rounded-xl border-l-4 border-primary bg-[#0b1220] p-4">
+                          <p className="text-lg font-bold text-primary">Frieren: Beyond Journey&apos;s End</p>
+                          <p className="mt-1.5 text-sm text-white/70">⭐ <b className="text-white">9.0</b> · 28 episodes</p>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {["Adventure", "Drama", "Fantasy"].map((genre) => (
+                              <span key={genre} className="rounded bg-white/8 px-2 py-0.5 font-mono text-[11px] text-white/70">{genre}</span>
+                            ))}
+                          </div>
+                          <p className="mt-3 text-sm leading-6 text-white/70">🎯 <b className="text-white">94% match</b> — based on your interest in Adventure, Drama anime.</p>
+                          <p className="mt-1 text-xs text-white/40">Mood: Chill</p>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="rounded-md bg-[#5865F2] px-3 py-1.5 text-xs font-semibold text-white">🎲 Next Pick</span>
+                          <span className="rounded-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">📣 Share</span>
+                          <span className="rounded-md bg-[#248046] px-3 py-1.5 text-xs font-semibold text-white">Add to List</span>
+                          <span className="rounded-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Open on Hikari</span>
                         </div>
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <span className="rounded-md bg-[#5865F2] px-3 py-1.5 text-xs font-semibold text-white">Next Pick</span>
-                        <span className="rounded-md bg-[#248046] px-3 py-1.5 text-xs font-semibold text-white">Add to List</span>
-                        <span className="rounded-md bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80">Open on Hikari</span>
-                      </div>
                     </div>
-                  </div>
-                  <div className="rounded-xl border border-white/8 bg-white/[0.035] px-4 py-3 font-mono text-sm text-white/65">
-                    <span className="text-[#a3a9f9]">/discover recommend</span> mood:<span className="text-primary">chill</span>
+                    <div className="rounded-xl border border-white/8 bg-white/[0.035] px-4 py-3 font-mono text-sm text-white/65">
+                      <span className="text-[#a3a9f9]">/discover recommend</span> mood:<span className="text-primary">chill</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -200,13 +211,14 @@ export default function DiscordBotPage() {
         <section className="px-4 py-24 md:px-8">
           <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-2 lg:items-center">
             <div>
-              <Badge variant="outline" className="border-primary/25 bg-primary/5 text-primary"><PlayCircle className="size-3.5" /> Slash commands</Badge>
+              <p className="font-jp text-xs font-semibold tracking-[0.3em] text-primary/65">コマンドはかんたん</p>
+              <Badge variant="outline" className="mt-3 border-primary/25 bg-primary/5 text-primary"><PlayCircle className="size-3.5" /> Slash commands</Badge>
               <h2 className="mt-5 text-balance text-3xl font-bold sm:text-4xl">Simple commands, useful answers</h2>
               <p className="mt-4 max-w-xl leading-7 text-muted-foreground">Hikari uses Discord&apos;s native command picker, so members can discover options as they type. No prefix to remember and no noisy automatic replies.</p>
               <div className="mt-8 grid gap-3">
                 {commands.map((item) => (
-                  <div key={item.command} className="group flex flex-col gap-2 rounded-2xl border border-border/50 bg-card/40 p-4 transition-colors hover:border-[#5865F2]/35 sm:flex-row sm:items-center sm:justify-between">
-                    <code className="font-mono text-sm font-semibold text-[#a3a9f9]">{item.command}</code>
+                  <div key={item.command} className="group flex flex-col gap-2 rounded-2xl border border-border/50 bg-card/40 p-4 transition-all hover:border-primary/40 hover:bg-card/60 sm:flex-row sm:items-center sm:justify-between">
+                    <code className="font-mono text-sm font-semibold text-primary">{item.command}</code>
                     <span className="text-sm text-muted-foreground sm:text-right">{item.detail}</span>
                   </div>
                 ))}
@@ -238,11 +250,13 @@ export default function DiscordBotPage() {
         </section>
 
         <section id="install" className="scroll-mt-24 px-4 pb-24 md:px-8">
-          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[32px] border border-[#5865F2]/25 bg-gradient-to-br from-[#5865F2]/18 via-card to-primary/10 px-6 py-14 text-center shadow-[0_30px_90px_-45px_rgba(88,101,242,0.8)] sm:px-12 sm:py-16">
-            <div className="absolute -left-20 -top-20 size-56 rounded-full bg-[#5865F2]/20 blur-3xl" aria-hidden="true" />
+          <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[32px] border border-primary/25 bg-gradient-to-br from-primary/12 via-card to-[#5865F2]/12 px-6 py-14 text-center shadow-[0_30px_90px_-45px_rgba(243,211,107,0.5)] sm:px-12 sm:py-16">
+            <div className="absolute -left-20 -top-20 size-56 rounded-full bg-primary/18 blur-3xl" aria-hidden="true" />
+            <div className="absolute -bottom-20 -right-20 size-56 rounded-full bg-[#5865F2]/18 blur-3xl" aria-hidden="true" />
             <div className="relative">
               <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[#5865F2] text-white shadow-lg"><DiscordMark className="size-7" /></div>
-              <h2 className="mt-6 text-balance text-3xl font-black sm:text-5xl">Bring Hikari to your server</h2>
+              <p className="mt-6 font-jp text-xs font-semibold tracking-[0.3em] text-primary/70">サーバーに光を</p>
+              <h2 className="mt-3 text-balance text-3xl font-black sm:text-5xl">Bring <span className="text-gradient">Hikari</span> to your server</h2>
               <p className="mx-auto mt-4 max-w-2xl text-pretty text-lg text-muted-foreground">Give your community a better way to discover, track, and celebrate anime together.</p>
               <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                 <Button asChild size="lg" className="h-14 rounded-2xl bg-[#5865F2] px-8 text-base font-bold text-white hover:bg-[#4752c4]">

@@ -1010,22 +1010,35 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="px-4 py-12">
-          <div className="mx-auto grid max-w-6xl gap-5 md:grid-cols-2">
-            <div className="group relative overflow-hidden rounded-2xl border border-[#5865F2]/25 bg-gradient-to-br from-[#5865F2]/12 to-card p-6 transition-all hover:border-[#5865F2]/40">
-              <div className="flex items-start gap-4">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/15 text-[#5865F2]">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="size-6">
-                    <path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-                  </svg>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-jp text-xs tracking-[0.25em] text-[#5865F2]">コミュニティ</h3>
-                  <p className="mt-0.5 text-lg font-bold text-foreground">Hang out on Discord</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+        <section className="px-4 py-16">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-8 text-center">
+              <p className="font-jp text-xs font-semibold tracking-[0.3em] text-primary/65">いっしょにアニメを</p>
+              <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">Hikari lives on Discord too</h2>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+              <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-7 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-[#5865F2]/45 hover:shadow-xl">
+                <div className="pointer-events-none absolute -right-16 -top-16 size-44 rounded-full bg-[#5865F2]/15 blur-3xl opacity-60 transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true" />
+                <div className="relative">
+                  <div className="flex size-12 items-center justify-center rounded-2xl bg-[#5865F2]/15 text-[#7983f5] transition-transform duration-300 group-hover:scale-110">
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="size-6">
+                      <path d="M20.317 4.37a19.79 19.79 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
+                    </svg>
+                  </div>
+                  <h3 className="mt-5 font-jp text-xs tracking-[0.25em] text-[#7983f5]">コミュニティ</h3>
+                  <p className="mt-1 text-xl font-black tracking-tight text-foreground">Hang out on Discord</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
                     Get release alerts, talk anime, and help shape Hikari with other fans.
                   </p>
-                  <Button asChild className="mt-4 gap-2 bg-[#5865F2] text-white hover:bg-[#4752c4]">
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {["Release alerts", "Anime talk", "Sneak peeks"].map((chip) => (
+                      <span key={chip} className="rounded-full border border-border/50 bg-card/60 px-3 py-1 text-xs text-foreground/70">
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                  <Button asChild className="mt-6 gap-2 bg-[#5865F2] text-white shadow-lg shadow-[#5865F2]/25 hover:bg-[#4752c4]">
                     <Link href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"} target="_blank" rel="noreferrer">
                       Join the server
                       <ExternalLink className="size-4" />
@@ -1033,22 +1046,28 @@ export default function HomePage() {
                   </Button>
                 </div>
               </div>
-            </div>
 
-            <div className="group relative overflow-hidden rounded-2xl border border-[#5865F2]/25 bg-gradient-to-br from-[#5865F2]/12 via-primary/5 to-card p-6 transition-all hover:border-[#5865F2]/45">
-              <div className="flex items-start gap-4">
-                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#5865F2]/15 text-[#8b92f7]">
-                  <Bot className="size-6" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-jp text-xs tracking-[0.25em] text-[#8b92f7]">ディスコードボット</h3>
-                  <p className="mt-0.5 text-lg font-bold text-foreground">Hikari for Discord</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Get anime recommendations, airing alerts, tracking, and server stats directly in Discord.
+              <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card/50 p-7 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/45 hover:shadow-xl">
+                <div className="pointer-events-none absolute -right-16 -top-16 size-44 rounded-full bg-primary/15 blur-3xl opacity-60 transition-opacity duration-300 group-hover:opacity-100" aria-hidden="true" />
+                <div className="relative">
+                  <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/12 text-primary transition-transform duration-300 group-hover:scale-110">
+                    <Bot className="size-6" />
+                  </div>
+                  <h3 className="mt-5 font-jp text-xs tracking-[0.25em] text-primary/80">ディスコードボット</h3>
+                  <p className="mt-1 text-xl font-black tracking-tight text-foreground">Hikari for Discord</p>
+                  <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                    Recommendations, airing alerts, episode tracking, and server stats — right inside your server.
                   </p>
-                  <Button asChild className="mt-4 gap-2 bg-[#5865F2] text-white hover:bg-[#4752c4]">
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {["/discover", "/list next", "/stats server"].map((chip) => (
+                      <span key={chip} className="rounded-full border border-primary/20 bg-primary/8 px-3 py-1 font-mono text-xs text-primary/90">
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                  <Button asChild className="mt-6 gap-2 bg-gradient-to-r from-primary to-accent font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:opacity-90">
                     <Link href="/discord-bot">
-                      Add to Discord
+                      Meet the bot
                       <ChevronRight className="size-4" />
                     </Link>
                   </Button>
