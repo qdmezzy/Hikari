@@ -51,7 +51,28 @@ export const EMOJI = {
   sparkle: "✨",
   calendar: "📅",
   brand: "🌸",
+  heart: "❤️",
+  party: "🎉",
+  dice: "🎲",
+  megaphone: "📣",
+  clipboard: "📋",
+  plus: "➕",
+  chat: "💬",
+  back: "⬅️",
+  globe: "🌐",
+
+  // Help categories
+  crystal: "🔮",
+  share: "📤",
+  chart: "📈",
+  tools: "🛠️",
 }
+
+// Unicode-only snapshot taken before the custom-emoji upgrade runs.
+// Discord cannot render custom emojis in embed titles, authors, or footers —
+// use UNICODE there, and EMOJI everywhere else (descriptions, fields,
+// Components V2 text, buttons).
+export const UNICODE = Object.freeze({ ...EMOJI })
 
 // Small helper so callers can do emoji("completed") with a safe fallback.
 export const emoji = (key) => EMOJI[key] || ""

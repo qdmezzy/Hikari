@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
 import { buildAnimeEmbed, buildListView, buildProfileButtons, buildProfileEmbed } from "../lib/embeds.js";
+import { EMOJI } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { searchAnime, buildTrailerUrl } from "../lib/anilist.js";
 import { getListCounts, getListEntriesByUser, getTopGenres, buildWatchingLine, buildListPreview } from "../services/profiles.js";
@@ -58,14 +59,17 @@ const shareCommand = {
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
+            .setEmoji(EMOJI.plus)
             .setLabel("Add to List")
             .setURL(buildHikariUrl(`/media/${media.id}`, "sharing")),
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
+            .setEmoji(EMOJI.info)
             .setLabel("View Details")
             .setURL(media.siteUrl || buildHikariUrl(`/media/${media.id}`, "sharing")),
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
+            .setEmoji(EMOJI.nowWatching)
             .setLabel("Trailer")
             .setURL(trailerUrl || media.siteUrl || "https://anilist.co"),
         );

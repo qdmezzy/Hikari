@@ -1,7 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
 import { embedColors } from "../lib/embeds.js";
-import { EMOJI } from "../lib/emojis.js";
+import { EMOJI, UNICODE } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { supabase } from "../lib/supabase.js";
 import { countLinkedAccounts, getAllLinks, getLinkByDiscordId } from "../services/links.js";
@@ -87,7 +87,7 @@ const leaderboardCommand = {
 
         const embed = new EmbedBuilder()
           .setColor(embedColors.brand)
-          .setTitle(`${EMOJI.trophy} Episode Leaderboard`)
+          .setTitle(`${UNICODE.trophy} Episode Leaderboard`)
           .setDescription(
             [
               `-# ${period === "monthly" ? "This Month" : "This Week"}`,
@@ -147,7 +147,7 @@ const leaderboardCommand = {
 
         const embed = new EmbedBuilder()
           .setColor(embedColors.brand)
-          .setTitle(`${EMOJI.fire} Streak Leaderboard`)
+          .setTitle(`${UNICODE.fire} Streak Leaderboard`)
           .setDescription(
             ["-# All Time", "", top.length ? top.join("\n") : "No active streaks right now."].join("\n"),
           )
@@ -227,7 +227,7 @@ const serverStatsCommand = {
 
       const embed = new EmbedBuilder()
         .setColor(embedColors.brand)
-        .setTitle(`${EMOJI.library} Server Stats`)
+        .setTitle(`${UNICODE.library} Server Stats`)
         .setDescription("-# Server-wide anime tracking, past 7 days")
         .addFields(
           { name: "Members", value: statTile(Number(interaction.guild?.memberCount || 0).toLocaleString()), inline: true },

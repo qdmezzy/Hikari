@@ -26,7 +26,7 @@ const ABOUT =
 const categories = [
   {
     key: "account",
-    emoji: "👤",
+    emojiKey: "user",
     label: "Account",
     description: "Link, unlink & view profiles",
     body: [
@@ -38,7 +38,7 @@ const categories = [
   },
   {
     key: "tracking",
-    emoji: "📊",
+    emojiKey: "library",
     label: "Tracking",
     description: "Manage your watch list",
     body: [
@@ -53,7 +53,7 @@ const categories = [
   },
   {
     key: "discover",
-    emoji: "🔮",
+    emojiKey: "crystal",
     label: "Discover",
     description: "Find your next anime",
     body: [
@@ -64,7 +64,7 @@ const categories = [
   },
   {
     key: "share",
-    emoji: "📤",
+    emojiKey: "share",
     label: "Share",
     description: "Post embeds to a channel",
     body: [
@@ -75,14 +75,14 @@ const categories = [
   },
   {
     key: "stats",
-    emoji: "📈",
+    emojiKey: "chart",
     label: "Stats",
     description: "Leaderboards & analytics",
     body: ["`/stats episodes [weekly|monthly]`", "`/stats streak`", "`/stats server`"],
   },
   {
     key: "server",
-    emoji: "🛠️",
+    emojiKey: "tools",
     label: "Server (Admin)",
     description: "Bot configuration",
     body: [
@@ -113,7 +113,9 @@ const buildHomePayload = (ownerId) => {
     container.addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(`**${cat.emoji} ${cat.label}**\n-# ${cat.description}`),
+          // EMOJI is resolved per render, not at import — the custom-emoji
+          // upgrade on boot happens after this module loads.
+          new TextDisplayBuilder().setContent(`**${EMOJI[cat.emojiKey]} ${cat.label}**\n-# ${cat.description}`),
         )
         .setButtonAccessory(
           new ButtonBuilder()
@@ -127,9 +129,9 @@ const buildHomePayload = (ownerId) => {
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
   container.addActionRowComponents(
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("➕").setLabel("Add to Server").setURL(buildDiscordBotInviteUrl()),
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("💬").setLabel("Support").setURL(getDiscordSupportUrl()),
+      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.sparkle).setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
+      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.plus).setLabel("Add to Server").setURL(buildDiscordBotInviteUrl()),
+      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.chat).setLabel("Support").setURL(getDiscordSupportUrl()),
     ),
   );
   container.addTextDisplayComponents(
@@ -143,7 +145,7 @@ const buildCategoryPayload = (ownerId, username, category) => {
   const container = new ContainerBuilder().setAccentColor(embedColors.brand);
 
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${category.emoji} ${category.label}\n-# ${category.description}`),
+    new TextDisplayBuilder().setContent(`## ${EMOJI[category.emojiKey]} ${category.label}\n-# ${category.description}`),
   );
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(category.body.join("\n")));
@@ -152,12 +154,12 @@ const buildCategoryPayload = (ownerId, username, category) => {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(`${helpCustomIdPrefix}:back:${ownerId}`)
-        .setEmoji("⬅️")
+        .setEmoji(EMOJI.back)
         .setLabel("Back")
         .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
         .setStyle(ButtonStyle.Link)
-        .setEmoji("🔗")
+        .setEmoji(EMOJI.link)
         .setLabel("Link Account")
         .setURL(buildHikariLinkUrl(ownerId, username)),
     ),

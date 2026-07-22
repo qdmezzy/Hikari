@@ -161,9 +161,9 @@ export const buildProfileEmbed = ({
 
 export const buildProfileButtons = ({ handle, campaign = "sharing" }) =>
   new ActionRowBuilder().addComponents(
-    linkButton("View Profile", profileUrl(handle, campaign), "🌐"),
-    linkButton("My Lists", listUrl(handle, campaign), "📋"),
-    linkButton("Open Hikari", buildHikariUrl("/", campaign), "✨"),
+    linkButton("View Profile", profileUrl(handle, campaign), EMOJI.globe),
+    linkButton("My Lists", listUrl(handle, campaign), EMOJI.clipboard),
+    linkButton("Open Hikari", buildHikariUrl("/", campaign), EMOJI.sparkle),
   );
 
 export const buildAnimeEmbed = (media, { campaign = "sharing" } = {}) => {
@@ -209,8 +209,8 @@ export const buildAnimeEmbed = (media, { campaign = "sharing" } = {}) => {
 };
 
 export const buildAnimeButtons = (media, { campaign = "sharing", includeInvite = false } = {}) => {
-  const buttons = [linkButton("Open on Hikari", animeUrl(media?.id, campaign), "▶️")];
-  if (includeInvite) buttons.push(linkButton("Add Hikari to Server", buildDiscordBotInviteUrl(), "➕"));
+  const buttons = [linkButton("Open on Hikari", animeUrl(media?.id, campaign), EMOJI.watching)];
+  if (includeInvite) buttons.push(linkButton("Add Hikari to Server", buildDiscordBotInviteUrl(), EMOJI.plus));
   return new ActionRowBuilder().addComponents(buttons);
 };
 
@@ -255,8 +255,10 @@ const listItemText = (item, campaign) => {
   } else if (isCompleted) {
     meta = `${progressBar(1)}  ${total || seen} / ${total || seen} · Completed`;
   } else if (total > 0) {
-    const pct = Math.max(0, Math.min(1, seen / total));
-    meta = `${progressBar(pct)}  Ep ${seen} / ${total} · ${Math.round(pct * 100)}%`;
+    // Clamp: split-cour data can leave progress past the listed total.
+    const shown = Math.min(seen, total);
+    const pct = Math.max(0, Math.min(1, shown / total));
+    meta = `${progressBar(pct)}  Ep ${shown} / ${total} · ${Math.round(pct * 100)}%`;
   } else {
     meta = `Ep ${seen}`;
   }
@@ -293,7 +295,9 @@ export const buildListView = ({
     container.addTextDisplayComponents(new TextDisplayBuilder().setContent("_No entries yet._"));
   }
 
-  items.forEach((item, index) => {
+  // No separators between rows — sections space themselves and the extra gaps
+  // made long lists feel even longer.
+  for (const item of items) {
     const text = new TextDisplayBuilder().setContent(listItemText(item, campaign));
     if (item.cover) {
       container.addSectionComponents(
@@ -304,17 +308,12 @@ export const buildListView = ({
     } else {
       container.addTextDisplayComponents(text);
     }
-    if (index < items.length - 1) {
-      container.addSeparatorComponents(
-        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false),
-      );
-    }
-  });
+  }
 
   if (handle) {
     container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
     container.addActionRowComponents(
-      new ActionRowBuilder().addComponents(linkButton("View Full List", listUrl(handle, campaign), "📋")),
+      new ActionRowBuilder().addComponents(linkButton("View Full List", listUrl(handle, campaign), EMOJI.clipboard)),
     );
   }
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# 光 Hikari"));

@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { buildAnimeButtons, buildAnimeEmbed, buildInfoEmbed, embedColors, progressBar } from "../lib/embeds.js";
-import { EMOJI } from "../lib/emojis.js";
+import { EMOJI, UNICODE } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { getRecommendationPool, mediaTitle, searchAnime, buildTrailerUrl, getAnimeByIds } from "../lib/anilist.js";
 import { getListEntriesByUser, getTopGenres } from "../services/profiles.js";
@@ -51,19 +51,21 @@ const recommendationButtons = (media, trailerUrl, { mood, tagsCsv } = {}) =>
     new ButtonBuilder()
       .setCustomId(`${discoverPrefix}:rec:${enc(mood)}:${enc(tagsCsv)}`)
       .setLabel("Next Pick")
-      .setEmoji("🎲")
+      .setEmoji(EMOJI.dice)
       .setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId(`${discoverPrefix}:share:${Number(media.id)}`)
       .setLabel("Share")
-      .setEmoji("📣")
+      .setEmoji(EMOJI.megaphone)
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
       .setCustomId(`${discoverPrefix}:add:${Number(media.id)}`)
       .setLabel("Add to List")
+      .setEmoji(EMOJI.plus)
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setStyle(ButtonStyle.Link)
+      .setEmoji(EMOJI.sparkle)
       .setLabel("Open on Hikari")
       .setURL(buildHikariUrl(`/discover?focus=${Number(media.id)}`, "recommendations")),
   );
@@ -177,26 +179,29 @@ const runRandom = async (interaction, tag) => {
 
       const pick = pool[Math.floor(Math.random() * pool.length)];
       const embed = buildAnimeEmbed(pick, { campaign: "recommendations" }).setAuthor({
-        name: tag ? `🎲 Random pick · ${tag}` : "🎲 Random pick",
+        // Author text can't render custom emojis — unicode only here.
+        name: tag ? `${UNICODE.dice} Random pick · ${tag}` : `${UNICODE.dice} Random pick`,
       });
       const trailerUrl = buildTrailerUrl(pick);
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId(`${discoverPrefix}:rand:${enc(tag)}`)
           .setLabel("Another Random")
-          .setEmoji("🎲")
+          .setEmoji(EMOJI.dice)
           .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
           .setCustomId(`${discoverPrefix}:share:${Number(pick.id)}`)
           .setLabel("Share")
-          .setEmoji("📣")
+          .setEmoji(EMOJI.megaphone)
           .setStyle(ButtonStyle.Secondary),
         new ButtonBuilder()
           .setCustomId(`${discoverPrefix}:add:${Number(pick.id)}`)
           .setLabel("Add to List")
+          .setEmoji(EMOJI.plus)
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setStyle(ButtonStyle.Link)
+          .setEmoji(EMOJI.sparkle)
           .setLabel("Open on Hikari")
           .setURL(buildHikariUrl(`/discover?focus=${Number(pick.id)}`, "recommendations")),
       );
@@ -241,7 +246,7 @@ const compareCommand = {
           new ButtonBuilder()
             .setStyle(ButtonStyle.Link)
             .setLabel("Create a Hikari Account")
-            .setEmoji("✨")
+            .setEmoji(EMOJI.sparkle)
             .setURL(buildHikariUrl("/register", "sharing")),
         );
         await respond(interaction, { embeds: [embed], components: [row] });
@@ -277,7 +282,7 @@ const compareCommand = {
 
       const embed = new EmbedBuilder()
         .setColor(embedColors.brand)
-        .setTitle(`${EMOJI.sparkle} Taste Comparison`)
+        .setTitle(`${UNICODE.sparkle} Taste Comparison`)
         .setDescription(
           [
             `**${selfName}** vs **${otherName}**`,

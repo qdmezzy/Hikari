@@ -1,10 +1,39 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  MessageFlags,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  SlashCommandBuilder,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
+} from "discord.js";
 import { buildHikariUrl } from "../config.js";
 import { buildInfoEmbed, embedColors } from "../lib/embeds.js";
+import { EMOJI } from "../lib/emojis.js";
 import { respond, replyError } from "../lib/interaction.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
 import { getLinkByDiscordId } from "../services/links.js";
 import { getFavoriteMediaIds } from "../services/profiles.js";
+
+const MAX_ROWS = 6;
+
+// One favorite row: linked title + a small meta line, cover pinned right.
+const favoriteRowText = (item) => {
+  const score = Number.isFinite(Number(item?.averageScore)) ? (Number(item.averageScore) / 10).toFixed(1) : null;
+  const meta = [
+    score ? `${EMOJI.star} ${score}` : null,
+    item?.format ? String(item.format).replace(/_/g, " ") : null,
+    item?.startDate?.year || null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const title = `**[${mediaTitle(item)}](${buildHikariUrl(`/media/${item.id}`, "sharing")})**`;
+  return meta ? `${title}\n-# ${meta}` : title;
+};
 
 const favoritesCommand = {
   data: new SlashCommandBuilder().setName("favorites").setDescription("Show the anime you've favorited on Hikari."),
@@ -28,34 +57,53 @@ const favoritesCommand = {
       return;
     }
 
-    const media = await getAnimeByIds(ids.slice(0, 10));
+    const media = await getAnimeByIds(ids.slice(0, MAX_ROWS));
     const byId = new Map(media.map((item) => [Number(item.id), item]));
-    const lines = ids
-      .slice(0, 10)
+    const items = ids
+      .slice(0, MAX_ROWS)
       .map((id) => byId.get(Number(id)))
-      .filter(Boolean)
-      .map((item) => `• [${mediaTitle(item)}](${buildHikariUrl(`/media/${item.id}`, "sharing")})`)
-      .join("\n");
-
-    const embed = new EmbedBuilder()
-      .setColor(embedColors.brand)
-      .setTitle(`❤️ ${link.hikari_username || "Your"} favorites`)
-      .setDescription(lines || "Couldn't load your favorites right now.")
-      .setFooter({ text: ids.length > 10 ? `光 Hikari • Showing 10 of ${ids.length}` : "光 Hikari" })
-      .setTimestamp();
-
-    const cover = media.find((item) => item?.coverImage?.large)?.coverImage?.large;
-    if (cover) embed.setThumbnail(cover);
-
+      .filter(Boolean);
+    const username = link.hikari_username || "Your";
     const handle = link.hikari_username ? String(link.hikari_username).replace(/^@/, "") : "";
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setStyle(ButtonStyle.Link)
-        .setLabel("View on Hikari")
-        .setURL(buildHikariUrl(handle ? `/u/${encodeURIComponent(handle)}` : "/lists", "sharing")),
-    );
 
-    await respond(interaction, { embeds: [embed], components: [row] });
+    const container = new ContainerBuilder().setAccentColor(embedColors.brand);
+    container.addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        [
+          `### ${EMOJI.heart}  ${username} — Favorites`,
+          ids.length > items.length ? `-# Showing ${items.length} of ${ids.length}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      ),
+    );
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+    for (const item of items) {
+      const text = new TextDisplayBuilder().setContent(favoriteRowText(item));
+      const cover = item?.coverImage?.large || item?.coverImage?.medium || null;
+      if (cover) {
+        container.addSectionComponents(
+          new SectionBuilder().addTextDisplayComponents(text).setThumbnailAccessory(new ThumbnailBuilder().setURL(cover)),
+        );
+      } else {
+        container.addTextDisplayComponents(text);
+      }
+    }
+
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setStyle(ButtonStyle.Link)
+          .setEmoji(EMOJI.globe)
+          .setLabel("View on Hikari")
+          .setURL(buildHikariUrl(handle ? `/u/${encodeURIComponent(handle)}` : "/lists", "sharing")),
+      ),
+    );
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# 光 Hikari"));
+
+    await respond(interaction, { components: [container], flags: MessageFlags.IsComponentsV2 });
   },
 };
 

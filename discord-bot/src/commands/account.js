@@ -58,8 +58,8 @@ const buildAccountView = async (user, discordClient) => {
     container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
     container.addActionRowComponents(
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link").setURL(url),
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.sparkle).setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.link).setLabel("Re-link").setURL(url),
         new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("Refresh"),
         new ButtonBuilder().setCustomId(`${accountPrefix}:unlink`).setStyle(ButtonStyle.Danger).setLabel("Unlink"),
       ),
@@ -74,7 +74,7 @@ const buildAccountView = async (user, discordClient) => {
     description: "Tap the button below to securely link your account — no passwords are entered in Discord.",
     rows: [
       new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Link Hikari").setURL(url),
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.link).setLabel("Link Hikari").setURL(url),
         new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("I linked it — refresh"),
       ),
     ],
@@ -117,7 +117,7 @@ export const handleAccountComponent = async (interaction) => {
             "Your Discord has been disconnected from Hikari.\n-# Your anime data is still safe on the website.",
           rows: [
             new ActionRowBuilder().addComponents(
-              new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link Account").setURL(relinkUrl),
+              new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.link).setLabel("Re-link Account").setURL(relinkUrl),
             ),
           ],
         }),
