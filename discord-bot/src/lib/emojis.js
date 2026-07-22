@@ -77,27 +77,52 @@ export const UNICODE = Object.freeze({ ...EMOJI })
 // Small helper so callers can do emoji("completed") with a safe fallback.
 export const emoji = (key) => EMOJI[key] || ""
 
+// Common server-emoji names (normalized: lowercased, underscores stripped)
+// mapped onto EMOJI keys, so existing packs like :first_place: or
+// :crystalball_gif: apply without renaming any uploads.
+const EMOJI_ALIASES = {
+  firstplace: "gold",
+  secondplace: "silver",
+  thirdplace: "bronze",
+  crystalball: "crystal",
+  crystalballgif: "crystal",
+  clock: "time",
+  cog: "tools",
+  pixelaccept: "check",
+  greenyes: "check",
+  redno: "cross",
+  discord: "chat",
+  polls: "clipboard",
+};
+
 // Auto-upgrade to custom emojis on boot: upload emojis to the bot's app
 // (Developer Portal -> Emojis) or any server the bot is in, named after the
-// keys above ("star", "completed", ...) or prefixed ("hikari_star",
-// "hikari_now_watching"). Matching keys get swapped in automatically -
-// no code changes needed.
+// keys above ("star", "completed", ...), prefixed ("hikari_star"), or matching
+// an alias. Matching keys get swapped in automatically - no code changes
+// needed. An exact key name always beats an alias.
 export const resolveCustomEmojis = async (client) => {
   try {
-    const applied = [];
     const appEmojis = await client.application?.emojis?.fetch?.().catch(() => null);
     const pools = [...(appEmojis?.values?.() || []), ...client.emojis.cache.values()];
     const keyByNorm = Object.fromEntries(Object.keys(EMOJI).map((key) => [key.toLowerCase(), key]));
+
+    const best = {};
     for (const emoji of pools) {
       const norm = String(emoji.name || "")
         .toLowerCase()
         .replace(/^hikari_/, "")
         .replace(/_/g, "");
-      const key = keyByNorm[norm];
-      if (key) {
-        EMOJI[key] = emoji.toString();
-        applied.push(emoji.name);
-      }
+      const direct = keyByNorm[norm];
+      const key = direct || EMOJI_ALIASES[norm];
+      if (!key) continue;
+      const priority = direct ? 2 : 1;
+      if (!best[key] || priority >= best[key].priority) best[key] = { priority, emoji };
+    }
+
+    const applied = [];
+    for (const [key, { emoji }] of Object.entries(best)) {
+      EMOJI[key] = emoji.toString();
+      applied.push(`:${emoji.name}:→${key}`);
     }
     if (applied.length) {
       console.log(`[hikari-bot] Using ${applied.length} custom emoji(s): ${applied.join(", ")}`);

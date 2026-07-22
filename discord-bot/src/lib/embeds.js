@@ -12,7 +12,7 @@ import {
   ThumbnailBuilder,
 } from "discord.js";
 import { buildDiscordBotInviteUrl, buildHikariUrl, config } from "../config.js";
-import { EMOJI } from "./emojis.js";
+import { EMOJI, UNICODE } from "./emojis.js";
 
 // Brand palette tuned to the Hikari web app (navy base, banana accent).
 // One gold accent for everything informational; green/amber/red are reserved
@@ -85,14 +85,15 @@ const linkButton = (label, url, emoji) => {
 export const buildInfoEmbed = ({ title, description, url } = {}) =>
   buildBaseEmbed({ color: embedColors.info, title, description, url });
 
+// UNICODE, not EMOJI: embed titles can't render custom emojis.
 export const buildSuccessEmbed = ({ title, description, url } = {}) =>
-  buildBaseEmbed({ color: embedColors.success, title: title ? `${EMOJI.check}  ${title}` : title, description, url });
+  buildBaseEmbed({ color: embedColors.success, title: title ? `${UNICODE.check}  ${title}` : title, description, url });
 
 export const buildWarningEmbed = ({ title, description, url } = {}) =>
-  buildBaseEmbed({ color: embedColors.warning, title: title ? `${EMOJI.warning}  ${title}` : title, description, url });
+  buildBaseEmbed({ color: embedColors.warning, title: title ? `${UNICODE.warning}  ${title}` : title, description, url });
 
 export const buildErrorEmbed = ({ title = "Request Failed", description } = {}) =>
-  buildBaseEmbed({ color: embedColors.error, title: `${EMOJI.cross}  ${title}`, description });
+  buildBaseEmbed({ color: embedColors.error, title: `${UNICODE.cross}  ${title}`, description });
 
 export const profileUrl = (handle, campaign = "sharing") =>
   buildHikariUrl(handle ? `/u/${encodeURIComponent(handle)}` : "/", campaign);

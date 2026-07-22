@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 import { buildHikariUrl, config } from "../config.js";
 import { getAiringSchedule, mediaTitle } from "../lib/anilist.js";
-import { EMOJI } from "../lib/emojis.js";
+import { UNICODE } from "../lib/emojis.js";
 import { getGuildsWithAlerts } from "./guilds.js";
 import { getAllLinks } from "./links.js";
 import { supabase } from "../lib/supabase.js";
@@ -28,7 +28,8 @@ const buildAiringEmbed = (schedules) => {
 
   return new EmbedBuilder()
     .setColor(0xf3d36b)
-    .setTitle(`${EMOJI.calendar} Airing in the next 24 hours`)
+    // UNICODE, not EMOJI: embed titles can't render custom emojis.
+    .setTitle(`${UNICODE.calendar} Airing in the next 24 hours`)
     .setDescription(lines.join("\n") || "Nothing scheduled right now.")
     .setFooter({ text: `Track everything on Hikari · ${config.hikariWebBaseUrl}` })
     .setTimestamp();

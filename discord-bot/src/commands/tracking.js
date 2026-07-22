@@ -112,10 +112,11 @@ const buildRatingRows = (mediaId) => {
 const buildCompletionPayload = ({ media, entry }) => {
   const embed = new EmbedBuilder()
     .setColor(embedColors.brand)
-    .setTitle(`Completed! ${UNICODE.party}`)
+    .setTitle("Completed!")
     .setDescription(
       [
-        `**${mediaTitle(media)}** — all ${Number(media?.episodes || entry?.progress || 0) || ""} episodes done.`.replace("  ", " "),
+        // EMOJI.party lives here, not the title — descriptions render custom emojis.
+        `${EMOJI.party} **${mediaTitle(media)}** — all ${Number(media?.episodes || entry?.progress || 0) || ""} episodes done.`.replace("  ", " "),
         "",
         "How was it? **Rate it below** (ノ◕ヮ◕)ノ*:・゚✧",
       ].join("\n"),
