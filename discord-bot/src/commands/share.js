@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
-import { buildAnimeEmbed, buildListButtons, buildListEmbed, buildProfileButtons, buildProfileEmbed } from "../lib/embeds.js";
+import { buildAnimeEmbed, buildListView, buildProfileButtons, buildProfileEmbed } from "../lib/embeds.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { searchAnime, buildTrailerUrl } from "../lib/anilist.js";
 import { getListCounts, getListEntriesByUser, getTopGenres, buildWatchingLine, buildListPreview } from "../services/profiles.js";
@@ -118,12 +118,15 @@ const shareCommand = {
       if (sub === "list") {
         const status = interaction.options.getString("status", true);
         const entries = await getListEntriesByUser(hikariUserId, { statuses: [status], limit: 50 });
-        const preview = await buildListPreview(entries, 10);
+        const preview = await buildListPreview(entries, 8);
         const statusLabel =
           status === "plan_to_watch" ? "Planned" : status.charAt(0).toUpperCase() + status.slice(1).replace("_", " ");
-        const embed = buildListEmbed({ handle, displayName, statusLabel, previewItems: preview });
-        const row = buildListButtons({ handle });
-        await respond(interaction, { embeds: [embed], components: [row] });
+        const statsLine =
+          entries.length > preview.length ? `Showing ${preview.length} of ${entries.length} titles` : null;
+        await respond(
+          interaction,
+          buildListView({ handle, displayName, statusLabel, previewItems: preview, statsLine }),
+        );
       }
     } catch (error) {
       await replyError(interaction, error?.message || "Failed to share content.");

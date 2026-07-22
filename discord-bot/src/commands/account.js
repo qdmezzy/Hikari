@@ -1,12 +1,18 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, SlashCommandBuilder } from "discord.js";
-import { buildHikariLinkUrl, buildHikariUrl } from "../config.js";
 import {
-  buildInfoEmbed,
-  buildProfileButtons,
-  buildProfileEmbed,
-  buildSuccessEmbed,
-  buildWarningEmbed,
-} from "../lib/embeds.js";
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  MessageFlags,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  SlashCommandBuilder,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
+} from "discord.js";
+import { buildHikariLinkUrl, buildHikariUrl } from "../config.js";
+import { buildNoticeView, buildProfileButtons, buildProfileEmbed, embedColors } from "../lib/embeds.js";
 import { EMOJI } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { getLinkByDiscordId, removeLinkByDiscordId, safeLinkTableMessage } from "../services/links.js";
@@ -33,31 +39,46 @@ const buildAccountView = async (user, discordClient) => {
   if (existing?.hikari_user_id) {
     await syncFoundingRoleForDiscordUser(discordClient, user.id).catch(() => null);
     const entries = await getListEntriesByUser(existing.hikari_user_id, { limit: 500 }).catch(() => []);
-    const embed = buildSuccessEmbed({
-      title: "Account linked",
-      description: "Your Discord is connected to Hikari - track anime right from here.",
-    }).addFields(
-      { name: "👤 Username", value: existing.hikari_username || "Linked user", inline: true },
-      { name: `${EMOJI.episodes} Entries`, value: `**${entries.length}**`, inline: true },
+
+    // Profile-card style: avatar pinned right, buttons inside the container.
+    const container = new ContainerBuilder().setAccentColor(embedColors.success);
+    container.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            [
+              `## ${EMOJI.check} Account linked`,
+              `${EMOJI.user} **@${existing.hikari_username || "linked user"}**  ·  ${EMOJI.episodes} **${entries.length}** entries`,
+              "-# Your Discord is connected to Hikari — track anime right from here.",
+            ].join("\n"),
+          ),
+        )
+        .setThumbnailAccessory(new ThumbnailBuilder().setURL(user.displayAvatarURL({ size: 128 }))),
     );
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link").setURL(url),
-      new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("Refresh"),
-      new ButtonBuilder().setCustomId(`${accountPrefix}:unlink`).setStyle(ButtonStyle.Danger).setLabel("Unlink"),
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("✨").setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link").setURL(url),
+        new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("Refresh"),
+        new ButtonBuilder().setCustomId(`${accountPrefix}:unlink`).setStyle(ButtonStyle.Danger).setLabel("Unlink"),
+      ),
     );
-    return { embeds: [embed], components: [row] };
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# 光 Hikari"));
+    return { components: [container], flags: MessageFlags.IsComponentsV2 };
   }
 
-  const embed = buildInfoEmbed({
-    title: "Connect Discord to Hikari",
-    description: "Tap the button below to securely link your account - no passwords are entered in Discord.",
+  return buildNoticeView({
+    color: embedColors.brand,
+    title: `${EMOJI.link} Connect Discord to Hikari`,
+    description: "Tap the button below to securely link your account — no passwords are entered in Discord.",
+    rows: [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Link Hikari").setURL(url),
+        new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("I linked it — refresh"),
+      ),
+    ],
   });
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Link Hikari").setURL(url),
-    new ButtonBuilder().setCustomId(`${accountPrefix}:refresh`).setStyle(ButtonStyle.Secondary).setLabel("I linked it — refresh"),
-  );
-  return { embeds: [embed], components: [row] };
 };
 
 const accountCommand = {
@@ -87,16 +108,31 @@ export const handleAccountComponent = async (interaction) => {
         return true;
       }
       const relinkUrl = buildHikariLinkUrl(interaction.user.id, interaction.user.username);
-      const embed = buildWarningEmbed({
-        title: "Account unlinked",
-        description: "Your Discord has been disconnected from Hikari.\nYour anime data is still safe on the website.",
-      });
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link Account").setURL(relinkUrl),
+      await respond(
+        interaction,
+        buildNoticeView({
+          color: embedColors.warning,
+          title: `${EMOJI.warning} Account unlinked`,
+          description:
+            "Your Discord has been disconnected from Hikari.\n-# Your anime data is still safe on the website.",
+          rows: [
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji("🔗").setLabel("Re-link Account").setURL(relinkUrl),
+            ),
+          ],
+        }),
       );
-      await respond(interaction, { embeds: [embed], components: [row] });
     } catch (error) {
-      await replyError(interaction, safeLinkTableMessage(error));
+      // The panel lives in Components V2, so the error notice must too — a
+      // classic error embed can't be edited onto this message.
+      await respond(
+        interaction,
+        buildNoticeView({
+          color: embedColors.error,
+          title: `${EMOJI.cross} Request failed`,
+          description: safeLinkTableMessage(error),
+        }),
+      );
     }
     return true;
   }

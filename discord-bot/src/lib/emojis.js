@@ -30,6 +30,10 @@ export const EMOJI = {
   star: "⭐",
   fire: "🔥",
   trophy: "🏆",
+  target: "🎯",
+  gold: "🥇",
+  silver: "🥈",
+  bronze: "🥉",
 
   // Anime card
   format: "📺",
@@ -38,6 +42,7 @@ export const EMOJI = {
   studio: "🎨",
 
   // UI / misc
+  user: "👤",
   link: "🔗",
   check: "✅",
   cross: "🚫",

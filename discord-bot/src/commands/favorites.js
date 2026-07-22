@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { buildHikariUrl } from "../config.js";
-import { buildInfoEmbed } from "../lib/embeds.js";
+import { buildInfoEmbed, embedColors } from "../lib/embeds.js";
 import { respond, replyError } from "../lib/interaction.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
 import { getLinkByDiscordId } from "../services/links.js";
@@ -38,10 +38,10 @@ const favoritesCommand = {
       .join("\n");
 
     const embed = new EmbedBuilder()
-      .setColor(0xe23b6d)
-      .setTitle(`${link.hikari_username || "Your"} favorites ❤️`)
+      .setColor(embedColors.brand)
+      .setTitle(`❤️ ${link.hikari_username || "Your"} favorites`)
       .setDescription(lines || "Couldn't load your favorites right now.")
-      .setFooter({ text: ids.length > 10 ? `Showing 10 of ${ids.length}` : "Hikari" })
+      .setFooter({ text: ids.length > 10 ? `光 Hikari • Showing 10 of ${ids.length}` : "光 Hikari" })
       .setTimestamp();
 
     const cover = media.find((item) => item?.coverImage?.large)?.coverImage?.large;

@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { config } from "../config.js";
 import { getAnimeByIds, mediaTitle, searchAnime } from "../lib/anilist.js";
-import { listUrl } from "../lib/embeds.js";
+import { buildListView, embedColors, progressBar } from "../lib/embeds.js";
 import { normalizeStatusForDisplay, normalizeStatusInput, statusChoices } from "../lib/status.js";
 import { supabase } from "../lib/supabase.js";
 import { getLinkByDiscordId } from "../services/links.js";
@@ -79,13 +79,6 @@ const findAnimeForCommand = async (queryText) => {
   return media;
 };
 
-const progressBar = (value, total, width = 14) => {
-  if (!Number.isFinite(total) || total <= 0) return "No episode total available";
-  const pct = Math.max(0, Math.min(1, Number(value || 0) / total));
-  const filled = Math.round(pct * width);
-  return `${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))} ${Math.round(pct * 100)}%`;
-};
-
 const buildProgressActionRow = (mediaId) =>
   new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -115,7 +108,7 @@ const buildRatingRows = (mediaId) => {
 
 const buildCompletionPayload = ({ media, entry }) => {
   const embed = new EmbedBuilder()
-    .setColor(0xf3d36b)
+    .setColor(embedColors.brand)
     .setTitle("Completed! 🎉")
     .setDescription(
       [
@@ -137,24 +130,21 @@ const buildProgressEmbed = ({ media, progress, status }) => {
   const pct = totalEpisodes > 0 ? Math.round((value / totalEpisodes) * 100) : null;
   const cover = media?.coverImage?.medium || media?.coverImage?.large || null;
 
+  const metaBits = [normalizeStatusForDisplay(status)];
+  if (remaining !== null) metaBits.push(remaining === 0 ? "All caught up" : `${remaining} episode${remaining === 1 ? "" : "s"} left`);
+
   const embed = new EmbedBuilder()
-    .setColor(0x22c55e)
+    .setColor(embedColors.success)
     .setTitle("Progress Updated")
     .setDescription(
       [
         `**${mediaTitle(media)}**`,
-        totalEpisodes > 0 ? `Episode ${value} / ${totalEpisodes}` : `Episode ${value}`,
+        totalEpisodes > 0
+          ? `${progressBar(value / totalEpisodes, 12)}  **${value} / ${totalEpisodes}** · ${pct}%`
+          : `Episode **${value}**`,
+        "",
+        `-# ${metaBits.join(" · ")}`,
       ].join("\n"),
-    )
-    .addFields(
-      { name: "STATUS", value: normalizeStatusForDisplay(status), inline: true },
-      { name: "COMPLETE", value: pct === null ? "Unknown" : `${pct}%`, inline: true },
-      { name: "Progress", value: progressBar(value, totalEpisodes), inline: false },
-      {
-        name: "REMAINING",
-        value: remaining === null ? "Unknown" : `${remaining} episode(s) left`,
-        inline: true,
-      },
     )
     .setFooter({ text: "光 Hikari" })
     .setTimestamp();
@@ -227,7 +217,7 @@ const runUndo = async (interaction) => {
   }
 
   const undoEmbed = new EmbedBuilder()
-    .setColor(0x22c55e)
+    .setColor(embedColors.success)
     .setTitle("Action Undone")
     .setDescription("Your last tracking change has been reverted.")
     .addFields(
@@ -267,41 +257,18 @@ const handleShow = async (interaction) => {
       statuses: ["watching", "rewatching"],
       limit: 200,
     });
-    const preview = await buildListPreview(entries, 5);
-    const lines = preview.map((item, index) => `${index + 1}. ${item.title} - Ep ${item.progress}`);
+    const preview = await buildListPreview(entries, 6);
     const weekCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const episodesThisWeek = (entries || [])
       .filter((entry) => new Date(entry.updated_at || 0).getTime() >= weekCutoff)
       .reduce((sum, entry) => sum + Number(entry.progress || 0), 0);
-    const displayHandle = handle ? `@${handle}` : "User";
     const displayName = profile?.display_name || handle || "Hikari User";
-    const avatarUrl = profile?.avatar_url || null;
+    const statsLine = `${entries.length} show${entries.length === 1 ? "" : "s"} · ${episodesThisWeek} eps this week`;
 
-    const embed = new EmbedBuilder()
-      .setColor(0x3b82f6)
-      .setTitle("Currently Watching")
-      .setDescription(
-        [`${displayHandle}`, lines.length ? lines.join("\n") : "No active watching entries."].join("\n\n"),
-      )
-      .addFields(
-        { name: "TOTAL SHOWS", value: String(entries.length), inline: true },
-        { name: "EPISODES THIS WEEK", value: String(episodesThisWeek), inline: true },
-      )
-      .setFooter({ text: "光 Hikari" })
-      .setTimestamp();
-    if (avatarUrl) {
-      embed.setAuthor({ name: displayName, iconURL: avatarUrl });
-    }
-    const components = [];
-    if (handle) {
-      components.push(
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("View Full List").setURL(listUrl(handle)),
-        ),
-      );
-    }
-
-    await respond(interaction, { embeds: [embed], components });
+    await respond(
+      interaction,
+      buildListView({ handle, displayName, statusLabel: "Watching", previewItems: preview, statsLine }),
+    );
   } catch (error) {
     await replyError(interaction, error?.message || "Failed to load watching list.");
   }
@@ -378,12 +345,13 @@ const handleStatus = async (interaction) => {
     }
 
     const statusEmbed = new EmbedBuilder()
-      .setColor(0x22c55e)
+      .setColor(embedColors.success)
       .setTitle("Status Updated")
-      .setDescription(`**${mediaTitle(media)}** has been marked as **${normalizeStatusForDisplay(stateInput)}**.`)
-      .addFields(
-        { name: "Previous", value: normalizeStatusForDisplay(before?.status || "plan_to_watch"), inline: true },
-        { name: "New Status", value: normalizeStatusForDisplay(stateInput), inline: true },
+      .setDescription(
+        [
+          `**${mediaTitle(media)}**`,
+          `-# ${normalizeStatusForDisplay(before?.status || "plan_to_watch")} → **${normalizeStatusForDisplay(stateInput)}**`,
+        ].join("\n"),
       )
       .setFooter({ text: "光 Hikari" })
       .setTimestamp();
@@ -518,13 +486,15 @@ const handleRemove = async (interaction) => {
       row: before,
     });
     const removedEmbed = new EmbedBuilder()
-      .setColor(0xf59e0b)
+      .setColor(embedColors.warning)
       .setTitle("Anime Removed")
-      .setDescription(`**${mediaTitle(media)}** has been removed from your list.`)
-      .addFields(
-        { name: "EPISODES WATCHED", value: String(before.progress || 0), inline: true },
-        { name: "PREVIOUS STATUS", value: normalizeStatusForDisplay(before.status), inline: true },
-        { name: "Changed your mind?", value: "Tap **Undo** below to restore this entry.", inline: false },
+      .setDescription(
+        [
+          `**${mediaTitle(media)}** has been removed from your list.`,
+          `-# ${normalizeStatusForDisplay(before.status)} · Ep ${Number(before.progress || 0)}`,
+          "",
+          "Changed your mind? Tap **Undo** below to restore it.",
+        ].join("\n"),
       )
       .setFooter({ text: "光 Hikari" })
       .setTimestamp();
@@ -691,7 +661,7 @@ export const handleTrackingComponent = async (interaction) => {
       const mediaList = await getAnimeByIds([mediaId]);
       const media = mediaList?.[0] || null;
       const ratedEmbed = new EmbedBuilder()
-        .setColor(0xf3d36b)
+        .setColor(embedColors.brand)
         .setTitle(`Rated ${score}/10 ${"★".repeat(Math.round(score / 2))}`)
         .setDescription(`**${media ? mediaTitle(media) : `#${mediaId}`}** — saved to your Hikari list.`)
         .setFooter({ text: "光 Hikari" })

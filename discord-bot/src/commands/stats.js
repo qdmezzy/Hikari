@@ -1,5 +1,7 @@
 import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
+import { embedColors } from "../lib/embeds.js";
+import { EMOJI } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { supabase } from "../lib/supabase.js";
 import { countLinkedAccounts, getAllLinks, getLinkByDiscordId } from "../services/links.js";
@@ -17,7 +19,10 @@ const startOfTodayIso = () => {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 };
 
-const rankLine = (index, username, value, suffix) => `${index + 1}. @${username || "unknown"} - ${value} ${suffix}`;
+const rankBadge = (index) => [EMOJI.gold, EMOJI.silver, EMOJI.bronze][index] || `**#${index + 1}**`;
+
+const rankLine = (index, username, value, suffix) =>
+  `${rankBadge(index)} @${username || "unknown"} — **${value}** ${suffix}`;
 
 const leaderboardCommand = {
   data: new SlashCommandBuilder()
@@ -81,14 +86,17 @@ const leaderboardCommand = {
         }
 
         const embed = new EmbedBuilder()
-          .setColor(0xf59e0b)
-          .setTitle("Episode Leaderboard")
-          .setDescription(topLines.length ? topLines.join("\n") : "No episode activity in this period.")
-          .addFields(
-            { name: "Period", value: period === "monthly" ? "This Month" : "This Week", inline: true },
-            { name: "Your Position", value: selfLine, inline: false },
+          .setColor(embedColors.brand)
+          .setTitle(`${EMOJI.trophy} Episode Leaderboard`)
+          .setDescription(
+            [
+              `-# ${period === "monthly" ? "This Month" : "This Week"}`,
+              "",
+              topLines.length ? topLines.join("\n") : "No episode activity in this period.",
+            ].join("\n"),
           )
-          .setFooter({ text: "光 Hikari • Updated just now" })
+          .addFields({ name: "Your Position", value: selfLine, inline: false })
+          .setFooter({ text: "光 Hikari" })
           .setTimestamp();
 
         await respond(interaction, { embeds: [embed] });
@@ -138,11 +146,12 @@ const leaderboardCommand = {
           .map(([userId, streak], idx) => rankLine(idx, usernameByUserId.get(userId), streak, "day(s)"));
 
         const embed = new EmbedBuilder()
-          .setColor(0xf59e0b)
-          .setTitle("Streak Leaderboard")
-          .setDescription(top.length ? top.join("\n") : "No active streaks right now.")
-          .addFields({ name: "Period", value: "All Time", inline: true })
-          .setFooter({ text: "光 Hikari • Updated just now" })
+          .setColor(embedColors.brand)
+          .setTitle(`${EMOJI.fire} Streak Leaderboard`)
+          .setDescription(
+            ["-# All Time", "", top.length ? top.join("\n") : "No active streaks right now."].join("\n"),
+          )
+          .setFooter({ text: "光 Hikari" })
           .setTimestamp();
         await respond(interaction, { embeds: [embed] });
       }
@@ -200,7 +209,7 @@ const serverStatsCommand = {
       const topUserEntry = Object.entries(scoreByUser).sort((a, b) => b[1] - a[1])[0] || null;
       const usernameByUserId = new Map(links.map((row) => [String(row.hikari_user_id), row.hikari_username || "unknown"]));
       const topUserText = topUserEntry
-        ? `@${usernameByUserId.get(topUserEntry[0]) || "unknown"} with ${topUserEntry[1]} episodes`
+        ? `@${usernameByUserId.get(topUserEntry[0]) || "unknown"} — **${topUserEntry[1]}** eps this week`
         : "No weekly activity";
 
       const topAnimeIds = Object.entries(countByMedia)
@@ -209,22 +218,35 @@ const serverStatsCommand = {
         .map(([id]) => Number(id));
       const topAnimeMedia = topAnimeIds.length ? await getAnimeByIds(topAnimeIds) : [];
       const mediaById = new Map(topAnimeMedia.map((m) => [Number(m.id), m]));
-      const topAnimeLines = topAnimeIds.map((id, index) => `${index + 1}. ${mediaTitle(mediaById.get(id))}`).join("\n");
+      const topAnimeLines = topAnimeIds
+        .map((id, index) => `${rankBadge(index)} ${mediaTitle(mediaById.get(id))}`)
+        .join("\n");
+
+      // Big numbers in code blocks read as stat tiles — same style as /profile.
+      const statTile = (value) => `\`\`\`\n${value}\n\`\`\``;
 
       const embed = new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setTitle("Anime Club Server Stats")
-        .setDescription("Server-wide anime tracking statistics")
+        .setColor(embedColors.brand)
+        .setTitle(`${EMOJI.library} Server Stats`)
+        .setDescription("-# Server-wide anime tracking, past 7 days")
         .addFields(
-          { name: "Total Members", value: String(interaction.guild?.memberCount || "N/A"), inline: true },
-          { name: "Linked Users", value: String(linkedCount), inline: true },
-          { name: "Active Today", value: String(activeTodayUsers.size), inline: true },
-          { name: "Episodes This Week", value: String(episodesThisWeek), inline: true },
-          { name: "Top Anime", value: topAnimeLines || "No weekly anime data", inline: false },
-          { name: "Most Active", value: topUserText, inline: false },
+          { name: "Members", value: statTile(Number(interaction.guild?.memberCount || 0).toLocaleString()), inline: true },
+          { name: "Linked", value: statTile(Number(linkedCount).toLocaleString()), inline: true },
+          { name: "Active Today", value: statTile(activeTodayUsers.size.toLocaleString()), inline: true },
+          {
+            name: `${EMOJI.episodes} Episodes This Week`,
+            value: `**${episodesThisWeek.toLocaleString()}**`,
+            inline: false,
+          },
+          { name: `${EMOJI.fire} Top Anime`, value: topAnimeLines || "No weekly anime data", inline: false },
+          { name: `${EMOJI.trophy} Most Active`, value: topUserText, inline: false },
         )
-        .setFooter({ text: "光 Hikari • Updated just now" })
+        .setFooter({ text: "光 Hikari" })
         .setTimestamp();
+      const guildIcon = interaction.guild?.iconURL?.({ size: 128 });
+      if (interaction.guild?.name) {
+        embed.setAuthor({ name: interaction.guild.name, iconURL: guildIcon || undefined });
+      }
       await respond(interaction, { embeds: [embed] });
     } catch (error) {
       await replyError(interaction, error?.message || "Failed to load server stats.");

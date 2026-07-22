@@ -1,15 +1,36 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
+import {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  EmbedBuilder,
+  MessageFlags,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
+} from "discord.js";
 import { buildDiscordBotInviteUrl, buildHikariUrl, config } from "../config.js";
 import { EMOJI } from "./emojis.js";
 
-// Brand palette tuned to the Hikari web app (navy base, banana/cream accent).
+// Brand palette tuned to the Hikari web app (navy base, banana accent).
+// One gold accent for everything informational; green/amber/red are reserved
+// for success/warning/error so color always carries meaning.
 export const embedColors = {
   brand: 0xf3d36b,
-  info: 0xfaf0c7,
+  info: 0xf3d36b,
   success: 0x22c55e,
   warning: 0xf59e0b,
   error: 0xef4444,
-  discovery: 0xf0c14b,
+  discovery: 0xf3d36b,
+};
+
+// ▰▰▰▰▱▱▱▱▱▱ — takes a 0..1 ratio.
+export const progressBar = (ratio, width = 10) => {
+  const pct = Math.max(0, Math.min(1, Number(ratio) || 0));
+  const filled = Math.round(pct * width);
+  return "▰".repeat(filled) + "▱".repeat(width - filled);
 };
 
 const FOOTER = "光 Hikari";
@@ -24,6 +45,14 @@ const cleanText = (value, max = 200) => {
   if (plain.length <= max) return plain;
   return `${plain.slice(0, max - 1).trimEnd()}…`;
 };
+
+// "TV_SHORT" → "TV Short", "MOVIE" → "Movie"; keeps all-caps initialisms.
+const formatLabel = (raw) =>
+  String(raw || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => (/^(TV|OVA|ONA)$/i.test(part) ? part.toUpperCase() : part.charAt(0) + part.slice(1).toLowerCase()))
+    .join(" ");
 
 const statusLabel = (raw) => {
   const key = String(raw || "").toLowerCase();
@@ -139,36 +168,42 @@ export const buildProfileButtons = ({ handle, campaign = "sharing" }) =>
 
 export const buildAnimeEmbed = (media, { campaign = "sharing" } = {}) => {
   const title = media?.title?.english || media?.title?.romaji || "Unknown anime";
-  const score10 = Number.isFinite(Number(media?.averageScore))
-    ? `${EMOJI.star} ${(Number(media.averageScore) / 10).toFixed(1)} / 10`
-    : "Not rated";
-  const episodes = media?.episodes ?? "?";
-  const type = media?.format ? String(media.format).replace(/_/g, " ") : "Anime";
-  const year = media?.startDate?.year || "—";
-  const status = statusLabel(media?.status || "unknown");
+  const score10 = Number.isFinite(Number(media?.averageScore)) ? (Number(media.averageScore) / 10).toFixed(1) : null;
+  const episodes = Number(media?.episodes || 0);
   const genres = (media?.genres || []).slice(0, 4);
   const studios = (media?.studios?.nodes || []).map((node) => node?.name).filter(Boolean);
   const desc = cleanText(media?.description || "No synopsis available yet.", 240);
-  const cover = media?.coverImage?.large || media?.coverImage?.medium || null;
+
+  // One compact meta strip — the hero card below already repeats the basics,
+  // so the embed only adds what the card doesn't show.
+  const meta = [
+    score10 ? `${EMOJI.star} **${score10}**` : null,
+    media?.format ? formatLabel(media.format) : null,
+    episodes ? `${episodes} ep${episodes === 1 ? "" : "s"}` : null,
+    media?.startDate?.year || null,
+    media?.status ? statusLabel(media.status) : null,
+  ]
+    .filter(Boolean)
+    .join("  ·  ");
+
+  const lines = [meta, "", desc];
+  if (genres.length || studios.length) lines.push("");
+  if (genres.length) lines.push(genres.map((genre) => `\`${genre}\``).join(" "));
+  if (studios.length) lines.push(`-# ${EMOJI.studio} ${studios.slice(0, 2).join(", ")}`);
 
   const embed = buildBaseEmbed({
-    color: embedColors.info,
+    color: embedColors.brand,
     title,
-    description: desc,
+    description: lines.join("\n"),
     url: animeUrl(media?.id, campaign),
-  }).addFields(
-    { name: `${EMOJI.star} Rating`, value: score10, inline: true },
-    { name: `${EMOJI.format} Format`, value: String(type), inline: true },
-    { name: `${EMOJI.episodes} Episodes`, value: String(episodes), inline: true },
-    { name: `${EMOJI.year} Year`, value: String(year), inline: true },
-    { name: `${EMOJI.status} Status`, value: status, inline: true },
-  );
+  });
 
-  if (genres.length) embed.addFields({ name: `${EMOJI.genres} Genres`, value: genres.join("  •  "), inline: false });
-  if (studios.length) embed.addFields({ name: `${EMOJI.studio} Studio`, value: studios.slice(0, 3).join(", "), inline: true });
-  if (cover) embed.setThumbnail(cover);
   // The site renders a branded share card per title — use it as the hero image.
+  // No thumbnail: the card already shows the cover art.
   if (media?.id) embed.setImage(`${config.hikariWebBaseUrl}/media/${media.id}/opengraph-image`);
+  else if (media?.coverImage?.large || media?.coverImage?.medium) {
+    embed.setThumbnail(media.coverImage.large || media.coverImage.medium);
+  }
 
   return embed;
 };
@@ -189,33 +224,100 @@ const STATUS_EMOJI = {
   Rewatching: EMOJI.rewatching,
 };
 
-export const buildListEmbed = ({ handle, displayName, statusLabel: label, previewItems, campaign = "sharing" }) => {
-  const safeName = displayName || handle || "User";
-  const items = (previewItems || []).slice(0, 10);
-  const lines = items.map((item) => {
-    const emoji = STATUS_EMOJI[item.status] || "•";
-    // Planned titles haven't been started — show the show's length, not "Ep 0".
-    const isPlanned = /plan/i.test(String(item.status));
-    const meta = isPlanned
-      ? item.episodes
-        ? `${item.episodes} eps`
-        : "Not started"
-      : item.episodes
-        ? `Ep ${item.progress} / ${item.episodes}`
-        : `Ep ${item.progress}`;
-    return `${emoji} [**${item.title}**](${animeUrl(item.mediaId, campaign)}) — ${meta}`;
-  });
-
-  const embed = buildBaseEmbed({
-    color: embedColors.brand,
-    title: label ? `${label}` : "List",
-    description: lines.length ? lines.join("\n") : "_No entries yet._",
-    url: listUrl(handle, campaign),
-  }).setAuthor({ name: safeName });
-  const cover = items.find((item) => item.cover)?.cover;
-  if (cover) embed.setThumbnail(cover);
-  return embed;
+// Small Components V2 notice card: heading + body + optional button rows.
+// Used where a panel already lives in Components V2 and can't edit back to
+// classic embeds (the IsComponentsV2 flag is permanent on a message).
+export const buildNoticeView = ({ color = embedColors.brand, title, description, rows = [] }) => {
+  const container = new ContainerBuilder().setAccentColor(color);
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent([title ? `## ${title}` : null, description].filter(Boolean).join("\n")),
+  );
+  if (rows.length) {
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    for (const row of rows) container.addActionRowComponents(row);
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# 光 Hikari"));
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
 };
 
-export const buildListButtons = ({ handle, campaign = "sharing" }) =>
-  new ActionRowBuilder().addComponents(linkButton("View Full List", listUrl(handle, campaign), "📋"));
+// One list row: linked title plus a progress line rendered as small subtext.
+const listItemText = (item, campaign) => {
+  const title = `**[${item.title}](${animeUrl(item.mediaId, campaign)})**`;
+  const isPlanned = /plan/i.test(String(item.status));
+  const isCompleted = /complet/i.test(String(item.status));
+  const total = Number(item.episodes || 0);
+  const seen = Number(item.progress || 0);
+
+  let meta;
+  if (isPlanned) {
+    // Planned titles haven't been started — show the show's length, not "Ep 0".
+    meta = total ? `${progressBar(0)}  ${total} eps · Not started` : "Not started";
+  } else if (isCompleted) {
+    meta = `${progressBar(1)}  ${total || seen} / ${total || seen} · Completed`;
+  } else if (total > 0) {
+    const pct = Math.max(0, Math.min(1, seen / total));
+    meta = `${progressBar(pct)}  Ep ${seen} / ${total} · ${Math.round(pct * 100)}%`;
+  } else {
+    meta = `Ep ${seen}`;
+  }
+  return `${title}\n-# ${meta}`;
+};
+
+// Components V2 list card: each anime gets its own row with cover art.
+// Returns a full reply payload (components + flags), not an embed.
+export const buildListView = ({
+  handle,
+  displayName,
+  statusLabel: label,
+  previewItems,
+  statsLine,
+  campaign = "sharing",
+}) => {
+  const safeName = displayName || handle || "User";
+  // Component budget: 8 items × (section + text + thumbnail) + chrome stays
+  // under Discord's 40-component message cap.
+  const items = (previewItems || []).slice(0, 8);
+  const headerEmoji = STATUS_EMOJI[label] || EMOJI.library;
+
+  const container = new ContainerBuilder().setAccentColor(embedColors.brand);
+  container.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(
+      [`### ${headerEmoji}  ${safeName} — ${label || "List"}`, statsLine ? `-# ${statsLine}` : null]
+        .filter(Boolean)
+        .join("\n"),
+    ),
+  );
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+
+  if (!items.length) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent("_No entries yet._"));
+  }
+
+  items.forEach((item, index) => {
+    const text = new TextDisplayBuilder().setContent(listItemText(item, campaign));
+    if (item.cover) {
+      container.addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(text)
+          .setThumbnailAccessory(new ThumbnailBuilder().setURL(item.cover)),
+      );
+    } else {
+      container.addTextDisplayComponents(text);
+    }
+    if (index < items.length - 1) {
+      container.addSeparatorComponents(
+        new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(false),
+      );
+    }
+  });
+
+  if (handle) {
+    container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+    container.addActionRowComponents(
+      new ActionRowBuilder().addComponents(linkButton("View Full List", listUrl(handle, campaign), "📋")),
+    );
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# 光 Hikari"));
+
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+};

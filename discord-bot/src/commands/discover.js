@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, SlashCommandBuilder } from "discord.js";
-import { buildAnimeButtons, buildAnimeEmbed, buildInfoEmbed } from "../lib/embeds.js";
+import { buildAnimeButtons, buildAnimeEmbed, buildInfoEmbed, embedColors, progressBar } from "../lib/embeds.js";
+import { EMOJI } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { getRecommendationPool, mediaTitle, searchAnime, buildTrailerUrl, getAnimeByIds } from "../lib/anilist.js";
 import { getListEntriesByUser, getTopGenres } from "../services/profiles.js";
@@ -41,19 +42,6 @@ const parseTags = (value) =>
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
-
-const cleanText = (value, max = 180) => {
-  const text = String(value || "").replace(/\s+/g, " ").trim();
-  if (!text) return "";
-  if (text.length <= max) return text;
-  return `${text.slice(0, max - 3)}...`;
-};
-
-const progressBar = (pct, width = 20) => {
-  const value = Math.max(0, Math.min(100, Number(pct || 0)));
-  const filled = Math.round((value / 100) * width);
-  return `${"█".repeat(filled)}${"░".repeat(Math.max(0, width - filled))}`;
-};
 
 const discoverPrefix = "hikari_discover";
 const enc = (value) => encodeURIComponent(String(value || "")).slice(0, 55);
@@ -140,19 +128,19 @@ const runRecommend = async (interaction, mood, tagsCsv) => {
           : "Based on popular picks that fit your activity.";
 
       const embed = new EmbedBuilder()
-        .setColor(0xeb459e)
-        .setTitle("Recommendation")
+        .setColor(embedColors.brand)
+        .setTitle(mediaTitle(pick))
+        .setURL(buildHikariUrl(`/media/${Number(pick.id)}`, "recommendations"))
         .setDescription(
           [
-            `**${mediaTitle(pick)}**`,
-            `Score ${score10} • ${episodes} episodes`,
-            genresLine.length ? genresLine.map((genre) => `\`${genre}\``).join(" ") : "`General`",
-          ].join("\n"),
-        )
-        .addFields(
-          { name: "Mood", value: moodLabel(mood), inline: true },
-          { name: "Match", value: `${match}% Match`, inline: true },
-          { name: "Why this pick", value: reason, inline: false },
+            `${EMOJI.star} **${score10}**  ·  ${episodes} episodes`,
+            genresLine.length ? genresLine.map((genre) => `\`${genre}\``).join(" ") : null,
+            "",
+            `${EMOJI.target} **${match}% match** — ${reason}`,
+            `-# Mood: ${moodLabel(mood)}`,
+          ]
+            .filter((line) => line !== null)
+            .join("\n"),
         )
         .setFooter({ text: "光 Hikari" });
 
@@ -188,11 +176,9 @@ const runRandom = async (interaction, tag) => {
       }
 
       const pick = pool[Math.floor(Math.random() * pool.length)];
-      const embed = buildAnimeEmbed(pick, { campaign: "recommendations" }).setDescription(
-        tag
-          ? `${cleanText(pick?.description, 140)}\n\nTag: **${tag}**`
-          : cleanText(pick?.description, 160) || "Random recommendation.",
-      );
+      const embed = buildAnimeEmbed(pick, { campaign: "recommendations" }).setAuthor({
+        name: tag ? `🎲 Random pick · ${tag}` : "🎲 Random pick",
+      });
       const trailerUrl = buildTrailerUrl(pick);
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -290,18 +276,18 @@ const compareCommand = {
       const topGenre = overlap[0] || (otherTopGenres[0] || "Action");
 
       const embed = new EmbedBuilder()
-        .setColor(0x3b82f6)
-        .setTitle("Taste Comparison")
+        .setColor(embedColors.brand)
+        .setTitle(`${EMOJI.sparkle} Taste Comparison`)
         .setDescription(
           [
             `**${selfName}** vs **${otherName}**`,
-            `Compatibility ${compatibility}%`,
-            `\`${progressBar(compatibility)}\``,
+            "",
+            `${progressBar(compatibility / 100, 12)}  **${compatibility}%** compatible`,
           ].join("\n"),
         )
         .addFields(
-          { name: "Shared", value: String(sharedIds.length), inline: true },
-          { name: "Avg vs", value: `${avgSelf.toFixed(1)} vs ${avgOther.toFixed(1)}`, inline: true },
+          { name: "Shared Titles", value: `**${sharedIds.length}**`, inline: true },
+          { name: "Avg Rating", value: `${avgSelf.toFixed(1)} vs ${avgOther.toFixed(1)}`, inline: true },
           { name: "Top Genre", value: topGenre, inline: true },
         )
         .setFooter({ text: "光 Hikari" });
