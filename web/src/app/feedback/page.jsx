@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 
+const discordCommunityUrl = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"
+
 const CATEGORIES = [
   {
     id: "bug",
@@ -205,7 +207,12 @@ export default function FeedbackPage() {
         <p className="relative mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
           <MessageSquarePlus className="size-3.5" />
           You can also reach us in the{" "}
-          <Link href="/discord/link" className="text-primary hover:underline">
+          <Link
+            href={discordCommunityUrl}
+            target={discordCommunityUrl.startsWith("http") ? "_blank" : undefined}
+            rel={discordCommunityUrl.startsWith("http") ? "noreferrer" : undefined}
+            className="text-primary hover:underline"
+          >
             Hikari Discord
           </Link>
           .

@@ -842,12 +842,13 @@ function WrappedLoader() {
 export default function WrappedPage() {
   const { user, loading } = useAuth()
   const isMod = user?.app_metadata?.is_mod === true || user?.app_metadata?.isMod === true
+  const previewEnabled = process.env.NEXT_PUBLIC_ENABLE_WRAPPED === "true"
 
   useEffect(() => {
-    if (!loading && !isMod && typeof window !== "undefined") {
+    if (!loading && (!previewEnabled || !isMod) && typeof window !== "undefined") {
       window.location.replace("/profile")
     }
-  }, [loading, isMod])
+  }, [loading, isMod, previewEnabled])
 
   if (loading) {
     return (
@@ -856,7 +857,7 @@ export default function WrappedPage() {
       </div>
     )
   }
-  if (!isMod) return null
+  if (!previewEnabled || !isMod) return null
 
   return (
     <RequireAuth>

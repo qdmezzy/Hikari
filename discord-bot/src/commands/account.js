@@ -13,6 +13,7 @@ import { getLinkByDiscordId, removeLinkByDiscordId, safeLinkTableMessage } from 
 import { buildWatchingLine, getListCounts, getListEntriesByUser, getTopGenres } from "../services/profiles.js";
 import { resolveTarget } from "../services/targets.js";
 import { buildHelpHome } from "../ui/helpMenu.js";
+import { syncFoundingRoleForDiscordUser } from "../services/foundingRole.js";
 
 const helpCommand = {
   data: new SlashCommandBuilder().setName("help").setDescription("Open the clickable Hikari help menu."),
@@ -25,11 +26,12 @@ const accountPrefix = "hikari_account";
 
 // One /account command: shows your link state with the right action buttons
 // instead of separate /link + /unlink commands.
-const buildAccountView = async (user) => {
+const buildAccountView = async (user, discordClient) => {
   const url = buildHikariLinkUrl(user.id, user.username);
   const existing = await getLinkByDiscordId(user.id).catch(() => null);
 
   if (existing?.hikari_user_id) {
+    await syncFoundingRoleForDiscordUser(discordClient, user.id).catch(() => null);
     const entries = await getListEntriesByUser(existing.hikari_user_id, { limit: 500 }).catch(() => []);
     const embed = buildSuccessEmbed({
       title: "Account linked",
@@ -61,7 +63,7 @@ const buildAccountView = async (user) => {
 const accountCommand = {
   data: new SlashCommandBuilder().setName("account").setDescription("Your Hikari link status - link or unlink."),
   async execute(interaction) {
-    await respond(interaction, await buildAccountView(interaction.user));
+    await respond(interaction, await buildAccountView(interaction.user, interaction.client));
   },
 };
 
@@ -74,14 +76,14 @@ export const handleAccountComponent = async (interaction) => {
     await interaction.deferUpdate();
   }
   if (action === "refresh") {
-    await respond(interaction, await buildAccountView(interaction.user));
+    await respond(interaction, await buildAccountView(interaction.user, interaction.client));
     return true;
   }
   if (action === "unlink") {
     try {
       const removed = await removeLinkByDiscordId(interaction.user.id);
       if (!removed) {
-        await respond(interaction, await buildAccountView(interaction.user));
+        await respond(interaction, await buildAccountView(interaction.user, interaction.client));
         return true;
       }
       const relinkUrl = buildHikariLinkUrl(interaction.user.id, interaction.user.username);

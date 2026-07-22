@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils"
 import { needsAuthOnboarding, getUserHandle } from "@/lib/auth-onboarding"
 import { checkHandleAvailability, normalizeHandle, upsertPublicProfile } from "@/lib/public-profile"
 import { importFromAniListUsername, importFromMal } from "@/lib/import-service"
+import { getSafeNextPath } from "@/lib/safe-navigation.mjs"
 
 const VIBES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Romance",
@@ -39,13 +40,11 @@ const GOALS = [
   { id: "browse", label: "Just browsing", desc: "Keep it light and simple", icon: Coffee, route: "/" },
 ]
 
-const resolveNext = (raw) => (raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/")
-
 export default function OnboardingPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const nextPath = useMemo(() => resolveNext(searchParams?.get("next")), [searchParams])
+  const nextPath = useMemo(() => getSafeNextPath(searchParams?.get("next")), [searchParams])
 
   const needsAccount = useMemo(() => needsAuthOnboarding(user), [user])
   const steps = useMemo(
@@ -197,7 +196,8 @@ export default function OnboardingPage() {
 
   const connectMal = async () => {
     await persistGenres(genres) // preserve selection across the OAuth round-trip
-    window.location.href = "/api/mal/authorize?returnTo=/onboarding"
+    const returnTo = `/onboarding?next=${encodeURIComponent(nextPath)}`
+    window.location.href = `/api/mal/authorize?returnTo=${encodeURIComponent(returnTo)}`
   }
 
   /* ---- finish ---- */
@@ -216,7 +216,7 @@ export default function OnboardingPage() {
       /* proceed regardless */
     }
     const goalRoute = GOALS.find((g) => g.id === goal)?.route || "/"
-    router.replace(imported ? "/lists" : goalRoute)
+    router.replace(nextPath !== "/" ? nextPath : imported ? "/lists" : goalRoute)
   }
 
   return (

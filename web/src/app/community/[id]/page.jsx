@@ -39,6 +39,7 @@ import { parseVideoUrl } from "@/lib/video-utils"
 import { awardXp, XP_ACTIONS } from "@/lib/xp"
 import { addNotification } from "@/lib/notifications-store"
 import { reportContent } from "@/lib/reporting"
+import { FoundingName } from "@/components/founding/FoundingName"
 
 const formatRelativeTime = (value) => {
   if (!value) return ""
@@ -131,10 +132,10 @@ function CommunityThreadPostCard({ post, onToggleLike, onToggleSave }) {
               <div className="flex items-center gap-2">
                 {profileHref ? (
                   <Link href={profileHref} className="font-semibold text-foreground hover:text-primary">
-                    {post?.user_display_name || "User"}
+                    <FoundingName handle={profileHandle}>{post?.user_display_name || "User"}</FoundingName>
                   </Link>
                 ) : (
-                  <span className="font-semibold text-foreground">{post?.user_display_name || "User"}</span>
+                  <FoundingName handle={profileHandle}>{post?.user_display_name || "User"}</FoundingName>
                 )}
                 {post?.has_spoilers ? (
                   <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/50 px-2 py-0.5 text-xs text-amber-500">
@@ -264,7 +265,13 @@ function CommunityThreadPostCard({ post, onToggleLike, onToggleSave }) {
             </Button>
           </div>
 
-          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={handleShare}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={shareCopied ? "Link copied" : "Share post"}
+            className="text-muted-foreground"
+            onClick={handleShare}
+          >
             {shareCopied ? <Check className="size-4" /> : <Send className="size-4" />}
           </Button>
         </div>
@@ -519,8 +526,8 @@ export default function CommunityPostPage() {
           </Avatar>
           <div className="flex-1">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span className="font-medium text-foreground">{comment.user_display_name || "User"}</span>
-              <span>{comment.user_handle || ""}</span>
+              <FoundingName handle={comment.user_handle}>{comment.user_display_name || "User"}</FoundingName>
+              <FoundingName handle={comment.user_handle} showBadge={false} className="text-muted-foreground">{comment.user_handle || ""}</FoundingName>
               <span>•</span>
               <span>{formatRelativeTime(comment.created_at)}</span>
             </div>
@@ -549,6 +556,7 @@ export default function CommunityPostPage() {
     <div className="min-h-screen bg-background">
       <Navigation />
       <main className="pb-20 pt-28 md:pb-8">
+        <h1 className="sr-only">Community post</h1>
         <div className="mx-auto max-w-4xl space-y-6 px-4">
           {loadingPost ? (
             <Card className="bg-card/50 border-border/50"><CardContent className="py-12 text-center text-muted-foreground">Loading post...</CardContent></Card>

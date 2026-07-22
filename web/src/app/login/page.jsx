@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Eye,
@@ -25,6 +25,8 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { needsAuthOnboarding } from "@/lib/auth-onboarding"
+import { getPostLoginDestination, getSafeNextPath } from "@/lib/safe-navigation.mjs"
 
 const PENDING_OAUTH_LINK_KEY = "hikari:auth:pending-oauth-link"
 
@@ -49,6 +51,7 @@ const isExistingAccountOauthError = (message = "") => {
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState("")
@@ -61,12 +64,17 @@ export default function LoginPage() {
     rememberMe: false,
   })
   const [errors, setErrors] = useState({})
+  const nextPath = useMemo(() => getSafeNextPath(searchParams.get("next")), [searchParams])
+  const onboardingPath = useMemo(
+    () => `/onboarding?next=${encodeURIComponent(nextPath)}`,
+    [nextPath],
+  )
 
   useEffect(() => {
-    if (!loading && user) {
-      router.push("/")
+    if (!loading && user && !isLoading) {
+      router.replace(getPostLoginDestination(nextPath, { requiresOnboarding: needsAuthOnboarding(user) }))
     }
-  }, [loading, router, user])
+  }, [isLoading, loading, nextPath, onboardingPath, router, user])
 
   const validateForm = () => {
     const nextErrors = {}
@@ -122,7 +130,7 @@ export default function LoginPage() {
         const { error: linkError } = await client.auth.linkIdentity({
           provider: pendingProvider,
           options: {
-            redirectTo: `${window.location.origin}/onboarding`,
+            redirectTo: `${window.location.origin}${onboardingPath}`,
           },
         })
 
@@ -140,7 +148,7 @@ export default function LoginPage() {
 
       setLoginSuccess(true)
       await new Promise((resolve) => setTimeout(resolve, 800))
-      router.push("/")
+      router.replace(getPostLoginDestination(nextPath, { requiresOnboarding: needsAuthOnboarding(data?.user) }))
     } catch (error) {
       setErrors({ form: error?.message || "Login failed. Please try again." })
     } finally {
@@ -152,7 +160,7 @@ export default function LoginPage() {
     setErrors({})
     setOauthLoading(provider)
 
-    const redirectTo = `${window.location.origin}/onboarding`
+    const redirectTo = `${window.location.origin}${onboardingPath}`
 
     const { error } = await client.auth.signInWithOAuth({
       provider,
@@ -257,9 +265,9 @@ export default function LoginPage() {
 
             <div className="grid grid-cols-3 gap-4">
               {[
-                { icon: Play, value: "50K+", label: "Anime Titles" },
-                { icon: Heart, value: "2M+", label: "Users" },
-                { icon: Star, value: "4.9", label: "Rating" },
+                { icon: Play, value: "Track", label: "Episodes" },
+                { icon: Heart, value: "Save", label: "Favorites" },
+                { icon: Star, value: "Rate", label: "Your Picks" },
               ].map((stat, index) => (
                 <motion.div
                   key={stat.label}
@@ -339,7 +347,10 @@ export default function LoginPage() {
                     <h2 className="text-2xl font-bold text-foreground">Sign in to your account</h2>
                     <p className="mt-2 text-muted-foreground">
                       {"Don't have an account? "}
-                      <Link href="/register" className="text-primary hover:text-primary/80 font-semibold transition-colors">
+                      <Link
+                        href={`/register?next=${encodeURIComponent(nextPath)}`}
+                        className="text-primary hover:text-primary/80 font-semibold transition-colors"
+                      >
                         Create one
                       </Link>
                     </p>

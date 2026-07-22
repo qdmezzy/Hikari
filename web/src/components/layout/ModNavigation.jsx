@@ -14,6 +14,7 @@ import {
   Sparkles,
   Menu,
   X,
+  Crown,
 } from "lucide-react"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,7 @@ const modNavItems = [
   { href: "/mod/appeals", label: "Appeals", icon: AlertTriangle, badgeKey: "escalated", badgeColor: "warning" },
   { href: "/mod/history", label: "Log", icon: History },
   { href: "/mod/stats", label: "Stats", icon: BarChart3 },
+  { href: "/mod/founding", label: "Founding 25", icon: Crown },
   { href: "/mod/settings", label: "Settings", icon: Settings },
 ]
 

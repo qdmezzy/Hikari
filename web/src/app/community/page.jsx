@@ -40,7 +40,7 @@ import {
 import { fetchAniListMediaByIds } from "@/lib/anilist"
 import { awardXp, XP_ACTIONS } from "@/lib/xp"
 
-const DISCORD_COMMUNITY_URL = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord/link"
+const DISCORD_COMMUNITY_URL = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"
 
 function formatRelativeTime(value) {
   if (!value) return ""
@@ -1172,7 +1172,9 @@ function CommunityComingSoonPage() {
 
   const inviteLabel = discordStats.inviteCode
     ? `https://discord.gg/${discordStats.inviteCode}`
-    : "https://discord.gg/hikari"
+    : DISCORD_COMMUNITY_URL.startsWith("http")
+      ? DISCORD_COMMUNITY_URL
+      : "Hikari Discord"
 
   return (
     <div className="min-h-screen bg-background">

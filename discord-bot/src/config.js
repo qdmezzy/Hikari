@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildDiscordInviteUrl, buildTrackedUrl } from "./lib/urls.js";
+import { createDiscordLinkToken } from "./lib/linkToken.js";
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(currentDir, "..");
@@ -35,7 +36,9 @@ export const config = {
   discordGuildId: readEnv("DISCORD_GUILD_ID"),
   supabaseUrl: readEnv("SUPABASE_URL", { required: true }),
   supabaseServiceRoleKey: readEnv("SUPABASE_SERVICE_ROLE_KEY", { required: true }),
+  discordLinkSigningSecret: readEnv("DISCORD_LINK_SIGNING_SECRET", { required: true }),
   discordSupportUrl: normalizeBaseUrl(readEnv("DISCORD_SUPPORT_URL"), ""),
+  discordFoundingRoleId: readEnv("DISCORD_FOUNDING_ROLE_ID"),
   hikariWebBaseUrl,
   hikariLinkPath: readEnv("HIKARI_LINK_PATH", { fallback: "/discord/link" }),
 };
@@ -51,7 +54,12 @@ export const getDiscordSupportUrl = () =>
 
 export const buildHikariLinkUrl = (discordUserId, discordName) => {
   const url = new URL(buildHikariUrl(config.hikariLinkPath, "help"));
-  url.searchParams.set("discord_id", String(discordUserId || ""));
-  url.searchParams.set("discord_name", String(discordName || ""));
+  url.searchParams.set(
+    "token",
+    createDiscordLinkToken(
+      { discordUserId, discordName },
+      config.discordLinkSigningSecret,
+    ),
+  );
   return url.toString();
 };

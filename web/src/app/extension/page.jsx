@@ -61,7 +61,7 @@ export default function ExtensionPage() {
                 <Badge className="ml-1 bg-white/20 text-xs text-white">Soon</Badge>
               </Button>
               <Button asChild size="lg" variant="outline" className="h-14 rounded-2xl px-8 text-lg">
-                <Link href="/discord/link">
+                <Link href="/discord-bot">
                   <Sparkles className="mr-2 h-5 w-5" />
                   Get notified on Discord
                 </Link>

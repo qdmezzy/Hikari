@@ -774,6 +774,8 @@ export default function SettingsPage() {
         website: profile.website || null,
         show_online_status: privacy.showOnline,
         show_watch_activity: privacy.showActivity,
+        public_profile: privacy.publicProfile,
+        show_stats: privacy.showStats,
       })
 
       if (profileResult?.error) {

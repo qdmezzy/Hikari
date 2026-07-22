@@ -31,6 +31,8 @@ import { toast } from "sonner"
 import { fetchFollowingIds, toggleFollow } from "@/lib/social-service"
 import { fetchPublicProfileByHandle, normalizeHandle } from "@/lib/public-profile"
 import { fetchAniListMediaByIds, formatCompactNumber, getMediaHref, getMediaTitle } from "@/lib/anilist"
+import { FoundingBadge } from "@/components/founding/FoundingBadge"
+import { FoundingName } from "@/components/founding/FoundingName"
 
 const publicTabs = [
   { id: "overview", label: "Overview", icon: User },
@@ -365,13 +367,13 @@ export default function PublicProfilePage() {
       setLoading(true)
       setError("")
 
-      const { data: profileData, error: profileError } = await fetchPublicProfileByHandle(handle)
+      const { data: profileData, error: profileError, state: profileState } = await fetchPublicProfileByHandle(handle)
       if (!active) return
 
       if (profileError || !profileData?.user_id) {
         setProfile(null)
         setEntries([])
-        setError("This public profile could not be loaded.")
+        setError(profileState === "private" ? "private" : profileState === "missing" ? "missing" : "unavailable")
         setLoading(false)
         return
       }
@@ -625,6 +627,7 @@ export default function PublicProfilePage() {
       website: profile?.website || "",
       joinedDate: formatJoinedDate(profile?.joined_at || profile?.created_at),
       isPremium: Boolean(profile?.is_premium),
+      foundingMemberNumber: Number(profile?.founding_member_number || 0) || null,
       level: Number(profile?.level || 1),
       privacy: {
         showStats: profile?.show_stats !== false,
@@ -673,18 +676,37 @@ export default function PublicProfilePage() {
   }
 
   if (error || !profile) {
+    const privateProfile = error === "private"
+    const missingProfile = error === "missing"
     return (
       <div className="min-h-screen bg-background">
         <div className="mx-auto flex max-w-3xl items-center justify-center px-4 py-24">
           <div className="w-full rounded-3xl border border-border/50 bg-card/40 p-10 text-center">
-            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-primary">Unavailable</p>
-            <h1 className="text-3xl font-black text-foreground">This public profile could not be loaded</h1>
-            <p className="mt-3 text-muted-foreground">
-              The share page opened, but Hikari could not find a public profile for this user.
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.28em] text-primary">
+              {privateProfile ? "Private profile" : missingProfile ? "Profile not found" : "Unavailable"}
             </p>
-            <Button asChild className="mt-6 rounded-xl bg-primary hover:bg-primary/90">
-              <Link href="/">Go Home</Link>
-            </Button>
+            <h1 className="text-3xl font-black text-foreground">
+              {privateProfile
+                ? "This profile is private"
+                : missingProfile
+                  ? `@${handle || "user"} does not have a public profile yet`
+                  : "This public profile could not be loaded"}
+            </h1>
+            <p className="mt-3 text-muted-foreground">
+              {privateProfile
+                ? "The owner has chosen not to share their profile. Hikari does not expose their lists or personal details."
+                : missingProfile
+                  ? "Check the handle, or ask them to sign in once so Hikari can finish creating their profile."
+                  : "Hikari could not reach the profile service. Please try again in a moment."}
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Button asChild className="rounded-xl bg-primary hover:bg-primary/90">
+                <Link href="/search">Browse anime</Link>
+              </Button>
+              <Button asChild variant="outline" className="rounded-xl">
+                <Link href="/">Go home</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -752,7 +774,8 @@ export default function PublicProfilePage() {
 
               <div className="flex-1 pt-4 sm:pt-8">
                 <div className="mb-2 flex flex-wrap items-center gap-3">
-                  <h1 className="text-3xl font-black text-foreground sm:text-4xl">{userData.name}</h1>
+                  <h1 className="text-3xl font-black text-foreground sm:text-4xl"><FoundingName handle={userData.username} memberNumber={userData.foundingMemberNumber} showBadge={false}>{userData.name}</FoundingName></h1>
+                  {userData.foundingMemberNumber ? <FoundingBadge memberNumber={userData.foundingMemberNumber} /> : null}
                   {userData.isPremium ? (
                     <Badge className="border-0 bg-gradient-to-r from-amber-400 to-orange-500 text-white">
                       <Sparkles className="mr-1 h-3 w-3" />
@@ -762,7 +785,7 @@ export default function PublicProfilePage() {
                 </div>
 
                 <div className="mb-4 flex flex-wrap items-center gap-3">
-                  <p className="text-lg text-muted-foreground">@{userData.username}</p>
+                  <p className="text-lg text-muted-foreground"><FoundingName handle={userData.username} memberNumber={userData.foundingMemberNumber} showBadge={false}>@{userData.username}</FoundingName></p>
                   {canFollow ? (
                     <Button
                       size="sm"

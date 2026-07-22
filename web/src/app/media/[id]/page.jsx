@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { motion } from 'framer-motion'
 import useAuth from '@/hooks/useAuth'
 import client from '@/lib/client'
@@ -45,6 +45,8 @@ import { AddToCollection } from '@/components/lists/AddToCollection'
 import { StarRating } from '@/components/media/StarRating'
 import { syncPublicFavorites } from '@/lib/public-profile'
 import { toast } from 'sonner'
+import { buildLoginPath } from '@/lib/safe-navigation.mjs'
+import { FoundingName } from '@/components/founding/FoundingName'
 
 const MEDIA_FIELDS = `
     id
@@ -347,6 +349,8 @@ function getMangaDexId(externalLinks = []) {
   return match?.[1] || null
 }
 
+const toSecureExternalUrl = (value) => String(value || "").replace(/^http:\/\//i, "https://")
+
 function MediaPageSkeleton() {
   return (
     <main className="pb-20 pt-16 md:pb-8 md:pt-0">
@@ -432,6 +436,8 @@ function MediaNotFoundState() {
 
 export default function MediaPage() {
   const { id: rawId } = useParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const routeValue = getRouteValue(rawId)
   const [media, setMedia] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -463,18 +469,37 @@ export default function MediaPage() {
   const [reportingReviewId, setReportingReviewId] = useState(null)
   const [mangaDexChapterCount, setMangaDexChapterCount] = useState(null)
   const [mangaDexLoading, setMangaDexLoading] = useState(false)
+  const resumedAction = useRef("")
+
+  const requestLoginForAction = (action) => {
+    const params = new URLSearchParams(searchParams?.toString() || "")
+    params.set("action", action)
+    const nextPath = `/media/${encodeURIComponent(routeValue)}?${params.toString()}`
+    toast.info(action === "favorite" ? "Sign in to save this favorite" : "Sign in to add this title to your list")
+    router.push(buildLoginPath(nextPath))
+  }
 
   const loadReviews = async () => {
     if (!Number.isFinite(mediaId)) return
     setReviewsLoading(true)
     setReviewsError(null)
 
-    const { data, error: reviewsFetchError } = await client
+    let reviewsResult = await client
       .from("reviews")
-      .select("id, user_id, media_id, rating, review_text, user_display_name, user_avatar_url, created_at")
+      .select("id, user_id, media_id, rating, review_text, user_display_name, user_handle, user_avatar_url, created_at")
       .eq("media_id", mediaId)
       .eq("is_removed", false)
       .order("created_at", { ascending: false })
+
+    if (reviewsResult.error && ["42703", "PGRST204"].includes(String(reviewsResult.error.code || ""))) {
+      reviewsResult = await client
+        .from("reviews")
+        .select("id, user_id, media_id, rating, review_text, user_display_name, user_avatar_url, created_at")
+        .eq("media_id", mediaId)
+        .eq("is_removed", false)
+        .order("created_at", { ascending: false })
+    }
+    const { data, error: reviewsFetchError } = reviewsResult
 
     if (reviewsFetchError) {
       console.warn("Failed to load reviews:", reviewsFetchError)
@@ -561,11 +586,23 @@ export default function MediaPage() {
     setFavoriteIds(Array.from(new Set(normalized)))
   }, [user])
 
-  const handleToggleFavorite = async () => {
-    if (!user || !Number.isFinite(mediaId)) return
-    const previous = favoriteIds
-    const isFavorite = favoriteIds.includes(mediaId)
-    const next = isFavorite ? favoriteIds.filter((value) => value !== mediaId) : [...favoriteIds, mediaId]
+  const handleToggleFavorite = async (options = {}) => {
+    if (!user) {
+      requestLoginForAction("favorite")
+      return
+    }
+    if (!Number.isFinite(mediaId)) return
+    const metadataFavorites = Array.isArray(user?.user_metadata?.favorite_media_ids)
+      ? user.user_metadata.favorite_media_ids.map((value) => Number(value)).filter(Number.isFinite)
+      : []
+    const currentFavorites = options?.forceAdd === true ? Array.from(new Set(metadataFavorites)) : favoriteIds
+    const previous = currentFavorites
+    const isFavorite = currentFavorites.includes(mediaId)
+    if (options?.forceAdd === true && isFavorite) {
+      toast.success("Already in your favorites")
+      return
+    }
+    const next = isFavorite ? currentFavorites.filter((value) => value !== mediaId) : [...currentFavorites, mediaId]
     const normalizedNext = Array.from(new Set(next.map((value) => Number(value)).filter(Number.isFinite)))
     setFavoriteSaving(true)
     setFavoriteIds(normalizedNext)
@@ -588,6 +625,29 @@ export default function MediaPage() {
     }
     setFavoriteSaving(false)
   }
+
+  useEffect(() => {
+    const action = searchParams?.get("action") || ""
+    if (!user || !media || !Number.isFinite(mediaId) || !action || resumedAction.current === action) return
+
+    resumedAction.current = action
+    const cleanParams = new URLSearchParams(searchParams.toString())
+    cleanParams.delete("action")
+    router.replace(
+      `/media/${encodeURIComponent(routeValue)}${cleanParams.toString() ? `?${cleanParams.toString()}` : ""}`,
+      { scroll: false },
+    )
+
+    if (action === "favorite") {
+      void handleToggleFavorite({ forceAdd: true })
+    } else if (action === "list") {
+      setStatus((current) => current || "plan_to_watch")
+      setPopoverOpen(true)
+      toast.info("Choose a status, then save this title to your list")
+    }
+    // The ref makes this a one-time continuation after authentication.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media, mediaId, routeValue, router, searchParams, user])
 
   const handleShare = async () => {
     if (typeof window === "undefined") return
@@ -685,20 +745,25 @@ export default function MediaPage() {
     const displayName =
       user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email || "User"
     const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.avatar || null
+    const userHandle = user?.user_metadata?.username || user?.user_metadata?.handle || null
 
-    const { error: reviewError } = await client
+    const reviewPayload = {
+      user_id: user.id,
+      media_id: mediaId,
+      rating: reviewRating,
+      review_text: reviewText.trim(),
+      user_display_name: displayName,
+      user_handle: userHandle,
+      user_avatar_url: avatarUrl,
+    }
+    let reviewResult = await client
       .from("reviews")
-      .upsert(
-        {
-          user_id: user.id,
-          media_id: mediaId,
-          rating: reviewRating,
-          review_text: reviewText.trim(),
-          user_display_name: displayName,
-          user_avatar_url: avatarUrl,
-        },
-        { onConflict: "user_id,media_id" },
-      )
+      .upsert(reviewPayload, { onConflict: "user_id,media_id" })
+    if (reviewResult.error && ["42703", "PGRST204"].includes(String(reviewResult.error.code || ""))) {
+      const { user_handle, ...legacyPayload } = reviewPayload
+      reviewResult = await client.from("reviews").upsert(legacyPayload, { onConflict: "user_id,media_id" })
+    }
+    const { error: reviewError } = reviewResult
 
     if (reviewError) {
       console.error("Failed to save review:", reviewError)
@@ -993,7 +1058,7 @@ export default function MediaPage() {
     .map((episode, index) => ({
       id: `${episode.site || "stream"}-${index}`,
       title: episode.title,
-      url: episode.url,
+      url: toSecureExternalUrl(episode.url),
       site: episode.site || "Stream",
       thumbnail: episode.thumbnail || null,
     }))
@@ -1004,7 +1069,7 @@ export default function MediaPage() {
       if (!site || !url) return
       const key = site.toLowerCase().trim()
       if (!providerMap.has(key)) {
-        providerMap.set(key, { id: key, label: site, url })
+        providerMap.set(key, { id: key, label: site, url: toSecureExternalUrl(url) })
       }
     }
 
@@ -1051,6 +1116,7 @@ export default function MediaPage() {
     id: review.id,
     userId: review.user_id,
     userDisplayName: review.user_display_name,
+    userHandle: review.user_handle || null,
     user: review.user_display_name || "User",
     avatar: review.user_avatar_url,
     rating: review.rating,
@@ -1234,7 +1300,10 @@ export default function MediaPage() {
                       </PopoverContent>
                     </Popover>
                   ) : (
-                    <Button className="h-12 w-full bg-gradient-to-r from-primary to-accent text-white font-semibold shadow-lg shadow-primary/25" disabled>
+                    <Button
+                      className="h-12 w-full bg-gradient-to-r from-primary to-accent text-white font-semibold shadow-lg shadow-primary/25"
+                      onClick={() => requestLoginForAction("list")}
+                    >
                       <Plus className="mr-2 h-5 w-5" />
                       Add to List
                     </Button>
@@ -1247,7 +1316,7 @@ export default function MediaPage() {
                       favoriteActive && "border-red-500/50 bg-red-500/10 text-red-400",
                     )}
                     onClick={handleToggleFavorite}
-                    disabled={!user || favoriteSaving}
+                    disabled={favoriteSaving}
                   >
                     <Heart className={cn("mr-2 h-5 w-5", favoriteActive && "fill-current")} />
                     {favoriteActive ? "Favorited" : "Add to Favorites"}
@@ -1662,7 +1731,7 @@ export default function MediaPage() {
                             <div className="flex-1">
                               <div className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium text-white">{review.user}</span>
+                                  <FoundingName handle={review.userHandle} className="text-white">{review.user}</FoundingName>
                                   <div className="flex items-center gap-1">
                                     <Star className="h-4 w-4 fill-cyan-300 text-cyan-300" />
                                     <span className="text-sm text-white">{review.rating}</span>

@@ -6,6 +6,7 @@ import { resolveCustomEmojis } from "./lib/emojis.js";
 import { startHeartbeat } from "./services/heartbeat.js";
 import { startAiringBroadcast } from "./services/scheduler.js";
 import { startEpisodeAlerts } from "./services/episodeAlerts.js";
+import { syncAllFoundingRoles } from "./services/foundingRole.js";
 
 const client = new Client({
   intents: [GatewayIntentBits.Guilds],
@@ -36,6 +37,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   startAiringBroadcast(readyClient);
   startEpisodeAlerts(readyClient);
   startHeartbeat(readyClient);
+  await syncAllFoundingRoles(readyClient).catch(() => null);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

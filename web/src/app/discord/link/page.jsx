@@ -41,8 +41,7 @@ const STATUS_META = {
 
 export default function DiscordLinkPage() {
   const searchParams = useSearchParams();
-  const discordUserId = (searchParams.get("discord_id") || "").trim();
-  const discordName = (searchParams.get("discord_name") || "").trim();
+  const linkToken = (searchParams.get("token") || "").trim();
 
   const [loadingSession, setLoadingSession] = useState(true);
   const [sessionUser, setSessionUser] = useState(null);
@@ -71,9 +70,9 @@ export default function DiscordLinkPage() {
 
     const runLink = async () => {
       if (loadingSession || !sessionUser) return;
-      if (!discordUserId) {
+      if (!linkToken) {
         setStatus("error");
-        setError("Missing Discord user id in link URL.");
+        setError("This link is missing its secure Discord proof. Run /account in Discord to get a new link.");
         return;
       }
 
@@ -97,8 +96,7 @@ export default function DiscordLinkPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             access_token: accessToken,
-            discord_user_id: discordUserId,
-            discord_name: discordName,
+            token: linkToken,
           }),
         });
 
@@ -124,15 +122,14 @@ export default function DiscordLinkPage() {
     return () => {
       active = false;
     };
-  }, [loadingSession, sessionUser, discordUserId, discordName]);
+  }, [loadingSession, sessionUser, linkToken]);
 
   const nextLoginUrl = useMemo(() => {
     const params = new URLSearchParams();
-    if (discordUserId) params.set("discord_id", discordUserId);
-    if (discordName) params.set("discord_name", discordName);
+    if (linkToken) params.set("token", linkToken);
     const nextPath = `/discord/link${params.toString() ? `?${params.toString()}` : ""}`;
     return `/login?next=${encodeURIComponent(nextPath)}`;
-  }, [discordUserId, discordName]);
+  }, [linkToken]);
 
   const meta = STATUS_META[status] || STATUS_META.idle;
   const StateIcon = meta.Icon;
@@ -175,7 +172,7 @@ export default function DiscordLinkPage() {
           <h1 className="mt-1.5 text-2xl font-bold tracking-tight">{meta.title}</h1>
           <p className="mx-auto mt-2 max-w-sm text-pretty text-sm text-muted-foreground">{bodyText}</p>
 
-          {discordUserId && status !== "error" ? (
+          {linkToken && status !== "error" ? (
             <div className="mt-5 flex items-center gap-3 rounded-xl border border-border/60 bg-muted/30 px-4 py-3 text-left">
               <span className="flex size-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#5865F2]/15 text-[#8b95f5]">
                 <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
@@ -183,8 +180,8 @@ export default function DiscordLinkPage() {
                 </svg>
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-foreground">{discordName || "Discord user"}</p>
-                <p className="truncate font-mono text-xs text-muted-foreground">{discordUserId}</p>
+                <p className="truncate text-sm font-medium text-foreground">Discord account verified by Hikari Bot</p>
+                <p className="text-xs text-muted-foreground">This proof expires after ten minutes.</p>
               </div>
             </div>
           ) : null}

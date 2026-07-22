@@ -31,6 +31,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
+import { FoundingName } from "@/components/founding/FoundingName"
 
 interface LinkEmbed {
   url: string
@@ -145,17 +146,17 @@ export function SocialPost({
               <div className="flex flex-wrap items-center gap-1 text-sm">
                 {profileHref ? (
                   <Link href={profileHref} className="font-semibold hover:underline">
-                    {post.user.name}
+                    <FoundingName handle={normalizedHandle}>{post.user.name}</FoundingName>
                   </Link>
                 ) : (
-                  <span className="font-semibold">{post.user.name}</span>
+                  <FoundingName handle={normalizedHandle}>{post.user.name}</FoundingName>
                 )}
                 {profileHref ? (
                   <Link href={profileHref} className="text-muted-foreground hover:underline">
-                    {post.user.handle}
+                    <FoundingName handle={normalizedHandle} showBadge={false}>{post.user.handle}</FoundingName>
                   </Link>
                 ) : (
-                  <span className="text-muted-foreground">{post.user.handle}</span>
+                  <FoundingName handle={normalizedHandle} showBadge={false} className="text-muted-foreground">{post.user.handle}</FoundingName>
                 )}
                 <span className="text-muted-foreground">-</span>
                 <span className="text-muted-foreground">{post.timestamp}</span>
@@ -167,6 +168,7 @@ export function SocialPost({
                     variant="ghost"
                     size="icon"
                     className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label="Open post actions"
                   >
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
@@ -541,4 +543,3 @@ export function SocialPost({
     </Card>
   )
 }
-

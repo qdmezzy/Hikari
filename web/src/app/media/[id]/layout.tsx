@@ -22,12 +22,16 @@ export async function generateMetadata({
 
   const description = media.description || bits.join(" · ")
 
+  const canonical = `/media/${media.id}`
+
   return {
     title: media.title,
     description,
+    alternates: { canonical },
     openGraph: {
       title: `${media.title} · Hikari`,
       description,
+      url: canonical,
     },
     twitter: {
       card: "summary_large_image",

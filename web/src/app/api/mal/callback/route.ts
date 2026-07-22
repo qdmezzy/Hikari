@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { getSafeNextPath } from "@/lib/safe-navigation.mjs"
 
 const MAL_CLIENT_ID = process.env.MAL_CLIENT_ID
 const MAL_CLIENT_SECRET = process.env.MAL_CLIENT_SECRET
@@ -7,7 +8,7 @@ const MAL_REDIRECT_URI = process.env.MAL_REDIRECT_URI
 
 const redirectWithStatus = (req: Request, returnTo: string, status: string) => {
   const origin = new URL(req.url).origin
-  const target = new URL(returnTo, origin)
+  const target = new URL(getSafeNextPath(returnTo, "/import"), origin)
   target.searchParams.set("mal", status)
   return NextResponse.redirect(target.toString())
 }
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
   const cookieStore = await cookies()
   const storedState = cookieStore.get("mal_state")?.value
   const verifier = cookieStore.get("mal_verifier")?.value
-  const returnTo = cookieStore.get("mal_return_to")?.value || "/import"
+  const returnTo = getSafeNextPath(cookieStore.get("mal_return_to")?.value, "/import")
 
   if (!code || !state || !storedState || !verifier || state !== storedState) {
     return redirectWithStatus(req, returnTo, "error")

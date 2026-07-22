@@ -1,26 +1,30 @@
 "use client"
 
 import { useEffect } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import useAuth from "@/hooks/useAuth"
 import { needsAuthOnboarding } from "@/lib/auth-onboarding"
 import { fetchActiveBan } from "@/lib/moderation"
+import { getSafeNextPath } from "@/lib/safe-navigation.mjs"
 
 export default function RequireAuth({ children }) {
   const { user, loading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     if (!loading && !user) {
-      const next = encodeURIComponent(pathname || "/")
+      const current = `${pathname || "/"}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`
+      const next = encodeURIComponent(getSafeNextPath(current))
       router.replace(`/login?next=${next}`)
     }
     if (!loading && user && pathname !== "/onboarding" && needsAuthOnboarding(user)) {
-      const next = encodeURIComponent(pathname || "/")
+      const current = `${pathname || "/"}${searchParams?.toString() ? `?${searchParams.toString()}` : ""}`
+      const next = encodeURIComponent(getSafeNextPath(current))
       router.replace(`/onboarding?next=${next}`)
     }
-  }, [loading, user, router, pathname])
+  }, [loading, user, router, pathname, searchParams])
 
   // Banned users are redirected to the appeal page (which lives outside RequireAuth).
   useEffect(() => {

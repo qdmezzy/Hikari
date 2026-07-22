@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS public.discord_links (
 CREATE INDEX IF NOT EXISTS idx_discord_links_hikari_username
 ON public.discord_links (lower(hikari_username));
 
+-- Trusted server code uses the service role. Browser clients must not read or
+-- mutate account mappings directly.
+ALTER TABLE public.discord_links ENABLE ROW LEVEL SECURITY;
+
 CREATE OR REPLACE FUNCTION update_discord_links_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -22,9 +26,3 @@ CREATE TRIGGER trg_discord_links_updated_at
     BEFORE UPDATE ON public.discord_links
     FOR EACH ROW
     EXECUTE FUNCTION update_discord_links_updated_at();
-
--- Optional columns for a future secure one-time link-token flow
--- (web /discord/link verifies the token instead of trusting a Discord ID in the URL).
-ALTER TABLE public.discord_links ADD COLUMN IF NOT EXISTS link_token TEXT;
-ALTER TABLE public.discord_links ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ;
-CREATE INDEX IF NOT EXISTS idx_discord_links_token ON public.discord_links(link_token);

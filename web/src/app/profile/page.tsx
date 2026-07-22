@@ -54,6 +54,9 @@ import RequireAuth from "@/components/common/RequireAuth"
 import client from "@/lib/client"
 import { checkHandleAvailability, isHandleTakenError, normalizeHandle, syncPublicFavorites, upsertPublicProfile } from "@/lib/public-profile"
 import { fetchAniListMediaByIds } from "@/lib/anilist"
+import { FoundingBadge } from "@/components/founding/FoundingBadge"
+import { FoundingName } from "@/components/founding/FoundingName"
+import { useFoundingMe } from "@/hooks/useFoundingMe"
 
 const tabs = [
   { id: "overview", label: "Overview", icon: User },
@@ -157,6 +160,8 @@ const getEntryDisplayProgress = (entry: any) => {
 
 export default function ProfilePage() {
   const { user } = useAuth()
+  const founding = useFoundingMe(user)
+  const foundingNumber = founding.data?.member?.active ? founding.data.member.memberNumber : null
   const isMod = (user as any)?.app_metadata?.is_mod === true || (user as any)?.app_metadata?.isMod === true
   const [activeTab, setActiveTab] = React.useState("overview")
   const [isLoaded, setIsLoaded] = React.useState(false)
@@ -537,6 +542,8 @@ export default function ProfilePage() {
           handle: normalizedHandle,
           show_online_status: true,
           show_watch_activity: settings.showActivity,
+          public_profile: settings.publicProfile,
+          show_stats: settings.showStats,
         })
         setProfileSharingReady(!skipped)
         if (profileError) console.error("Failed to sync privacy settings:", profileError)
@@ -888,7 +895,11 @@ export default function ProfilePage() {
                     )}
                   </div>
                   
-                  <button className="absolute inset-1 flex items-center justify-center bg-foreground/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity rounded-xl">
+                  <button
+                    type="button"
+                    aria-label="Change profile photo"
+                    className="absolute inset-1 flex items-center justify-center bg-foreground/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity rounded-xl"
+                  >
                     <Camera className="h-8 w-8 text-background" />
                   </button>
                   
@@ -906,7 +917,10 @@ export default function ProfilePage() {
 
               <div className="flex-1 pt-4 sm:pt-8">
                 <div className="flex flex-wrap items-center gap-3 mb-2">
-                  <h1 className="text-3xl sm:text-4xl font-black text-foreground">{mockUser.name}</h1>
+                  <h1 className="text-3xl sm:text-4xl font-black text-foreground">
+                    <FoundingName handle={mockUser.username} memberNumber={foundingNumber} showBadge={false}>{mockUser.name}</FoundingName>
+                  </h1>
+                  {foundingNumber ? <FoundingBadge memberNumber={foundingNumber} /> : null}
                   {mockUser.isPremium && (
                     <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-white border-0">
                       <Sparkles className="w-3 h-3 mr-1" />
@@ -915,7 +929,7 @@ export default function ProfilePage() {
                   )}
                 </div>
                 
-                <p className="text-lg text-muted-foreground mb-4">@{mockUser.username}</p>
+                <p className="text-lg text-muted-foreground mb-4"><FoundingName handle={mockUser.username} memberNumber={foundingNumber} showBadge={false}>@{mockUser.username}</FoundingName></p>
 
                 <div className="mb-5 flex flex-wrap gap-2">
                   <Button 
@@ -1350,7 +1364,7 @@ export default function ProfilePage() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.3 }}
               >
-                {isMod ? (
+                {isMod && process.env.NEXT_PUBLIC_ENABLE_WRAPPED === "true" ? (
                   <Link
                     href="/wrapped"
                     className="mb-6 flex items-center justify-between gap-4 overflow-hidden rounded-2xl border border-primary/20 bg-[linear-gradient(135deg,rgba(34,211,238,0.12),rgba(168,85,247,0.12))] p-5 transition-all hover:border-primary/40"

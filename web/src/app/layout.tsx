@@ -29,6 +29,7 @@ const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://hikari.raycodes.net"
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
+  alternates: { canonical: siteUrl },
   title: {
     default: "Hikari — Anime Discovery & Tracking",
     template: "%s · Hikari",
@@ -51,6 +52,7 @@ export const metadata = {
     description: "Discover, track & share your anime.",
     images: ["/brand/og.jpg"],
   },
+  robots: { index: true, follow: true },
   appleWebApp: {
     capable: true,
     title: "Hikari",

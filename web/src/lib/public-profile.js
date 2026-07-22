@@ -9,7 +9,11 @@ export const normalizeHandle = (value) =>
     .replace(/[^a-z0-9_]/g, "")
 
 const pickDisplayName = (user) =>
-  user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email || "User"
+  user?.user_metadata?.display_name ||
+  user?.user_metadata?.full_name ||
+  user?.user_metadata?.username ||
+  user?.user_metadata?.handle ||
+  "User"
 
 const pickAvatar = (user) => user?.user_metadata?.avatar_url || user?.user_metadata?.avatar || null
 
@@ -30,9 +34,9 @@ const pickJoinedAt = (user) =>
 
 const pickHandle = (user) =>
   normalizeHandle(
-    user?.user_metadata?.username ||
+      user?.user_metadata?.username ||
       user?.user_metadata?.handle ||
-      (user?.email ? user.email.split("@")[0] : "user"),
+      (user?.id ? `user${String(user.id).replace(/-/g, "").slice(0, 8)}` : "user"),
   )
 
 const pickFavoriteMediaIds = (user) => {
@@ -78,6 +82,12 @@ const isMissingFavoritesColumn = (error) => {
   )
 }
 
+const isMissingPrivacyColumn = (error) => {
+  const code = String(error?.code || "")
+  const text = getErrorText(error)
+  return code === "42703" || code === "PGRST204" || text.includes("public_profile") || text.includes("show_stats")
+}
+
 const isHandleUniqueViolation = (error) => {
   const code = String(error?.code || "")
   const text = getErrorText(error)
@@ -112,6 +122,8 @@ export const buildPublicProfilePayload = (user, overrides = {}) => {
     joined_at: overrides.joined_at ?? pickJoinedAt(user),
     show_online_status: overrides.show_online_status ?? (user?.user_metadata?.show_online_status ?? true),
     show_watch_activity: overrides.show_watch_activity ?? (user?.user_metadata?.show_watch_activity ?? true),
+    public_profile: overrides.public_profile ?? (user?.user_metadata?.public_profile ?? true),
+    show_stats: overrides.show_stats ?? (user?.user_metadata?.show_stats ?? true),
   }
 }
 
@@ -168,6 +180,15 @@ export const upsertPublicProfile = async (user, overrides = {}) => {
       .single())
   }
 
+  if (error && isMissingPrivacyColumn(error)) {
+    const { public_profile, show_stats, ...legacyPayload } = payload
+    ;({ data, error } = await client
+      .from("public_profiles")
+      .upsert(legacyPayload, { onConflict: "user_id" })
+      .select("*")
+      .single())
+  }
+
   if (error && isMissingPublicProfileSchema(error)) {
     return { data: null, error: null, skipped: true }
   }
@@ -204,23 +225,24 @@ export const checkHandleAvailability = async (handle, excludeUserId = null) => {
 export const fetchPublicProfileByHandle = async (handle) => {
   const normalized = normalizeHandle(handle)
   if (!normalized) return { data: null, error: new Error("Invalid profile handle.") }
-  const { data, error } = await client
-    .from("public_profiles")
-    .select("*")
-    .eq("handle", normalized)
-    .maybeSingle()
-  if (error && isMissingPublicProfileSchema(error)) {
-    return { data: null, error: new Error("Profile sharing is not set up yet."), skipped: true }
+  try {
+    const response = await fetch(`/api/profiles/${encodeURIComponent(normalized)}`, { cache: "no-store" })
+    const body = await response.json().catch(() => ({}))
+    if (response.status === 404) return { data: null, error: null, state: "missing" }
+    if (response.status === 403) return { data: null, error: null, state: "private" }
+    if (!response.ok) return { data: null, error: new Error(body?.error || "Profile sharing is unavailable."), state: "error" }
+    return { data: body?.profile || null, error: null, state: "public" }
+  } catch (error) {
+    return { data: null, error, state: "error" }
   }
-  return { data, error }
 }
 
 const processedHandleUserIds = new Set()
 
 const deriveHandleBase = (user) => {
   const fromName = normalizeHandle(user?.user_metadata?.full_name || user?.user_metadata?.display_name || "")
-  const fromEmail = normalizeHandle(user?.email ? user.email.split("@")[0] : "")
-  let base = fromName || fromEmail || "user"
+  const anonymous = user?.id ? `user${String(user.id).replace(/-/g, "").slice(0, 8)}` : "user"
+  let base = fromName || anonymous
   if (base.length < 3) base = `${base}fan`
   return base.slice(0, 20)
 }
@@ -238,6 +260,8 @@ export const ensureUserHandle = async (user) => {
   const existing = normalizeHandle(user?.user_metadata?.username || user?.user_metadata?.handle || "")
   if (existing) {
     processedHandleUserIds.add(user.id)
+    const result = await upsertPublicProfile(user, { handle: existing })
+    if (result?.error || result?.skipped) processedHandleUserIds.delete(user.id)
     return
   }
   processedHandleUserIds.add(user.id)

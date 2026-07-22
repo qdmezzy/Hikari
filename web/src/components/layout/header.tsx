@@ -32,6 +32,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ThemeToggle } from "@/components/theme/theme-toggle"
+import { FoundingBadge } from "@/components/founding/FoundingBadge"
+import { FoundingName } from "@/components/founding/FoundingName"
+import { useFoundingMe } from "@/hooks/useFoundingMe"
 
 const NotificationsMenu = dynamic(
   () => import("@/components/notifications/NotificationsMenu").then((mod) => mod.NotificationsMenu),
@@ -80,7 +83,9 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
   const [isScrolled, setIsScrolled] = React.useState(false)
   const actualIsMod = authUser?.app_metadata?.is_mod === true || authUser?.app_metadata?.isMod === true
   const isMod = !authLoading && actualIsMod
-  const discordUrl = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord/link"
+  const founding = useFoundingMe(authUser)
+  const foundingNumber = founding.data?.member?.active ? founding.data.member.memberNumber : null
+  const discordUrl = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"
   const discordExternal = discordUrl.startsWith("http")
 
   const runSearch = React.useCallback(() => {
@@ -292,10 +297,13 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
                             <Crown className="w-2.5 h-2.5 text-white" />
                           </div>
                         )}
+                        {foundingNumber ? (
+                          <FoundingBadge memberNumber={foundingNumber} compact className="absolute -right-2 -top-2" />
+                        ) : null}
                       </div>
-                      <span className="hidden sm:inline text-sm font-medium max-w-[100px] truncate">
+                      <FoundingName handle={user.username} memberNumber={foundingNumber} showBadge={false} className="hidden max-w-[100px] truncate text-sm sm:inline">
                         {user.name}
-                      </span>
+                      </FoundingName>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56 rounded-xl p-1.5 bg-card border-border/50">
@@ -303,6 +311,12 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
                       <Link href="/profile" className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg">
                         <User className="h-4 w-4 text-muted-foreground" />
                         <span>Profile</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/founding" className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg">
+                        <Crown className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+                        <span>{foundingNumber ? `Founding Member #${foundingNumber}` : "The Founding 25"}</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

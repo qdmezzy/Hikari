@@ -279,6 +279,7 @@ export default function ModAppealsPage() {
       <div className="min-h-screen bg-background">
         <ModNavigation />
         <main className="pb-24 md:pb-8">
+          <h1 className="sr-only">Ban appeals</h1>
           <div className="px-4 py-6 md:px-8">
             <div className="mx-auto max-w-6xl space-y-6">
               <Card className="bg-card/60 border-border/50">

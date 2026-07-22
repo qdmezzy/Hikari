@@ -611,7 +611,12 @@ export default function HomePage() {
                             View Details
                           </Link>
                         </Button>
-                        <Button size="lg" variant="ghost" className="hover:bg-red-500/10 hover:text-red-400 group">
+                        <Button
+                          size="lg"
+                          variant="ghost"
+                          aria-label="Add featured title to favorites"
+                          className="hover:bg-red-500/10 hover:text-red-400 group"
+                        >
                           <Heart className="w-5 h-5 group-hover:scale-110 transition-transform" />
                         </Button>
                       </motion.div>
@@ -1021,7 +1026,7 @@ export default function HomePage() {
                     Get release alerts, talk anime, and help shape Hikari with other fans.
                   </p>
                   <Button asChild className="mt-4 gap-2 bg-[#5865F2] text-white hover:bg-[#4752c4]">
-                    <Link href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord/link"} target="_blank" rel="noreferrer">
+                    <Link href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"} target="_blank" rel="noreferrer">
                       Join the server
                       <ExternalLink className="size-4" />
                     </Link>
@@ -1080,7 +1085,15 @@ export default function HomePage() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/community" className="hover:text-accent transition-colors">Community</Link></li>
                 <li><Link href="/discord-bot" className="hover:text-accent transition-colors">Discord Bot</Link></li>
-                <li><Link href="/discord/link" className="hover:text-accent transition-colors flex items-center gap-1">Discord <ExternalLink className="w-3 h-3" /></Link></li>
+                <li><Link href="/founding" className="hover:text-accent transition-colors">The Founding 25</Link></li>
+                <li>
+                  <Link
+                    href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"}
+                    className="hover:text-accent transition-colors flex items-center gap-1"
+                  >
+                    Discord Server <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </li>
                 <li><Link href="/feedback" className="hover:text-accent transition-colors">Feedback</Link></li>
               </ul>
             </div>

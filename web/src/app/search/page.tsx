@@ -23,13 +23,14 @@ import {
   getPrimaryStudio,
   
 } from "@/lib/anilist"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { Navigation } from "@/components/layout/Navigation"
 import { AnimeCard } from "@/components/media/AnimeCard"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import { logListActivity } from "@/lib/activity-service"
+import { buildLoginPath } from "@/lib/safe-navigation.mjs"
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]*>/g, "")
@@ -135,13 +136,18 @@ type QuickState = Record<number, "adding" | "added">
 
 export default function BrowsePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [activeQuery, setActiveQuery] = useState("")
-  const [mediaType, setMediaType] = useState<MediaType>("ANIME")
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([])
-  const [sortBy, setSortBy] = useState<SortKey>("popularity")
+  const initialQuery = (searchParams.get("query") || searchParams.get("q") || "").trim()
+  const initialType = searchParams.get("type")?.toLowerCase() === "manga" ? "MANGA" : "ANIME"
+  const initialGenres = (searchParams.get("genres") || "").split(",").filter((genre) => genres.includes(genre))
+  const initialSort = searchParams.get("sort") as SortKey
+  const [searchQuery, setSearchQuery] = useState(initialQuery)
+  const [activeQuery, setActiveQuery] = useState(initialQuery)
+  const [mediaType, setMediaType] = useState<MediaType>(initialType)
+  const [viewMode, setViewMode] = useState<"grid" | "list">(searchParams.get("view") === "list" ? "list" : "grid")
+  const [selectedGenres, setSelectedGenres] = useState<string[]>(initialGenres)
+  const [sortBy, setSortBy] = useState<SortKey>(initialSort in sortOptions ? initialSort : "popularity")
   const [filtersOpen, setFiltersOpen] = useState(false)
 
   const [results, setResults] = useState<AniListMedia[]>([])
@@ -211,36 +217,65 @@ export default function BrowsePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQuery, selectedGenres, sortBy, mediaType])
 
-  // Pick up a search term passed in the URL (e.g. from the header search box,
-  // which routes here as /search?query=...). Without this, those searches just
-  // land on the default browse view and appear to "do nothing".
+  // Treat the URL as the durable search state so refresh, sharing, and browser
+  // back/forward navigation restore the same query and filters.
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(searchParams.toString())
     const incoming = (params.get("query") || params.get("q") || "").trim()
-    if (incoming) {
-      setSearchQuery(incoming)
-      setActiveQuery(incoming)
-    }
-    if ((params.get("type") || "").toLowerCase() === "manga") {
-      setMediaType("MANGA")
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    const incomingGenres = (params.get("genres") || "").split(",").filter((genre) => genres.includes(genre))
+    const incomingSort = params.get("sort") as SortKey
+    setSearchQuery(incoming)
+    setActiveQuery(incoming)
+    setMediaType(params.get("type")?.toLowerCase() === "manga" ? "MANGA" : "ANIME")
+    setSelectedGenres(incomingGenres)
+    setSortBy(incomingSort in sortOptions ? incomingSort : "popularity")
+    setViewMode(params.get("view") === "list" ? "list" : "grid")
+  }, [searchParams])
 
-  const toggleGenre = (genre: string) => {
-    setSelectedGenres((current) =>
-      current.includes(genre) ? current.filter((value) => value !== genre) : [...current, genre],
-    )
+  const updateSearchUrl = (overrides: {
+    query?: string
+    mediaType?: MediaType
+    selectedGenres?: string[]
+    sortBy?: SortKey
+    viewMode?: "grid" | "list"
+  }) => {
+    const next = {
+      query: activeQuery,
+      mediaType,
+      selectedGenres,
+      sortBy,
+      viewMode,
+      ...overrides,
+    }
+    const params = new URLSearchParams()
+    if (next.query.trim()) params.set("query", next.query.trim())
+    if (next.mediaType === "MANGA") params.set("type", "manga")
+    if (next.selectedGenres.length) params.set("genres", next.selectedGenres.join(","))
+    if (next.sortBy !== "popularity") params.set("sort", next.sortBy)
+    if (next.viewMode === "list") params.set("view", "list")
+    router.push(`/search${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false })
   }
 
-  const handleSearchSubmit = () => setActiveQuery(searchQuery.trim())
+  const toggleGenre = (genre: string) => {
+    const next = selectedGenres.includes(genre)
+      ? selectedGenres.filter((value) => value !== genre)
+      : [...selectedGenres, genre]
+    setSelectedGenres(next)
+    updateSearchUrl({ selectedGenres: next })
+  }
+
+  const handleSearchSubmit = () => {
+    const next = searchQuery.trim()
+    setActiveQuery(next)
+    updateSearchUrl({ query: next })
+  }
 
   const clearAll = () => {
     setSelectedGenres([])
     setSearchQuery("")
     setActiveQuery("")
     setSortBy("popularity")
+    updateSearchUrl({ query: "", selectedGenres: [], sortBy: "popularity" })
   }
 
   const handleQuickAdd = async (anime: AniListMedia) => {
@@ -248,7 +283,7 @@ export default function BrowsePage() {
     if (!mediaId || quickState[mediaId] === "adding") return
     if (!user) {
       toast.info("Sign in to add anime to your list")
-      router.push("/login?next=/search")
+      router.push(buildLoginPath(`/search${searchParams.toString() ? `?${searchParams.toString()}` : ""}`))
       return
     }
 
@@ -329,7 +364,10 @@ export default function BrowsePage() {
                 <button
                   key={type}
                   type="button"
-                  onClick={() => setMediaType(type)}
+                  onClick={() => {
+                    setMediaType(type)
+                    updateSearchUrl({ mediaType: type })
+                  }}
                   className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                     mediaType === type
                       ? "bg-primary text-primary-foreground shadow-sm"
@@ -354,7 +392,10 @@ export default function BrowsePage() {
                   const value = event.target.value
                   setSearchQuery(value)
                   // Emptying the field clears the active search filter/chip.
-                  if (!value.trim() && activeQuery) setActiveQuery("")
+                  if (!value.trim() && activeQuery) {
+                    setActiveQuery("")
+                    updateSearchUrl({ query: "" })
+                  }
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") handleSearchSubmit()
@@ -367,6 +408,7 @@ export default function BrowsePage() {
                   onClick={() => {
                     setSearchQuery("")
                     setActiveQuery("")
+                    updateSearchUrl({ query: "" })
                   }}
                   aria-label="Clear search"
                   className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground"
@@ -415,7 +457,10 @@ export default function BrowsePage() {
                       <button
                         key={key}
                         type="button"
-                        onClick={() => setSortBy(key)}
+                        onClick={() => {
+                          setSortBy(key)
+                          updateSearchUrl({ sortBy: key })
+                        }}
                         className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                           active ? "bg-accent font-medium text-primary" : "text-foreground hover:bg-secondary"
                         }`}
@@ -434,7 +479,10 @@ export default function BrowsePage() {
                   {selectedGenres.length ? (
                     <button
                       type="button"
-                      onClick={() => setSelectedGenres([])}
+                      onClick={() => {
+                        setSelectedGenres([])
+                        updateSearchUrl({ selectedGenres: [] })
+                      }}
                       className="text-xs font-medium text-primary hover:underline"
                     >
                       Reset
@@ -483,7 +531,10 @@ export default function BrowsePage() {
               <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
                 <button
                   type="button"
-                  onClick={() => setViewMode("grid")}
+                  onClick={() => {
+                    setViewMode("grid")
+                    updateSearchUrl({ viewMode: "grid" })
+                  }}
                   aria-label="Grid view"
                   className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
                     viewMode === "grid"
@@ -495,7 +546,10 @@ export default function BrowsePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode("list")}
+                  onClick={() => {
+                    setViewMode("list")
+                    updateSearchUrl({ viewMode: "list" })
+                  }}
                   aria-label="List view"
                   className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
                     viewMode === "list"

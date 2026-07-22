@@ -21,8 +21,9 @@ export default async function ProfileOg({ params }: { params: Promise<{ handle: 
       const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
       const { data: profile } = await sb
         .from("public_profiles")
-        .select("user_id, display_name, handle")
+        .select("user_id, display_name, handle, public_profile")
         .eq("handle", displayHandle)
+        .eq("public_profile", true)
         .maybeSingle()
 
       if (profile) {

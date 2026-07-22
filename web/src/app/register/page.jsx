@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Eye,
   EyeOff,
@@ -28,6 +28,7 @@ import {
   normalizeHandle,
   upsertPublicProfile,
 } from "@/lib/public-profile"
+import { getSafeNextPath } from "@/lib/safe-navigation.mjs"
 
 const steps = [
   { id: 1, name: "Account", description: "Email & password" },
@@ -66,6 +67,7 @@ const isExistingAccountOauthError = (message = "") => {
 
 export default function RegisterPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
@@ -82,12 +84,17 @@ export default function RegisterPage() {
     agreeToTerms: false,
   })
   const [errors, setErrors] = useState({})
+  const nextPath = useMemo(() => getSafeNextPath(searchParams.get("next")), [searchParams])
+  const onboardingPath = useMemo(
+    () => `/onboarding?next=${encodeURIComponent(nextPath)}`,
+    [nextPath],
+  )
 
   useEffect(() => {
     if (!loading && user) {
-      router.push("/")
+      router.replace(onboardingPath)
     }
-  }, [loading, router, user])
+  }, [loading, onboardingPath, router, user])
 
   const validateStep = (step) => {
     const nextErrors = {}
@@ -206,13 +213,13 @@ export default function RegisterPage() {
           console.warn("Failed to create public profile during signup:", profileError)
         }
 
-        router.push("/onboarding")
+        router.push(onboardingPath)
         return
       }
 
       setSuccessMessage("Account created! Check your email to confirm your account, then sign in.")
       setTimeout(() => {
-        router.push("/login")
+        router.push(`/login?next=${encodeURIComponent(nextPath)}`)
       }, 2500)
     } catch (error) {
       setErrors({ form: error?.message || "An error occurred during registration." })
@@ -226,7 +233,7 @@ export default function RegisterPage() {
     setSuccessMessage("")
     setOauthLoading(provider)
 
-    const redirectTo = `${window.location.origin}/onboarding`
+    const redirectTo = `${window.location.origin}${onboardingPath}`
 
     const { error } = await client.auth.signInWithOAuth({
       provider,
@@ -298,7 +305,7 @@ export default function RegisterPage() {
                 Start your anime journey today
               </h1>
               <p className="text-lg text-muted-foreground leading-relaxed">
-                Join thousands of anime fans tracking their watchlists and discovering new favorites.
+                Build your watchlist, discover new favorites, and keep your anime journey in one place.
               </p>
             </div>
 
@@ -373,7 +380,10 @@ export default function RegisterPage() {
               {currentStep === 1 && (
                 <>
                   Already have an account?{" "}
-                  <Link href="/login" className="text-primary hover:text-primary/80 font-medium">
+                  <Link
+                    href={`/login?next=${encodeURIComponent(nextPath)}`}
+                    className="text-primary hover:text-primary/80 font-medium"
+                  >
                     Sign in
                   </Link>
                 </>

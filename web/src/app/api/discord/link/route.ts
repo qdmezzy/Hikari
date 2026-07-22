@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { verifyDiscordLinkToken } from "@/lib/discord-link-token.mjs";
+import { decideDiscordLinkWrite } from "@/lib/discord-link-ownership.mjs";
+import { syncFoundingRoleForHikariUser } from "@/lib/server/discord-founding-role";
 
 const readFirstEnv = (...keys: string[]) => {
   for (const key of keys) {
@@ -60,9 +63,6 @@ const notifyDiscordLinked = async (discordUserId: string, username: string | nul
   }
 };
 
-const sanitizeDiscordId = (value: unknown) => String(value || "").trim();
-const sanitizeDiscordName = (value: unknown) => String(value || "").trim().slice(0, 100);
-
 export async function POST(req: Request) {
   const { url: supabaseUrl, anonKey: supabaseAnonKey, serviceRoleKey } = readSupabaseConfig();
   if (!supabaseUrl || !supabaseAnonKey || !serviceRoleKey) {
@@ -76,13 +76,23 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const accessToken = String(body?.access_token || "").trim();
-    const discordUserId = sanitizeDiscordId(body?.discord_user_id);
-    const discordName = sanitizeDiscordName(body?.discord_name);
+    const linkToken = String(body?.token || "").trim();
 
     if (!accessToken) return errorResponse("Missing access token.", 401);
-    if (!discordUserId || !/^\d{5,30}$/.test(discordUserId)) {
-      return errorResponse("Invalid Discord user id.");
+    if (!linkToken) return errorResponse("Missing Discord link token.");
+
+    const signingSecret = readFirstEnv("DISCORD_LINK_SIGNING_SECRET");
+    if (!signingSecret) {
+      return errorResponse("Discord account linking is not configured.", 503);
     }
+
+    let verifiedLink;
+    try {
+      verifiedLink = verifyDiscordLinkToken(linkToken, signingSecret);
+    } catch (error) {
+      return errorResponse(error instanceof Error ? error.message : "Invalid Discord link token.", 401);
+    }
+    const { discordUserId, discordName } = verifiedLink;
 
     const authClient = createClient(supabaseUrl, supabaseAnonKey, {
       auth: { persistSession: false, autoRefreshToken: false },
@@ -103,21 +113,38 @@ export async function POST(req: Request) {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Keep mapping one-to-one from both directions before writing new row.
-    const { error: deleteByDiscordError } = await admin
-      .from("discord_links")
-      .delete()
-      .eq("discord_user_id", discordUserId);
-    if (deleteByDiscordError) {
-      return errorResponse(deleteByDiscordError.message || "Failed clearing previous discord link.", 500);
+    const [discordLookup, hikariLookup] = await Promise.all([
+      admin
+        .from("discord_links")
+        .select("discord_user_id, hikari_user_id, hikari_username, linked_at")
+        .eq("discord_user_id", discordUserId)
+        .maybeSingle(),
+      admin
+        .from("discord_links")
+        .select("discord_user_id, hikari_user_id, hikari_username, linked_at")
+        .eq("hikari_user_id", hikariUserId)
+        .maybeSingle(),
+    ]);
+
+    if (discordLookup.error || hikariLookup.error) {
+      return errorResponse(
+        discordLookup.error?.message || hikariLookup.error?.message || "Failed checking account links.",
+        500,
+      );
     }
 
-    const { error: deleteByUserError } = await admin
-      .from("discord_links")
-      .delete()
-      .eq("hikari_user_id", hikariUserId);
-    if (deleteByUserError) {
-      return errorResponse(deleteByUserError.message || "Failed clearing previous user link.", 500);
+    const decision = decideDiscordLinkWrite({
+      discordLink: discordLookup.data,
+      hikariLink: hikariLookup.data,
+      hikariUserId,
+      discordUserId,
+    });
+    if (!decision.ok) {
+      const message =
+        decision.reason === "discord_claimed"
+          ? "That Discord account is already linked to another Hikari account."
+          : "This Hikari account is already linked to a different Discord account. Unlink it in Discord before linking another.";
+      return errorResponse(message, decision.status);
     }
 
     const payload = {
@@ -126,13 +153,18 @@ export async function POST(req: Request) {
       hikari_username: fallbackHandle,
     };
 
-    const { data: linkedRow, error: upsertError } = await admin
-      .from("discord_links")
-      .upsert(payload, { onConflict: "discord_user_id" })
+    const writeQuery = decision.mode === "update"
+      ? admin.from("discord_links").update(payload).eq("discord_user_id", discordUserId)
+      : admin.from("discord_links").insert(payload);
+
+    const { data: linkedRow, error: upsertError } = await writeQuery
       .select("discord_user_id, hikari_user_id, hikari_username, linked_at")
       .single();
 
     if (upsertError) {
+      if (String(upsertError.code || "") === "23505") {
+        return errorResponse("That Discord or Hikari account was linked by another request. Please refresh and try again.", 409);
+      }
       return errorResponse(upsertError.message || "Failed to create Discord link.", 500);
     }
 
@@ -147,12 +179,12 @@ export async function POST(req: Request) {
       }
     })();
     await notifyDiscordLinked(discordUserId, linkedRow?.hikari_username ?? null, origin);
+    await syncFoundingRoleForHikariUser(admin, hikariUserId);
 
-    return NextResponse.json({
-      ok: true,
-      linked: linkedRow,
-      discord_name: discordName || null,
-    });
+    return NextResponse.json(
+      { ok: true, linked: linkedRow, discord_name: discordName || null },
+      { headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
     return errorResponse(String(error || "Failed to link account."), 500);
   }

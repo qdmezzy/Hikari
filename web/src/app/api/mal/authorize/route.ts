@@ -1,6 +1,7 @@
 import crypto from "crypto"
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { getSafeNextPath } from "@/lib/safe-navigation.mjs"
 
 const MAL_CLIENT_ID = process.env.MAL_CLIENT_ID
 const MAL_REDIRECT_URI = process.env.MAL_REDIRECT_URI
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url)
-  const returnTo = url.searchParams.get("returnTo") || "/import"
+  const returnTo = getSafeNextPath(url.searchParams.get("returnTo"), "/import")
   const state = base64UrlEncode(crypto.randomBytes(16))
   const verifier = createVerifier()
   const challenge = createChallenge(verifier)
