@@ -96,21 +96,37 @@ const helpCustomIdPrefix = "hikari_help";
 const categoryByKey = new Map(categories.map((item) => [item.key, item]));
 const commandCount = categories.reduce((n, c) => n + c.body.length, 0);
 
-// Home: a Components V2 page — heading, blurb, then one section per category
-// with a "View" button pinned to the right of each row.
+// Home: two stacked Components V2 cards — a hero card with the blurb and an
+// "Open Hikari" button pinned beside the heading, then a commands card with
+// one section per category and a "View" button on each row.
 const buildHomePayload = (ownerId) => {
-  const container = new ContainerBuilder().setAccentColor(embedColors.brand);
-
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(
-      `# ${EMOJI.sparkle} What is Hikari?\n-# Anime discovery & tracking, right inside your server`,
-    ),
-    new TextDisplayBuilder().setContent(ABOUT),
+  const hero = new ContainerBuilder().setAccentColor(embedColors.brand);
+  hero.addSectionComponents(
+    new SectionBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          `# ${EMOJI.sparkle} What is Hikari?\n-# Anime discovery & tracking, right inside your server`,
+        ),
+      )
+      .setButtonAccessory(
+        new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.sparkle).setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
+      ),
   );
-  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+  hero.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(ABOUT),
+    new TextDisplayBuilder().setContent(
+      "-# **NOTE:** Hikari isn't affiliated with MyAnimeList or AniList — it imports your history from both.",
+    ),
+  );
+
+  const commands = new ContainerBuilder().setAccentColor(embedColors.brand);
+  commands.addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`## Commands\n-# ${commandCount} commands · pick a category`),
+  );
+  commands.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
 
   for (const cat of categories) {
-    container.addSectionComponents(
+    commands.addSectionComponents(
       new SectionBuilder()
         .addTextDisplayComponents(
           // EMOJI is resolved per render, not at import — the custom-emoji
@@ -126,26 +142,25 @@ const buildHomePayload = (ownerId) => {
     );
   }
 
-  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
-  container.addActionRowComponents(
+  commands.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+  commands.addActionRowComponents(
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.sparkle).setLabel("Open Hikari").setURL(buildHikariUrl("/", "help")),
       new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.plus).setLabel("Add to Server").setURL(buildDiscordBotInviteUrl()),
       new ButtonBuilder().setStyle(ButtonStyle.Link).setEmoji(EMOJI.chat).setLabel("Support").setURL(getDiscordSupportUrl()),
     ),
   );
-  container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`-# 光 Hikari · ${commandCount} commands`),
-  );
+  commands.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# 光 Hikari"));
 
-  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+  return { components: [hero, commands], flags: MessageFlags.IsComponentsV2 };
 };
 
 const buildCategoryPayload = (ownerId, username, category) => {
   const container = new ContainerBuilder().setAccentColor(embedColors.brand);
 
   container.addTextDisplayComponents(
-    new TextDisplayBuilder().setContent(`## ${EMOJI[category.emojiKey]} ${category.label}\n-# ${category.description}`),
+    new TextDisplayBuilder().setContent(
+      `## ${EMOJI[category.emojiKey]} ${category.label}\n-# ${category.description} · ${category.body.length} commands`,
+    ),
   );
   container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
   container.addTextDisplayComponents(new TextDisplayBuilder().setContent(category.body.join("\n")));

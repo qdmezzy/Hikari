@@ -1,7 +1,16 @@
-import { EmbedBuilder, SlashCommandBuilder } from "discord.js";
+import {
+  ContainerBuilder,
+  MessageFlags,
+  SectionBuilder,
+  SeparatorBuilder,
+  SeparatorSpacingSize,
+  SlashCommandBuilder,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
+} from "discord.js";
 import { getAnimeByIds, mediaTitle } from "../lib/anilist.js";
 import { embedColors } from "../lib/embeds.js";
-import { EMOJI, UNICODE } from "../lib/emojis.js";
+import { EMOJI } from "../lib/emojis.js";
 import { replyError, respond } from "../lib/interaction.js";
 import { supabase } from "../lib/supabase.js";
 import { countLinkedAccounts, getAllLinks, getLinkByDiscordId } from "../services/links.js";
@@ -23,6 +32,25 @@ const rankBadge = (index) => [EMOJI.gold, EMOJI.silver, EMOJI.bronze][index] || 
 
 const rankLine = (index, username, value, suffix) =>
   `${rankBadge(index)} @${username || "unknown"} — **${value}** ${suffix}`;
+
+// Niko-style typographic card: big heading, meta subtext, body blocks.
+const buildStatsCard = ({ heading, subtext, thumbnail, blocks }) => {
+  const container = new ContainerBuilder().setAccentColor(embedColors.brand);
+  const head = new TextDisplayBuilder().setContent(`# ${heading}\n-# ${subtext}`);
+  if (thumbnail) {
+    container.addSectionComponents(
+      new SectionBuilder().addTextDisplayComponents(head).setThumbnailAccessory(new ThumbnailBuilder().setURL(thumbnail)),
+    );
+  } else {
+    container.addTextDisplayComponents(head);
+  }
+  container.addSeparatorComponents(new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small));
+  for (const block of blocks.filter(Boolean)) {
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(block));
+  }
+  container.addTextDisplayComponents(new TextDisplayBuilder().setContent("-# 光 Hikari"));
+  return { components: [container], flags: MessageFlags.IsComponentsV2 };
+};
 
 const leaderboardCommand = {
   data: new SlashCommandBuilder()
@@ -85,21 +113,17 @@ const leaderboardCommand = {
           }
         }
 
-        const embed = new EmbedBuilder()
-          .setColor(embedColors.brand)
-          .setTitle(`${UNICODE.trophy} Episode Leaderboard`)
-          .setDescription(
-            [
-              `-# ${period === "monthly" ? "This Month" : "This Week"}`,
-              "",
+        await respond(
+          interaction,
+          buildStatsCard({
+            heading: `${EMOJI.trophy} Episode Leaderboard`,
+            subtext: period === "monthly" ? "This Month" : "This Week",
+            blocks: [
               topLines.length ? topLines.join("\n") : "No episode activity in this period.",
-            ].join("\n"),
-          )
-          .addFields({ name: "Your Position", value: selfLine, inline: false })
-          .setFooter({ text: "光 Hikari" })
-          .setTimestamp();
-
-        await respond(interaction, { embeds: [embed] });
+              `-# Your position: ${selfLine}`,
+            ],
+          }),
+        );
         return;
       }
 
@@ -145,15 +169,14 @@ const leaderboardCommand = {
           .filter((row) => row[1] > 0)
           .map(([userId, streak], idx) => rankLine(idx, usernameByUserId.get(userId), streak, "day(s)"));
 
-        const embed = new EmbedBuilder()
-          .setColor(embedColors.brand)
-          .setTitle(`${UNICODE.fire} Streak Leaderboard`)
-          .setDescription(
-            ["-# All Time", "", top.length ? top.join("\n") : "No active streaks right now."].join("\n"),
-          )
-          .setFooter({ text: "光 Hikari" })
-          .setTimestamp();
-        await respond(interaction, { embeds: [embed] });
+        await respond(
+          interaction,
+          buildStatsCard({
+            heading: `${EMOJI.fire} Streak Leaderboard`,
+            subtext: "All Time",
+            blocks: [top.length ? top.join("\n") : "No active streaks right now."],
+          }),
+        );
       }
     } catch (error) {
       await replyError(interaction, error?.message || "Failed to load leaderboard.");
@@ -222,32 +245,22 @@ const serverStatsCommand = {
         .map((id, index) => `${rankBadge(index)} ${mediaTitle(mediaById.get(id))}`)
         .join("\n");
 
-      // Big numbers in code blocks read as stat tiles — same style as /profile.
-      const statTile = (value) => `\`\`\`\n${value}\n\`\`\``;
-
-      const embed = new EmbedBuilder()
-        .setColor(embedColors.brand)
-        .setTitle(`${UNICODE.library} Server Stats`)
-        .setDescription("-# Server-wide anime tracking, past 7 days")
-        .addFields(
-          { name: "Members", value: statTile(Number(interaction.guild?.memberCount || 0).toLocaleString()), inline: true },
-          { name: "Linked", value: statTile(Number(linkedCount).toLocaleString()), inline: true },
-          { name: "Active Today", value: statTile(activeTodayUsers.size.toLocaleString()), inline: true },
-          {
-            name: `${EMOJI.episodes} Episodes This Week`,
-            value: `**${episodesThisWeek.toLocaleString()}**`,
-            inline: false,
-          },
-          { name: `${EMOJI.fire} Top Anime`, value: topAnimeLines || "No weekly anime data", inline: false },
-          { name: `${EMOJI.trophy} Most Active`, value: topUserText, inline: false },
-        )
-        .setFooter({ text: "光 Hikari" })
-        .setTimestamp();
-      const guildIcon = interaction.guild?.iconURL?.({ size: 128 });
-      if (interaction.guild?.name) {
-        embed.setAuthor({ name: interaction.guild.name, iconURL: guildIcon || undefined });
-      }
-      await respond(interaction, { embeds: [embed] });
+      await respond(
+        interaction,
+        buildStatsCard({
+          heading: `${EMOJI.library} Server Stats`,
+          subtext: `${interaction.guild?.name || "Server"} · past 7 days`,
+          thumbnail: interaction.guild?.iconURL?.({ size: 128 }) || null,
+          blocks: [
+            [
+              `**${Number(interaction.guild?.memberCount || 0).toLocaleString()}** members  ·  **${Number(linkedCount).toLocaleString()}** linked  ·  **${activeTodayUsers.size.toLocaleString()}** active today`,
+              `${EMOJI.episodes} **${episodesThisWeek.toLocaleString()}** episodes watched this week`,
+            ].join("\n"),
+            `**${EMOJI.fire} Top Anime**\n${topAnimeLines || "No weekly anime data"}`,
+            `**${EMOJI.trophy} Most Active**\n${topUserText}`,
+          ],
+        }),
+      );
     } catch (error) {
       await replyError(interaction, error?.message || "Failed to load server stats.");
     }
