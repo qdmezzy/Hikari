@@ -201,8 +201,8 @@ function ActivityItem({ post, coverImage, user }) {
   )
 
   return (
-    <article className="overflow-hidden rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm transition-colors hover:border-border">
-      <div className="flex items-start gap-3 px-4 py-3.5">
+    <article className="overflow-hidden rounded-2xl border border-border/60 bg-card/55 shadow-[0_14px_32px_-28px_rgba(16,24,40,0.75)] transition-[border-color,box-shadow] hover:border-primary/35 hover:shadow-[0_20px_38px_-28px_rgba(16,24,40,0.85)]">
+      <div className="flex items-start gap-3 px-4 py-4 sm:px-5">
         {profileHref ? (
           <Link href={profileHref} className="flex-shrink-0">
             {avatar}
@@ -247,7 +247,7 @@ function ActivityItem({ post, coverImage, user }) {
           {!isStatus && mediaHref ? (
             <Link
               href={mediaHref}
-              className="mt-2.5 flex items-center gap-3 rounded-xl border border-border/50 bg-secondary/40 p-2 pr-3 transition-colors hover:border-primary/40 hover:bg-secondary/60"
+              className="mt-3 flex items-center gap-3 border-l-2 border-primary/60 bg-secondary/35 p-2.5 pr-3 transition-colors hover:bg-secondary/55"
             >
               <div className="relative h-16 w-11 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
                 {coverImage ? (
@@ -265,7 +265,7 @@ function ActivityItem({ post, coverImage, user }) {
             </Link>
           ) : null}
 
-          <div className="-ml-2 mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="-ml-2 mt-3 flex items-center gap-1 border-t border-border/40 pt-2 text-xs text-muted-foreground">
             <button
               type="button"
               onClick={toggleComments}
@@ -376,7 +376,7 @@ function ActivityItem({ post, coverImage, user }) {
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              <Link href="/login" className="text-primary hover:underline">
+              <Link href="/login?next=%2Fcommunity" className="text-primary hover:underline">
                 Sign in
               </Link>{" "}
               to join the conversation.
@@ -592,14 +592,14 @@ function AnnouncementCard({ announcement, isMod, onEdit, onDelete }) {
 
 function ForumThreadItem({ thread, isMod, onEdit, onDelete }) {
   return (
-    <div className="group border-b border-border/30 pb-4 last:border-0 last:pb-0">
+    <div className="rv-discussion-item group border-b border-border/30 pb-4 last:border-0 last:pb-0">
       <div className="flex items-start justify-between gap-2">
         <h4 className="line-clamp-2 flex items-start gap-1.5 text-sm font-medium text-foreground">
           {thread.is_pinned ? <Pin className="mt-0.5 size-3 flex-shrink-0 text-primary" /> : null}
           {thread.title}
         </h4>
         {isMod ? (
-          <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="flex flex-shrink-0 items-center gap-1">
             <button
               type="button"
               onClick={() => onEdit(thread)}
@@ -620,7 +620,7 @@ function ForumThreadItem({ thread, isMod, onEdit, onDelete }) {
         ) : null}
       </div>
       {thread.body ? (
-        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">{thread.body}</p>
+        <details className="rv-thread-body"><summary>Read discussion</summary><p className="selectable whitespace-pre-wrap">{thread.body}</p></details>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <span className="flex items-center gap-1">
@@ -651,23 +651,21 @@ function ReviewCard({ review }) {
   const ratingLabel = rating > 10 ? (rating / 10).toFixed(1) : rating.toFixed(rating % 1 === 0 ? 0 : 1)
 
   return (
-    <div className="space-y-2">
+    <article className="rv-review-card">
       {mediaHref ? (
-        <Link href={mediaHref} className="block aspect-video overflow-hidden rounded-lg bg-muted/50">
+        <Link href={mediaHref} className="rv-review-cover">
           {review.cover_image ? (
             <img src={review.cover_image} alt="" className="h-full w-full object-cover" />
           ) : null}
         </Link>
       ) : (
-        <div className="aspect-video overflow-hidden rounded-lg bg-muted/50" />
+        <div className="rv-review-cover" />
       )}
       <div>
-        <h4 className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
+        <h4>
           Review of {review.media_title || "this title"} by {review.user_display_name || "User"}
         </h4>
-        <p className="selectable mt-1 line-clamp-4 text-[11px] leading-relaxed text-muted-foreground">
-          {review.review_text}
-        </p>
+        <details className="rv-review-text"><summary className="selectable">{String(review.review_text || "").slice(0,160)}{String(review.review_text || "").length > 160 ? "… Read more" : ""}</summary><p className="selectable whitespace-pre-wrap">{review.review_text}</p></details>
         {rating > 0 ? (
           <div className="mt-1.5 flex items-center gap-1 text-xs text-muted-foreground">
             <Star className="size-3 fill-chart-3 text-chart-3" />
@@ -675,7 +673,7 @@ function ReviewCard({ review }) {
           </div>
         ) : null}
       </div>
-    </div>
+    </article>
   )
 }
 
@@ -747,6 +745,12 @@ function StatusComposer({ user, onPosted }) {
 }
 
 function CommunityExperience({ user, isMod }) {
+  const [communityView, setCommunityView] = useState("activity")
+  const [feedError, setFeedError] = useState("")
+  const [forumLoading, setForumLoading] = useState(true)
+  const [forumError, setForumError] = useState("")
+  const [reviewsError, setReviewsError] = useState("")
+  const [reloadKey, setReloadKey] = useState(0)
   const [activities, setActivities] = useState([])
   const [covers, setCovers] = useState(new Map())
   const [loading, setLoading] = useState(true)
@@ -794,19 +798,21 @@ function CommunityExperience({ user, isMod }) {
     let active = true
     const load = async () => {
       try {
-        const [ann, thr] = await Promise.all([fetchAnnouncements(5), fetchForumThreads(8)])
+        setForumLoading(true)
+        setForumError("")
+        const [ann, thr] = await Promise.all([fetchAnnouncements(5), fetchForumThreads(20)])
         if (!active) return
         setAnnouncements(ann)
         setThreads(thr)
       } catch {
-        if (!active) return
-      }
+        if (active) setForumError("The discussions couldn’t be loaded.")
+      } finally { if (active) setForumLoading(false) }
     }
     load()
     return () => {
       active = false
     }
-  }, [])
+  }, [reloadKey])
 
   const handleSaveAnnouncement = async (values) => {
     if (announcementEditor.initial) {
@@ -866,6 +872,7 @@ function CommunityExperience({ user, isMod }) {
     let active = true
     const load = async () => {
       setLoading(true)
+      setFeedError("")
       try {
         const data = await fetchActivityFeed(user?.id, 30)
         if (!active) return
@@ -873,6 +880,7 @@ function CommunityExperience({ user, isMod }) {
       } catch {
         if (!active) return
         setActivities([])
+        setFeedError("We couldn’t load the activity feed.")
       } finally {
         if (active) setLoading(false)
       }
@@ -881,19 +889,21 @@ function CommunityExperience({ user, isMod }) {
     return () => {
       active = false
     }
-  }, [user?.id])
+  }, [user?.id, reloadKey])
 
   useEffect(() => {
     let active = true
     const load = async () => {
       setReviewsLoading(true)
+      setReviewsError("")
       try {
-        const data = await fetchRecentReviews(4)
+        const data = await fetchRecentReviews(12)
         if (!active) return
         setReviews(data)
       } catch {
         if (!active) return
         setReviews([])
+        setReviewsError("We couldn’t load recent reviews.")
       } finally {
         if (active) setReviewsLoading(false)
       }
@@ -902,7 +912,7 @@ function CommunityExperience({ user, isMod }) {
     return () => {
       active = false
     }
-  }, [])
+  }, [reloadKey])
 
   useEffect(() => {
     let active = true
@@ -933,174 +943,36 @@ function CommunityExperience({ user, isMod }) {
   }, [activities])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="hikari-revamp rv-community min-h-screen">
       <Navigation />
-      <main className="mx-auto max-w-6xl px-4 pb-16 pt-24">
-        <div className="mb-8">
-          <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">コミュニティ</p>
-          <h1 className="mt-1 text-3xl font-bold text-foreground md:text-4xl">Community</h1>
-          <p className="mt-2 text-muted-foreground">
-            See what everyone&apos;s watching, posting, and talking about.
-          </p>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Activity
-              </h2>
-              <div className="flex items-center gap-1 rounded-lg border border-border/50 bg-card/40 p-0.5">
-                {[
-                  { id: "following", label: "Following" },
-                  { id: "global", label: "Global" },
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveFeed(tab.id)}
-                    className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-                      activeFeed === tab.id
-                        ? "bg-primary/15 text-primary"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="rounded-xl border border-border/50 bg-card/40 backdrop-blur-sm">
-                <StatusComposer user={user} onPosted={handlePostStatus} />
-              </div>
-              {loading ? (
-                Array.from({ length: 8 }).map((_, i) => <ActivitySkeleton key={i} />)
-              ) : visibleActivities.length === 0 ? (
-                <div className="flex flex-col items-center rounded-xl border border-border/50 bg-card/40 p-12 text-center backdrop-blur-sm">
-                  <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <MessageCircle className="size-5" />
-                  </div>
-                  <p className="mt-3 text-sm font-medium text-foreground">
-                    {activeFeed === "following" ? "It's quiet in here" : "No activity yet"}
-                  </p>
-                  <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-                    {activeFeed === "following"
-                      ? "Follow people to fill this feed with their watching activity."
-                      : "Write a status or update your list to start the feed!"}
-                  </p>
-                </div>
-              ) : (
-                visibleActivities.map((post) => (
-                  <ActivityItem
-                    key={post.id}
-                    post={post}
-                    coverImage={covers.get(Number(post.attached_media_id)) || null}
-                    user={user}
-                  />
-                ))
-              )}
-            </div>
+      <main className="rv-container rv-main">
+        <header className="rv-community-masthead">
+          <div><span className="hk-page-jp" lang="ja">みんなの広場</span><h1>Community</h1><p>Activity, discussions, and reviews.</p></div>
+          <div className="rv-community-covers" aria-hidden="true">{Array.from(covers.values()).filter(Boolean).slice(0,5).map((cover,index) => <img key={index} src={cover} alt="" />)}</div>
+        </header>
+        <div className="rv-community-layout">
+          <aside className="hk-community-tabs">
+            {[{id:"activity",label:"Activity",icon:Heart},{id:"discussions",label:"Discussions",icon:MessageCircle},{id:"reviews",label:"Reviews",icon:Star}].map(item => <button key={item.id} type="button" aria-pressed={communityView === item.id} onClick={() => setCommunityView(item.id)}><item.icon size={17} />{item.label}</button>)}
+          </aside>
+          <section className="rv-community-feed" aria-label={communityView}>
+            {communityView === "activity" ? <>
+              <div className="rv-feed-heading"><h2>Activity</h2><div>{[{id:"global",label:"Everyone"},{id:"following",label:"Following"}].map(tab => <button key={tab.id} type="button" aria-pressed={activeFeed === tab.id} onClick={() => setActiveFeed(tab.id)}>{tab.label}</button>)}</div></div>
+              {activeFeed === "following" && !user ? <div className="rv-empty"><h3>Following</h3><p>Sign in to see updates from the people you follow.</p><Button asChild><Link href="/login?next=%2Fcommunity">Sign in</Link></Button></div> : <>
+                <div className="rv-status-composer"><StatusComposer user={user} onPosted={handlePostStatus} /></div>
+                {loading ? <div role="status" aria-label="Loading activity">{[1,2,3].map(i => <ActivitySkeleton key={i} />)}</div> : feedError ? <div className="rv-empty"><p role="alert">{feedError}</p><Button variant="outline" onClick={() => setReloadKey(key => key + 1)}>Try again</Button></div> : visibleActivities.length ? <div className="rv-activity-stream">{visibleActivities.map(post => <ActivityItem key={post.id} post={post} coverImage={covers.get(Number(post.attached_media_id)) || null} user={user} />)}</div> : <div className="rv-empty"><MessageCircle size={30} className="mx-auto mb-4 text-primary" /><h3>{activeFeed === "following" ? "No updates from your follows yet." : "Start the conversation."}</h3><p>{activeFeed === "following" ? "Follow people from their profiles, or explore everyone’s activity." : "Post a status or update your watch progress to share what you’re into."}</p>{activeFeed === "following" ? <Button variant="outline" onClick={() => setActiveFeed("global")}>Explore everyone’s activity</Button> : null}</div>}
+              </>}
+            </> : communityView === "discussions" ? <>
+              <div className="rv-feed-heading"><div><h2>Discussions</h2><p>Latest threads from the Hikari team.</p></div>{isMod ? <Button size="sm" onClick={() => setThreadEditor({open:true,initial:null})}><Plus size={15} />New thread</Button> : null}</div>
+              {forumLoading ? <p role="status" className="py-10 text-muted-foreground">Loading discussions…</p> : forumError ? <div className="rv-empty"><p role="alert">{forumError}</p><Button variant="outline" onClick={() => setReloadKey(key => key + 1)}>Try again</Button></div> : threads.length ? <div className="rv-discussions">{threads.map(thread => <ForumThreadItem key={thread.id} thread={thread} isMod={isMod} onEdit={initial => setThreadEditor({open:true,initial})} onDelete={handleDeleteThread} />)}</div> : <div className="rv-empty"><MessageCircle size={30} className="mx-auto mb-4 text-primary" /><h3>No discussions yet.</h3><p>New threads will appear here. You can share your own thoughts in the activity feed.</p><Button variant="outline" onClick={() => setCommunityView("activity")}>Go to activity</Button></div>}
+            </> : <>
+              <div className="rv-feed-heading"><div><h2>Recent reviews</h2><p>Ratings and reviews from the community.</p></div></div>
+              {reviewsLoading ? <p role="status" className="py-10 text-muted-foreground">Loading reviews…</p> : reviewsError ? <div className="rv-empty"><p role="alert">{reviewsError}</p><Button variant="outline" onClick={() => setReloadKey(key => key + 1)}>Try again</Button></div> : reviews.length ? <div className="rv-reviews">{reviews.map(review => <ReviewCard key={review.id} review={review} />)}</div> : <div className="rv-empty"><Star size={30} className="mx-auto mb-4 text-primary" /><h3>Have a title on your mind?</h3><p>Open an anime or manga page to leave a review. Recent reviews will appear here.</p><Button asChild variant="outline"><Link href="/search">Find a title to review</Link></Button></div>}
+            </>}
           </section>
-
-          <aside className="space-y-5">
-            {announcements.length > 0 || isMod ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                    Announcements
-                  </h3>
-                  {isMod ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 gap-1 px-2 text-xs"
-                      onClick={() => setAnnouncementEditor({ open: true, initial: null })}
-                    >
-                      <Plus className="size-3.5" />
-                      New
-                    </Button>
-                  ) : null}
-                </div>
-                {announcements.length === 0 ? (
-                  <p className="rounded-xl border border-dashed border-border/50 p-4 text-xs text-muted-foreground">
-                    No announcements yet. Create one to greet the community.
-                  </p>
-                ) : (
-                  announcements.map((announcement) => (
-                    <AnnouncementCard
-                      key={announcement.id}
-                      announcement={announcement}
-                      isMod={isMod}
-                      onEdit={(a) => setAnnouncementEditor({ open: true, initial: a })}
-                      onDelete={handleDeleteAnnouncement}
-                    />
-                  ))
-                )}
-              </div>
-            ) : null}
-
-            <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                  Forum activity
-                </h3>
-                {isMod ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 gap-1 px-2 text-xs"
-                    onClick={() => setThreadEditor({ open: true, initial: null })}
-                  >
-                    <Plus className="size-3.5" />
-                    New
-                  </Button>
-                ) : null}
-              </div>
-              {threads.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  {isMod ? "No threads yet. Start the first discussion." : "No threads yet."}
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {threads.map((thread) => (
-                    <ForumThreadItem
-                      key={thread.id}
-                      thread={thread}
-                      isMod={isMod}
-                      onEdit={(t) => setThreadEditor({ open: true, initial: t })}
-                      onDelete={handleDeleteThread}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-border/50 bg-card/40 p-4 backdrop-blur-sm">
-              <h3 className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Recent reviews
-              </h3>
-              {reviewsLoading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="space-y-2">
-                      <div className="aspect-video animate-pulse rounded-lg bg-muted/40" />
-                      <div className="h-3 w-3/4 animate-pulse rounded bg-muted/40" />
-                      <div className="h-2.5 w-full animate-pulse rounded bg-muted/30" />
-                    </div>
-                  ))}
-                </div>
-              ) : reviews.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No reviews yet. Be the first to review a title.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {reviews.map((review) => (
-                    <ReviewCard key={review.id} review={review} />
-                  ))}
-                </div>
-              )}
-            </div>
+          <aside className="rv-community-noticeboard">
+            <div className="rv-feed-heading"><h2>Noticeboard</h2>{isMod ? <Button size="icon" variant="ghost" aria-label="New announcement" onClick={() => setAnnouncementEditor({open:true,initial:null})}><Plus size={16} /></Button> : null}</div>
+            {announcements.length ? announcements.map(announcement => <AnnouncementCard key={announcement.id} announcement={announcement} isMod={isMod} onEdit={initial => setAnnouncementEditor({open:true,initial})} onDelete={handleDeleteAnnouncement} />) : <p className="text-sm leading-relaxed text-muted-foreground">{forumLoading ? "Loading announcements…" : forumError ? "Announcements are temporarily unavailable." : "Updates from the Hikari team will appear here."}</p>}
+            <div className="rv-community-note"><h3>Before you post</h3><p>Mark spoilers and keep discussions respectful.</p><Link href="/feedback">Send feedback ↗</Link></div>
           </aside>
         </div>
       </main>
@@ -1263,10 +1135,6 @@ export default function CommunityPage() {
         Loading...
       </div>
     )
-  }
-
-  if (!isMod) {
-    return <CommunityComingSoonPage />
   }
 
   return <CommunityExperience user={user} isMod={isMod} />

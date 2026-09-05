@@ -6,8 +6,8 @@ import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { motion } from "framer-motion"
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Navigation } from "@/components/layout/Navigation"
-import { AnimeDecorations } from "@/components/common/anime-decorations"
 import RequireAuth from "@/components/common/RequireAuth"
 import { EmptyState } from "@/components/common/EmptyState"
 import {
@@ -25,6 +25,7 @@ import {
   ListPlus,
   XCircle,
 } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -138,14 +139,151 @@ const formatEntryScore = (value) => {
   return numeric.toFixed(numeric % 1 === 0 ? 0 : 1)
 }
 
+function TrackingEntryRow({ entry, tabId, pendingId, onIncrement, onUpdate, onRemove }) {
+  const title = getMediaTitle(entry?.media)
+  const cover = entry?.media?.coverImage?.extraLarge || entry?.media?.coverImage?.large || "/placeholder.svg"
+  const score = formatEntryScore(entry?.score)
+  const episodeCount = getEntryTotalUnits(entry)
+  const isCompletedEntry = tabId === "completed" || entry?.status === "completed"
+  const rawProgress = Number(entry?.progress || 0)
+  // Completed items always read as fully watched/read, never partial.
+  const progress = isCompletedEntry && episodeCount ? episodeCount : rawProgress
+  const progressValue = isCompletedEntry
+    ? 100
+    : episodeCount
+      ? Math.min((progress / episodeCount) * 100, 100)
+      : 0
+  // Stable dates that imports don't bump: created_at (when added to Hikari),
+  // started_at / finished_at (real dates from the source). updated_at is the
+  // last-edit time, which a re-import touches — so we avoid it on these labels.
+  const toDate = (value: string | null | undefined) =>
+    value ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : null
+  const finishedOn = toDate(entry?.finished_at)
+  const lastWatchedOn = toDate(entry?.updated_at)
+  const addedOn = toDate(entry?.created_at)
+  // updated_at is bumped by imports and edits, not just watching — so only
+  // treat it as real watch/read activity when it lands meaningfully after the
+  // entry was added. Otherwise an imported list would falsely read
+  // "Last watched today" on every title.
+  const createdMs = entry?.created_at ? new Date(entry.created_at).getTime() : 0
+  const updatedMs = entry?.updated_at ? new Date(entry.updated_at).getTime() : 0
+  const hasProgressActivity = createdMs > 0 && updatedMs - createdMs > 120_000
+  const lastActivityVerb = isMangaEntry(entry) ? "Last read" : "Last watched"
+  const addedLabel = formatRelativeTime(entry?.created_at)
+  const meta = tabMeta[tabId]
+  const Icon = meta.icon
+  const isPending = pendingId === entry.id
+  const unitLabel = getEntryUnitLabel(entry)
+  const shortUnitLabel = getEntryUnitLabel(entry, true)
+  const statusLabel = getEntryStatusLabel(entry, tabId)
+  const mediaStatusLabel = getMediaStatusLabel(entry)
+
+  const detailText =
+    tabId === "completed"
+      ? finishedOn
+        ? `${isMangaEntry(entry) ? "Read" : "Finished"} ${finishedOn}`
+        : isMangaEntry(entry)
+          ? "Read"
+          : "Completed"
+      : tabId === "watching"
+        ? hasProgressActivity && lastWatchedOn
+          ? `${lastActivityVerb} ${lastWatchedOn}`
+          : addedOn
+            ? `Added ${addedOn}`
+            : `Added ${addedLabel || "recently"}`
+        : addedOn
+          ? `Added ${addedOn}`
+          : `Added ${addedLabel || "recently"}`
+
+  return <article className="hk-library-entry">
+    <Link className="hk-library-cover" href={`/media/${entry.media_id}`} aria-label={title}><Image src={cover} alt="" fill sizes="48px" /></Link>
+    <div className="hk-library-title"><Link href={`/media/${entry.media_id}`}><h3>{title}</h3></Link><p>{isMangaEntry(entry) ? "Manga" : "Anime"}{mediaStatusLabel ? ` · ${mediaStatusLabel}` : ""} · {detailText}</p></div>
+    <div className="hk-library-progress"><span>{shortUnitLabel} <strong>{progress}</strong>{episodeCount ? ` / ${episodeCount}` : ""}</span>{episodeCount ? <Progress value={progressValue} aria-label={`${title} progress`} className="h-1" /> : null}</div>
+    <div className="hk-library-score"><Star size={12} /><span>{score || "—"}</span></div>
+    <div className="hk-library-actions">{tabId === "watching" || tabId === "paused" ? <Button size="icon" variant="outline" disabled={isPending} onClick={() => onIncrement(entry)} aria-label={`Add one ${unitLabel} to ${title}`}><Plus size={15} /></Button> : null}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="ghost" className="flex-shrink-0 h-8 w-8 p-0" disabled={isPending} aria-label={`Actions for ${title}`}>
+                  {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreHorizontal className="w-4 h-4" />}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <Link href={`/media/${entry.media_id}`}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Open details
+                  </Link>
+                </DropdownMenuItem>
+                {(tabId === "watching" || tabId === "paused") && (
+                  <DropdownMenuItem onClick={() => onIncrement(entry)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add 1 {unitLabel}
+                  </DropdownMenuItem>
+                )}
+                {entry.status !== "watching" && (
+                  <DropdownMenuItem onClick={() => onUpdate(entry, { status: "watching" })}>
+                    <Play className="w-4 h-4 mr-2" />
+                    Move to {isMangaEntry(entry) ? "reading" : "watching"}
+                  </DropdownMenuItem>
+                )}
+                {entry.status !== "completed" && (
+                  <DropdownMenuItem
+                    onClick={() =>
+                      onUpdate(entry, {
+                        status: "completed",
+                        progress: episodeCount || entry?.progress || 0,
+                      })
+                    }
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    Mark {isMangaEntry(entry) ? "read" : "completed"}
+                  </DropdownMenuItem>
+                )}
+                {entry.status !== "plan_to_watch" && (
+                  <DropdownMenuItem onClick={() => onUpdate(entry, { status: "plan_to_watch" })}>
+                    <ListPlus className="w-4 h-4 mr-2" />
+                    Move to plan to {isMangaEntry(entry) ? "read" : "watch"}
+                  </DropdownMenuItem>
+                )}
+                {entry.status !== "on_hold" && (
+                  <DropdownMenuItem onClick={() => onUpdate(entry, { status: "on_hold" })}>
+                    <Pause className="w-4 h-4 mr-2" />
+                    Put on hold
+                  </DropdownMenuItem>
+                )}
+                {entry.status !== "dropped" && (
+                  <DropdownMenuItem onClick={() => onUpdate(entry, { status: "dropped" })}>
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Mark dropped
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={() => onRemove(entry)}>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Remove from list
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+    </div>
+  </article>
+}
+
 function ListPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user } = useAuth()
+  const [removeTarget, setRemoveTarget] = useState<any>(null)
   const statusParam = searchParams.get("status")
 
   const initialTab = statusParam ? statusToTab[statusParam] || "watching" : "watching"
 
+  const libraryView = searchParams.get("view") === "collections" ? "collections" : "titles"
+  const [listQuery, setListQuery] = useState("")
+  const changeView = (view: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("view", view)
+    router.replace(`/lists?${params.toString()}`, { scroll: false })
+  }
   const [activeTab, setActiveTab] = useState(initialTab)
   const [entries, setEntries] = useState([])
   const [isLoaded, setIsLoaded] = useState(false)
@@ -369,272 +507,27 @@ function ListPageContent() {
     setPendingId(null)
   }
 
-  const AnimeCard = ({ entry, tabId }) => {
-    const title = getMediaTitle(entry?.media)
-    const cover = entry?.media?.coverImage?.extraLarge || entry?.media?.coverImage?.large || "/placeholder.svg"
-    const score = formatEntryScore(entry?.score)
-    const episodeCount = getEntryTotalUnits(entry)
-    const isCompletedEntry = tabId === "completed" || entry?.status === "completed"
-    const rawProgress = Number(entry?.progress || 0)
-    // Completed items always read as fully watched/read, never partial.
-    const progress = isCompletedEntry && episodeCount ? episodeCount : rawProgress
-    const progressValue = isCompletedEntry
-      ? 100
-      : episodeCount
-        ? Math.min((progress / episodeCount) * 100, 100)
-        : 0
-    // Stable dates that imports don't bump: created_at (when added to Hikari),
-    // started_at / finished_at (real dates from the source). updated_at is the
-    // last-edit time, which a re-import touches — so we avoid it on these labels.
-    const toDate = (value: string | null | undefined) =>
-      value ? new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : null
-    const finishedOn = toDate(entry?.finished_at)
-    const lastWatchedOn = toDate(entry?.updated_at)
-    const addedOn = toDate(entry?.created_at)
-    // updated_at is bumped by imports and edits, not just watching — so only
-    // treat it as real watch/read activity when it lands meaningfully after the
-    // entry was added. Otherwise an imported list would falsely read
-    // "Last watched today" on every title.
-    const createdMs = entry?.created_at ? new Date(entry.created_at).getTime() : 0
-    const updatedMs = entry?.updated_at ? new Date(entry.updated_at).getTime() : 0
-    const hasProgressActivity = createdMs > 0 && updatedMs - createdMs > 120_000
-    const lastActivityVerb = isMangaEntry(entry) ? "Last read" : "Last watched"
-    const addedLabel = formatRelativeTime(entry?.created_at)
-    const meta = tabMeta[tabId]
-    const Icon = meta.icon
-    const isPending = pendingId === entry.id
-    const unitLabel = getEntryUnitLabel(entry)
-    const shortUnitLabel = getEntryUnitLabel(entry, true)
-    const statusLabel = getEntryStatusLabel(entry, tabId)
-    const mediaStatusLabel = getMediaStatusLabel(entry)
-
-    const detailText =
-      tabId === "completed"
-        ? finishedOn
-          ? `${isMangaEntry(entry) ? "Read" : "Finished"} ${finishedOn}`
-          : isMangaEntry(entry)
-            ? "Read"
-            : "Completed"
-        : tabId === "watching"
-          ? hasProgressActivity && lastWatchedOn
-            ? `${lastActivityVerb} ${lastWatchedOn}`
-            : addedOn
-              ? `Added ${addedOn}`
-              : `Added ${addedLabel || "recently"}`
-          : addedOn
-            ? `Added ${addedOn}`
-            : `Added ${addedLabel || "recently"}`
-
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="glass-card p-4 flex gap-4 group hover:border-accent/50 transition-all"
-      >
-        <Link href={`/media/${entry.media_id}`} className="relative w-20 h-28 md:w-24 md:h-32 rounded-lg overflow-hidden flex-shrink-0">
-          <Image
-            src={cover}
-            alt={title}
-            fill
-            className="object-cover group-hover:scale-110 transition-transform duration-500"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
-            <span className="rounded-full bg-black/60 px-3 py-1 text-xs text-white">Open</span>
-          </div>
-        </Link>
-
-        <div className="flex-1 flex flex-col justify-between py-1 min-w-0">
-          <div>
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <Link href={`/media/${entry.media_id}`}>
-                  <h3 className="font-semibold text-foreground text-lg group-hover:text-accent transition-colors line-clamp-1">
-                    {title}
-                  </h3>
-                </Link>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <Badge className={meta.badge}>
-                    <Icon className="w-3 h-3 mr-1" />
-                    {statusLabel}
-                  </Badge>
-                  {mediaStatusLabel ? (
-                    <Badge variant="outline" className="text-xs">
-                      {mediaStatusLabel}
-                    </Badge>
-                  ) : null}
-                </div>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="ghost" className="flex-shrink-0 h-8 w-8 p-0" disabled={isPending} aria-label="Entry actions">
-                    {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MoreHorizontal className="w-4 h-4" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={`/media/${entry.media_id}`}>
-                      <Eye className="w-4 h-4 mr-2" />
-                      Open details
-                    </Link>
-                  </DropdownMenuItem>
-                  {(tabId === "watching" || tabId === "paused") && (
-                    <DropdownMenuItem onClick={() => handleIncrement(entry)}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add 1 {unitLabel}
-                    </DropdownMenuItem>
-                  )}
-                  {entry.status !== "watching" && (
-                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "watching" })}>
-                      <Play className="w-4 h-4 mr-2" />
-                      Move to {isMangaEntry(entry) ? "reading" : "watching"}
-                    </DropdownMenuItem>
-                  )}
-                  {entry.status !== "completed" && (
-                    <DropdownMenuItem
-                      onClick={() =>
-                        updateEntry(entry, {
-                          status: "completed",
-                          progress: episodeCount || entry?.progress || 0,
-                        })
-                      }
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" />
-                      Mark {isMangaEntry(entry) ? "read" : "completed"}
-                    </DropdownMenuItem>
-                  )}
-                  {entry.status !== "plan_to_watch" && (
-                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "plan_to_watch" })}>
-                      <ListPlus className="w-4 h-4 mr-2" />
-                      Move to plan to {isMangaEntry(entry) ? "read" : "watch"}
-                    </DropdownMenuItem>
-                  )}
-                  {entry.status !== "on_hold" && (
-                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "on_hold" })}>
-                      <Pause className="w-4 h-4 mr-2" />
-                      Put on hold
-                    </DropdownMenuItem>
-                  )}
-                  {entry.status !== "dropped" && (
-                    <DropdownMenuItem onClick={() => updateEntry(entry, { status: "dropped" })}>
-                      <XCircle className="w-4 h-4 mr-2" />
-                      Mark dropped
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive" onClick={() => handleRemove(entry)}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Remove from list
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground flex-wrap">
-              {episodeCount ? (
-                <span>
-                  {shortUnitLabel} {progress}/{episodeCount}
-                </span>
-              ) : progress ? (
-                <span>
-                  Progress {progress} {progress === 1 ? unitLabel : `${unitLabel}s`}
-                </span>
-              ) : null}
-              {score ? (
-                <div className="flex items-center gap-1">
-                  <Star className="w-3.5 h-3.5 text-yellow-400" fill="currentColor" />
-                  <span>{score}</span>
-                </div>
-              ) : null}
-            </div>
-
-            <p className="text-xs text-muted-foreground mt-1">
-              {tabId === "planned" ? <Calendar className="w-3 h-3 inline mr-1" /> : <Clock className="w-3 h-3 inline mr-1" />}
-              {detailText}
-            </p>
-          </div>
-
-          {tabId === "watching" || tabId === "paused" ? (
-            <div className="mt-3 flex items-end gap-3">
-              {episodeCount ? (
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                    <span>Progress</span>
-                    <span>{Math.round(progressValue)}%</span>
-                  </div>
-                  <Progress value={progressValue} className="h-1.5" />
-                </div>
-              ) : (
-                <div className="flex-1" />
-              )}
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isPending}
-                onClick={() => handleIncrement(entry)}
-                className="h-7 flex-shrink-0 gap-1 rounded-full px-3 text-xs"
-              >
-                {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                1 {shortUnitLabel}
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      </motion.div>
-    )
-  }
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden">
-      <AnimeDecorations variant="sparse" />
+    <div className="hikari-revamp rv-library min-h-screen">
       <Navigation />
 
-      <main className="relative z-10 pt-24 pb-12 px-4">
-        <div className="max-w-5xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
-            transition={{ duration: 0.5 }}
-            className="mb-8"
-          >
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">My List</h1>
-            <p className="text-muted-foreground">Keep up with everything you're watching and reading.</p>
-          </motion.div>
-
-          <CollectionsSection user={user} />
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8"
-          >
-            {tabs.map((tab) => {
-              const meta = tabMeta[tab.id]
-              const Icon = meta.icon
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`glass-card p-4 text-center transition-all duration-300 hover:scale-105 ${
-                    activeTab === tab.id ? "border-accent ring-2 ring-accent/20" : ""
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-full ${meta.badge} flex items-center justify-center mx-auto mb-2`}>
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="text-2xl font-bold text-foreground">{tab.count}</div>
-                  <div className="text-xs text-muted-foreground">{tab.label}</div>
-                </button>
-              )
-            })}
-          </motion.div>
-
+      <main className="rv-container rv-main">
+        <div className="mx-auto">
+          <header className="rv-page-heading">
+            <div><p className="hk-page-jp" lang="ja">マイリスト</p><h1>My List</h1><p>Track episodes and chapters, or organize your collections.</p></div>
+            <Button variant="outline" asChild><Link href="/search"><Plus size={16} />Find a title</Link></Button>
+          </header>
+          <div className="rv-tabs" aria-label="Library views">
+            <button type="button" aria-pressed={libraryView === "titles"} onClick={() => changeView("titles")}>Tracking <small>{entries.length}</small></button>
+            <button type="button" aria-pressed={libraryView === "collections"} onClick={() => changeView("collections")}>Collections</button>
+          </div>
+          {libraryView === "collections" ? <CollectionsSection user={user} /> : <>
+          <div className="rv-library-search"><Input aria-label="Search your tracking list" placeholder="Find something in your list…" value={listQuery} onChange={event => setListQuery(event.target.value)} /><Link href="/onboarding" className="ml-auto text-xs text-muted-foreground hover:text-foreground">Import a list</Link></div>
           {entriesError ? <p className="mb-4 text-sm text-rose-400">{entriesError}</p> : null}
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full justify-start bg-transparent border-b border-border/50 p-0 mb-6 overflow-x-auto rounded-none h-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="hk-tracking-layout">
+            <TabsList className="hk-tracking-statuses">
               {tabs.map((tab) => {
                 const Icon = tabMeta[tab.id].icon
                 return (
@@ -644,7 +537,7 @@ function ListPageContent() {
                     className="flex items-center gap-2 px-4 py-3 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
                   >
                     <Icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span>{({watching:"In progress",completed:"Completed",planned:"Planned",paused:"On hold",dropped:"Dropped"})[tab.id]}</span>
                     <span className="text-xs px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
                       {tab.count}
                     </span>
@@ -666,10 +559,10 @@ function ListPageContent() {
                 >
                   {loadingEntries ? (
                     Array.from({ length: 4 }).map((_, index) => (
-                      <div key={index} className="glass-card p-4 h-40 animate-pulse border border-white/5" />
+                      <div key={index} className="hikari-panel p-4 h-40 animate-pulse border border-white/5" />
                     ))
                   ) : tab.list.length > 0 ? (
-                    tab.list.map((entry) => <AnimeCard key={entry.id} entry={entry} tabId={tab.id} />)
+                    tab.list.filter(entry => getMediaTitle(entry.media).toLowerCase().includes(listQuery.trim().toLowerCase())).length ? tab.list.filter(entry => getMediaTitle(entry.media).toLowerCase().includes(listQuery.trim().toLowerCase())).map((entry) => <TrackingEntryRow key={entry.id} entry={entry} tabId={tab.id} pendingId={pendingId} onIncrement={handleIncrement} onUpdate={updateEntry} onRemove={setRemoveTarget} />) : <div className="rv-empty"><h3>No matching titles</h3><p>Try another search in this status.</p><Button variant="outline" onClick={() => setListQuery("")}>Clear search</Button></div>
                   ) : (
                     <EmptyState
                       icon={tabMeta[tab.id].icon}
@@ -691,8 +584,12 @@ function ListPageContent() {
               </TabsContent>
             ))}
           </Tabs>
+          </>}
         </div>
       </main>
+      <Dialog open={Boolean(removeTarget)} onOpenChange={open => { if (!open) setRemoveTarget(null) }}>
+        <DialogContent><DialogTitle>Remove this title?</DialogTitle><DialogDescription>{removeTarget ? getMediaTitle(removeTarget.media) : "This title"} will leave your tracking list, including its progress and score. Your collections are separate.</DialogDescription><DialogFooter><Button variant="outline" onClick={() => setRemoveTarget(null)}>Keep title</Button><Button variant="destructive" disabled={Boolean(pendingId)} onClick={async () => { await handleRemove(removeTarget); setRemoveTarget(null) }}>Remove from list</Button></DialogFooter></DialogContent>
+      </Dialog>
     </div>
   )
 }

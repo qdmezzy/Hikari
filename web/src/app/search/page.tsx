@@ -342,24 +342,16 @@ export default function BrowsePage() {
   const hasActiveFilters = selectedGenres.length > 0 || activeQuery.length > 0
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="hikari-revamp rv-browse min-h-screen">
       <Navigation />
-      <main className="mx-auto max-w-7xl px-4 pb-8 pt-24 md:px-6 md:pb-10 lg:pt-28">
-        <header className="animate-rise">
-          <p className="text-sm font-medium text-primary">Catalog</p>
-          <h1 className="mt-1 text-balance text-3xl font-bold tracking-tight md:text-4xl">
-            Browse {mediaType === "MANGA" ? "manga" : "anime"}
-          </h1>
-          <p className="mt-2 max-w-2xl text-pretty text-muted-foreground">
-            {mediaType === "MANGA"
-              ? "Search every series and one-shot, filter by genre, and line up your next read."
-              : "Search across every studio and season, filter by genre, and line up your next watch."}
-          </p>
+      <main className="rv-container rv-main">
+        <header className="rv-catalog-heading">
+          <div><span className="hk-page-jp" lang="ja">作品を探す</span><h1>Browse</h1></div><p>Anime and manga catalog</p>
         </header>
 
-        <div className="mt-6 animate-rise">
+        <div className="rv-catalog-search">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="inline-flex self-start rounded-2xl border border-border bg-card p-1 shadow-sm sm:self-auto">
+            <div className="rv-catalog-types">
               {(["ANIME", "MANGA"] as const).map((type) => (
                 <button
                   key={type}
@@ -368,9 +360,10 @@ export default function BrowsePage() {
                     setMediaType(type)
                     updateSearchUrl({ mediaType: type })
                   }}
+                  aria-pressed={mediaType === type}
                   className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors ${
                     mediaType === type
-                      ? "bg-primary text-primary-foreground shadow-sm"
+                      ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -381,11 +374,12 @@ export default function BrowsePage() {
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
               <input
-                type="text"
+                type="search"
+                aria-label="Search titles"
                 placeholder={
                   mediaType === "MANGA"
-                    ? "Search manga, authors, one-shots..."
-                    : "Search anime, studios, characters..."
+                    ? "Search manga titles…"
+                    : "Search anime titles…"
                 }
                 value={searchQuery}
                 onChange={(event) => {
@@ -420,7 +414,7 @@ export default function BrowsePage() {
             <button
               type="button"
               onClick={handleSearchSubmit}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-foreground px-7 py-3.5 text-sm font-medium text-background shadow-sm transition-colors hover:bg-primary/90"
             >
               <Search className="size-4" />
               Search
@@ -428,9 +422,11 @@ export default function BrowsePage() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[260px_1fr]">
+        <div className="rv-catalog-layout">
           <button
             type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="catalog-filters"
             onClick={() => setFiltersOpen((open) => !open)}
             className="inline-flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-sm lg:hidden"
           >
@@ -446,34 +442,9 @@ export default function BrowsePage() {
             <ChevronDown className={`size-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
           </button>
 
-          <aside className={`${filtersOpen ? "block" : "hidden"} lg:block`}>
+          <aside id="catalog-filters" className={`rv-catalog-filters ${filtersOpen ? "block" : "hidden"} lg:block`}>
             <div className="lg:sticky lg:top-24 space-y-6">
-              <div className="card-elevated p-4">
-                <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sort by</h2>
-                <div className="mt-3 space-y-1">
-                  {(Object.keys(sortLabels) as SortKey[]).map((key) => {
-                    const active = sortBy === key
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          setSortBy(key)
-                          updateSearchUrl({ sortBy: key })
-                        }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                          active ? "bg-accent font-medium text-primary" : "text-foreground hover:bg-secondary"
-                        }`}
-                      >
-                        {sortLabels[key]}
-                        {active ? <Check className="size-4" /> : null}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="card-elevated p-4">
+              <div className="rv-genres">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Genres</h2>
                   {selectedGenres.length ? (
@@ -489,22 +460,14 @@ export default function BrowsePage() {
                     </button>
                   ) : null}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="rv-genre-options">
                   {genres.map((genre) => {
                     const active = selectedGenres.includes(genre)
                     return (
-                      <button
-                        key={genre}
-                        type="button"
-                        onClick={() => toggleGenre(genre)}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                        }`}
-                      >
-                        {genre}
-                      </button>
+                      <label key={genre} className="rv-genre-option">
+                        <input type="checkbox" checked={active} onChange={() => toggleGenre(genre)} />
+                        <span>{genre}</span>
+                      </label>
                     )
                   })}
                 </div>
@@ -522,13 +485,14 @@ export default function BrowsePage() {
             </div>
           </aside>
 
-          <section>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <section className="rv-catalog-results">
+            <div className="rv-catalog-resultbar">
               <div>
                 <p className="text-sm font-medium text-foreground">{resultsLabel}</p>
                 {error ? <p className="text-sm text-destructive">{error}</p> : null}
               </div>
-              <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
+              <label className="rv-sort-control"><span>Sort</span><select aria-label="Sort titles" value={sortBy} onChange={event => { const value = event.target.value as SortKey; setSortBy(value); updateSearchUrl({sortBy:value}) }}>{(Object.keys(sortLabels) as SortKey[]).map(key => <option value={key} key={key}>{sortLabels[key]}</option>)}</select></label>
+              <div className="rv-catalog-views">
                 <button
                   type="button"
                   onClick={() => {
@@ -536,9 +500,10 @@ export default function BrowsePage() {
                     updateSearchUrl({ viewMode: "grid" })
                   }}
                   aria-label="Grid view"
+                  aria-pressed={viewMode === "grid"}
                   className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
                     viewMode === "grid"
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -551,9 +516,10 @@ export default function BrowsePage() {
                     updateSearchUrl({ viewMode: "list" })
                   }}
                   aria-label="List view"
+                  aria-pressed={viewMode === "list"}
                   className={`inline-flex size-9 items-center justify-center rounded-lg transition-colors ${
                     viewMode === "list"
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-foreground text-background"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -585,9 +551,9 @@ export default function BrowsePage() {
 
             <div className="mt-5">
               {loading ? (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div className="rv-catalog-postergrid">
                   {Array.from({ length: 15 }).map((_, index) => (
-                    <div key={index} className="card-elevated overflow-hidden">
+                    <div key={index} className="hikari-panel overflow-hidden">
                       <div className="aspect-[3/4] animate-pulse bg-secondary" />
                       <div className="space-y-2 p-3">
                         <div className="h-3.5 w-3/4 animate-pulse rounded bg-secondary" />
@@ -597,7 +563,7 @@ export default function BrowsePage() {
                   ))}
                 </div>
               ) : !results.length ? (
-                <div className="card-elevated flex flex-col items-center p-12 text-center">
+                <div className="hikari-panel flex flex-col items-center p-12 text-center">
                   <h2 className="text-xl font-semibold">Nothing matched that search</h2>
                   <p className="mt-2 text-muted-foreground">
                     Try a different title, remove a genre filter, or change the sort.
@@ -611,7 +577,7 @@ export default function BrowsePage() {
                   </button>
                 </div>
               ) : viewMode === "grid" ? (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div className="rv-catalog-postergrid">
                   {results.map((anime, index) => (
                     <AnimeCard
                       key={anime.id}
@@ -679,7 +645,7 @@ function ListRow({
 
   return (
     <div
-      className="card-elevated group flex animate-rise gap-4 p-3 transition-colors hover:border-primary/30"
+      className="hikari-panel group flex animate-rise gap-4 p-3 transition-colors hover:border-primary/30"
       style={{ animationDelay: `${Math.min(index * 30, 360)}ms` }}
     >
       <a

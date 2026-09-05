@@ -1,0 +1,2 @@
+import { InfoPage } from "../../components/InfoPage";
+export default function DiscordLinkPage() { return <InfoPage code="Connect Discord" title="One identity, both places." description="Link your Hikari profile to Discord for roles, watch clubs, and list sharing."><h2>What gets linked</h2><p>Your display name, Hikari handle, and community role. Hikari never reads private messages.</p><a className="signal-action" href="https://discord.com">Continue with Discord ↗</a></InfoPage>; }

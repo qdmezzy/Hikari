@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { BookMarked, Globe, Loader2, Lock, Plus, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,9 @@ import client from "@/lib/client"
 import { fetchAniListMediaByIds } from "@/lib/anilist"
 
 export function CollectionsSection({ user }) {
+  const router = useRouter()
+  const [loadError, setLoadError] = useState("")
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [lists, setLists] = useState([])
   const [listMeta, setListMeta] = useState({})
   const [loading, setLoading] = useState(true)
@@ -38,6 +42,7 @@ export function CollectionsSection({ user }) {
       return
     }
     setLoading(true)
+    setLoadError("")
     const { data, error } = await client
       .from("custom_lists")
       .select("id, name, description, is_public, updated_at")
@@ -45,7 +50,7 @@ export function CollectionsSection({ user }) {
       .order("updated_at", { ascending: false })
 
     if (error) {
-      console.error("Failed to load collections:", error)
+      setLoadError("Your collections couldn’t be loaded. Please try again.")
       setLists([])
       setLoading(false)
       return
@@ -60,12 +65,13 @@ export function CollectionsSection({ user }) {
       return
     }
     try {
-      const { data: items } = await client
+      const { data: items, error: itemsError } = await client
         .from("custom_list_items")
         .select("list_id, media_id, added_at")
         .in("list_id", listIds)
         .order("added_at", { ascending: false })
-      const grouped = {}
+      if (itemsError) throw itemsError
+      const grouped = Object.fromEntries(listIds.map(id => [id, {count: 0, mediaIds: []}]))
       ;(items || []).forEach((item) => {
         const group = grouped[item.list_id] || (grouped[item.list_id] = { count: 0, mediaIds: [] })
         group.count += 1
@@ -133,106 +139,49 @@ export function CollectionsSection({ user }) {
     setDescription("")
     setIsPublic(false)
     setOpen(false)
-    toast.success("Collection created")
+    toast.success("Collection created — now add some titles.")
+    router.push(`/lists/${data.id}?add=1`)
   }
 
   const handleDelete = async (list) => {
-    if (!list?.id || typeof window === "undefined") return
-    if (!window.confirm(`Delete the collection "${list.name}"? This can't be undone.`)) return
+    if (!list?.id || !user || deletingId) return
     setDeletingId(list.id)
-    const { error } = await client.from("custom_lists").delete().eq("id", list.id)
+    const { error } = await client.from("custom_lists").delete().eq("id", list.id).eq("user_id", user.id)
     setDeletingId(null)
     if (error) {
       toast.error("Couldn't delete that collection.")
       return
     }
     setLists((current) => current.filter((item) => item.id !== list.id))
-    toast.success("Collection deleted")
+    setDeleteTarget(null)
+    toast.success("Collection deleted. Your tracked titles are unchanged.")
   }
 
   return (
-    <section className="mb-10">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-foreground">Collections</h2>
-          <p className="text-sm text-muted-foreground">Curate your own playlists of anime &amp; manga.</p>
-        </div>
-        <Button onClick={() => setOpen(true)} className="rounded-full">
-          <Plus className="h-4 w-4" />
-          New collection
-        </Button>
+    <section className="rv-collections">
+      <div className="rv-collection-toolbar">
+        <div><h2>Collections</h2><p>Group titles independently of their watch or reading status.</p></div>
+        <Button onClick={() => setOpen(true)}><Plus size={16} />New collection</Button>
       </div>
+      {loading ? <div className="rv-collection-grid" role="status" aria-label="Loading collections">{[1,2,3].map(i => <div key={i} className="rv-collection-cover animate-pulse" />)}</div> : loadError ? (
+        <div className="rv-error" role="alert"><p>{loadError}</p><Button variant="outline" onClick={loadLists}>Try again</Button></div>
+      ) : lists.length ? <div className="rv-collection-grid">{lists.map(list => {
+        const meta = listMeta[list.id]
+        return <article key={list.id} className="rv-collection-card">
+          <Link href={`/lists/${list.id}`} aria-label={`Open ${list.name}`}>
+            <div className="rv-collection-cover">{meta?.covers?.length ? meta.covers.map((cover, i) => <img key={i} src={cover} alt="" loading="lazy" />) : <BookMarked size={32} strokeWidth={1.2} />}</div>
+          </Link>
+          <div className="rv-collection-card-footer">
+            <div className="min-w-0"><h3><Link href={`/lists/${list.id}`}>{list.name}</Link></h3><small>{list.is_public ? <Globe size={12} /> : <Lock size={12} />}{list.is_public ? "Public" : "Only you"}<span>·</span>{meta ? `${meta.count} titles` : "Collection"}</small></div>
+            <Button size="icon" variant="ghost" aria-label={`Delete ${list.name}`} onClick={() => setDeleteTarget(list)}><Trash2 size={15} /></Button>
+          </div>
+          {list.description ? <p className="line-clamp-2">{list.description}</p> : null}
+        </article>
+      })}</div> : <div className="rv-empty"><BookMarked className="mx-auto mb-5 text-muted-foreground" size={36} strokeWidth={1.2} /><h3>No collections yet</h3><p>Create a collection, add titles from your library, and choose whether to make it public.</p><Button onClick={() => setOpen(true)}><Plus size={16} />Make your first collection</Button></div>}
 
-      {loading ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="glass-card h-24 animate-pulse border border-white/5" />
-          ))}
-        </div>
-      ) : lists.length ? (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {lists.map((list) => {
-            const meta = listMeta[list.id]
-            return (
-            <div key={list.id} className="glass-card group relative flex flex-col gap-2 p-4 transition-all hover:border-accent/50">
-              <Link href={`/lists/${list.id}`} className="flex items-center gap-3">
-                {meta?.covers?.length ? (
-                  <div
-                    className="relative h-16 shrink-0"
-                    style={{ width: `${44 + (meta.covers.length - 1) * 14}px` }}
-                  >
-                    {meta.covers.map((cover, index) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={index}
-                        src={cover}
-                        alt=""
-                        className="absolute top-0 h-16 w-11 rounded-lg object-cover shadow-md ring-2 ring-background"
-                        style={{ left: `${index * 14}px`, zIndex: 3 - index }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="flex h-16 w-11 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                    <BookMarked className="h-5 w-5" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-foreground group-hover:text-accent">{list.name}</p>
-                  <p className="line-clamp-1 text-xs text-muted-foreground">
-                    {list.description || "No description"}
-                  </p>
-                  <span className="mt-1 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    {list.is_public ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
-                    {list.is_public ? "Public" : "Private"}
-                    <span aria-hidden="true">·</span>
-                    {meta ? `${meta.count} ${meta.count === 1 ? "title" : "titles"}` : "Empty"}
-                  </span>
-                </div>
-              </Link>
-              <button
-                type="button"
-                onClick={() => handleDelete(list)}
-                disabled={deletingId === list.id}
-                className="absolute right-2 top-2 rounded-lg p-1.5 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                aria-label="Delete collection"
-              >
-                {deletingId === list.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-              </button>
-            </div>
-            )
-          })}
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="glass-card flex w-full items-center justify-center gap-2 border-dashed py-8 text-sm text-muted-foreground transition-colors hover:border-accent/50 hover:text-foreground"
-        >
-          <Plus className="h-4 w-4" />
-          Create your first collection
-        </button>
-      )}
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={value => { if (!value && !deletingId) setDeleteTarget(null) }}>
+        <DialogContent role="alertdialog"><DialogHeader><DialogTitle>Delete “{deleteTarget?.name}”?</DialogTitle><DialogDescription>This removes the collection and its contents. Your watch progress and tracked titles will stay in My List. This can’t be undone.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={Boolean(deletingId)} onClick={() => setDeleteTarget(null)}>Keep collection</Button><Button variant="destructive" disabled={Boolean(deletingId)} onClick={() => handleDelete(deleteTarget)}>{deletingId ? "Deleting…" : "Delete collection"}</Button></DialogFooter></DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -240,7 +189,7 @@ export function CollectionsSection({ user }) {
             <DialogHeader>
               <DialogTitle>New collection</DialogTitle>
               <DialogDescription>
-                Build a custom playlist. Add titles to it from any anime or manga page.
+                Start with a name, then choose titles from your library. You can also add titles from any anime or manga page.
               </DialogDescription>
             </DialogHeader>
 
@@ -282,7 +231,7 @@ export function CollectionsSection({ user }) {
               </Button>
               <Button type="submit" disabled={creating || !name.trim()}>
                 {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                Create
+                Create & choose titles
               </Button>
             </DialogFooter>
           </form>

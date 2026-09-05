@@ -1,0 +1,50 @@
+/* Motion follows the artwork: slow framing, quick responses, staggered reveals. */
+@keyframes hikari-drift { from { transform: scale(1.055) translateX(-.6%); } to { transform: scale(1.005) translateX(.3%); } }
+@keyframes hikari-enter { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes hikari-timer { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.hk-cinema-drift { animation: hikari-drift 9s cubic-bezier(.2,.55,.4,1) both; }
+.hk-cinema-native { font-family: var(--font-jp),sans-serif; font-size: 13px; letter-spacing: .14em; color: #dfd7bc; margin: 0 0 14px; animation: hikari-enter .65s both; }
+.hk-cinema-meta { animation: hikari-enter .65s .12s both; }
+.hk-cinema-description { animation: hikari-enter .65s .2s both; }
+.hk-cinema-overline [lang="ja"] { font-family: var(--font-jp),sans-serif; color: #d7c28c; }
+.hk-cinema-bottom { position: relative; }
+.hk-cinema-picks button { position: relative; padding: 10px 0 17px; border-left: 0; transition: opacity .35s; }
+.hk-cinema-picks button::after { content: ""; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: #ffffff20; }
+.hk-cinema-picks button img { transition: transform .4s; }
+.hk-cinema-picks button:hover img { transform: translateY(-3px); }
+.hk-cinema-timer { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #d7c28c; transform-origin: left; animation: hikari-timer linear both; }
+.hk-cinema-timer[data-running="false"] { animation: none; }
+/* Rotation remains controllable for keyboard/assistive-tech users, without a transport toolbar. */
+.hk-cinema-motion-toggle { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.hk-cinema-motion-toggle:focus-visible { clip-path: none; width: auto; height: auto; right: 24px; bottom: 8px; padding: 8px 12px; background: #f1ecdf; color: #171719; z-index: 2; font-size: 11px; }
+.hk-scroll-reveal[data-revealed="true"] > * { animation: hikari-enter .7s cubic-bezier(.2,.65,.3,1) both; }
+.hk-scroll-reveal[data-revealed="true"] .hk-poster { animation: hikari-enter .65s both; }
+.hk-scroll-reveal .hk-poster:nth-child(2) { animation-delay: 60ms; }
+.hk-scroll-reveal .hk-poster:nth-child(3) { animation-delay: 120ms; }
+.hk-scroll-reveal .hk-poster:nth-child(4) { animation-delay: 180ms; }
+.hk-scroll-reveal .hk-poster:nth-child(5) { animation-delay: 240ms; }
+.hk-scroll-reveal .hk-poster:nth-child(6) { animation-delay: 300ms; }
+.hk-section-title [lang="ja"],.hk-sidebar-brand [lang="ja"],.hk-page-jp { font-family: var(--font-jp),sans-serif; letter-spacing: .18em; color: var(--primary); }
+.hk-page-jp { display: block; font-size: 11px; margin-bottom: 12px; }
+.hk-sidebar nav a,.hk-library-entry,.hk-airing-line { transition: background-color .2s, color .2s; }
+.hk-sidebar nav a svg { transition: transform .25s; }
+.hk-sidebar nav a:hover svg { transform: translateX(3px); }
+.hk-library-entry:hover { background: color-mix(in srgb,var(--secondary) 40%,transparent); }
+.hk-airing-line:hover { color: var(--primary); }
+.hk-section-title a svg,.hk-home-social a svg,.hk-cinema-actions a svg { transition: transform .25s; }
+.hk-section-title a:hover svg,.hk-home-social a:hover svg,.hk-cinema-actions a:hover svg { transform: translate(3px,-3px); }
+.rv-collection-cover img { transition: transform .55s cubic-bezier(.2,.65,.3,1); }
+.rv-collection-cover { overflow: hidden; }
+.rv-collection-card:hover .rv-collection-cover img { transform: scale(1.045); }
+.hk-settings-content,.rv-catalog-heading,.rv-community-masthead { animation: hikari-enter .45s both; }
+.hk-discover-top h1 [lang="ja"] { margin-left: 12px; font: 11px var(--font-jp),sans-serif; letter-spacing: .2em; color: #d7c28c; }
+.hk-discover-caption:not(.is-hidden) > * { animation: hikari-enter .5s both; }
+.hk-discover-caption:not(.is-hidden) > :nth-child(2) { animation-delay: 70ms; }
+.hk-discover-caption:not(.is-hidden) > :nth-child(3) { animation-delay: 140ms; }
+.hk-discover-caption:not(.is-hidden) > :nth-child(4) { animation-delay: 210ms; }
+.hk-sidebar { z-index: 41; }
+.hk-appbar { z-index: 40; }
+@media (min-width:641px) and (max-width:760px) { .hk-discover-stage { top: 70px; } }
+.reduce-motion .hk-cinema-drift,.reduce-motion .hk-scroll-reveal * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .hk-cinema-drift,.hk-scroll-reveal * { animation: none !important; } }
+@media (max-width:640px) { .hk-cinema-native { font-size: 10px; letter-spacing: .06em; } }

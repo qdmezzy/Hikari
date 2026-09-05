@@ -1,0 +1,103 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@source "..";
+@custom-variant dark (&:is(.dark *));
+/* A fresh foundation. No archive panels, offset shadows, grid ground, or legacy decoration rules. */
+:root {
+  --background: #f4f3ef; --foreground: #202124;
+  --card: #fbfaf7; --card-foreground: #202124;
+  --popover: #fbfaf7; --popover-foreground: #202124;
+  --primary: #827049; --primary-foreground: #ffffff;
+  --secondary: #e8e7e2; --secondary-foreground: #202124;
+  --muted: #e8e7e2; --muted-foreground: #747571;
+  --accent: #e5e1d7; --accent-foreground: #202124;
+  --destructive: #b93845; --destructive-foreground: #fff;
+  --border: #dcdcd5; --input: #dcdcd5; --ring: #9a885b;
+  --radius: .35rem;
+  --chart-1: #8b9f98; --chart-2: #b49a63; --chart-3: #9d9e7e; --chart-4: #8889a7; --chart-5: #b08c91;
+  --sidebar: var(--background); --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary); --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--secondary); --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border); --sidebar-ring: var(--ring);
+  --lift: none; --lift-raised: none;
+}
+.dark {
+  --background: #111214; --foreground: #eeede8;
+  --card: #191a1d; --card-foreground: #eeede8;
+  --popover: #1d1e21; --popover-foreground: #eeede8;
+  --primary: #c4b791; --primary-foreground: #171719;
+  --secondary: #242529; --secondary-foreground: #eeede8;
+  --muted: #232428; --muted-foreground: #989a9f;
+  --accent: #32312c; --accent-foreground: #eeede8;
+  --destructive: #e6747d; --border: #2d2e31; --input: #2d2e31; --ring: #c4b791;
+}
+@theme inline {
+  --font-sans: "Geist", "Geist Fallback";
+  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --font-jp: var(--font-jp), "Geist", sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* One radius scale, tightened. Overriding 2xl/3xl here retunes every
+     existing `rounded-2xl` / `rounded-3xl` in the app at once, so the
+     interface stops reading as a pile of soft blobs without a page sweep. */
+  --radius-sm: calc(var(--radius) - 3px);
+  --radius-md: calc(var(--radius) - 1px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 4px);
+  --radius-3xl: calc(var(--radius) + 8px);
+}
+
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { scroll-padding-top: 90px; }
+  body { @apply bg-background text-foreground antialiased; margin: 0; -webkit-text-size-adjust: 100%; }
+  button:not(:disabled),a,summary { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 4px; }
+  ::selection { background: var(--secondary); color: var(--foreground); }
+}
+[data-slot="button"][data-variant="default"] { background: var(--foreground); color: var(--background); box-shadow: none; }
+[data-slot="button"][data-variant="ghost"]:hover { background: var(--secondary); color: var(--foreground); }
+[data-slot="button"][data-variant="outline"] { background: transparent; box-shadow: none; }
+.hikari-panel,.hikari-panel-raised { background: var(--card); border: 1px solid var(--border); border-radius: 5px; }
+.hikari-command { border: 1px solid var(--border); background: var(--card); border-radius: 5px; }
+.font-jp { font-family: var(--font-jp),sans-serif; }
+.selectable { user-select: text; }
+.high-contrast { --muted-foreground: #454545; --border: #757575; }
+.dark.high-contrast { --muted-foreground: #d0d0d0; --border: #878787; }
+.reduce-motion *, .reduce-motion *::before,.reduce-motion *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+

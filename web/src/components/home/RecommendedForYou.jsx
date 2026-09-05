@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { RefreshCw, Sparkles } from "lucide-react"
+import { RefreshCw } from "lucide-react"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import { AnimeCard } from "@/components/media/AnimeCard"
@@ -80,53 +80,9 @@ export function RecommendedForYou() {
   if (!user) return null
   if (!loading && !items.length) return null
 
-  return (
-    <section className="px-4 py-16 relative">
-      <div className="max-w-7xl mx-auto relative">
-        <div className="mb-8 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <div>
-              <p className="font-jp text-xs font-medium tracking-[0.3em] text-primary/70">おすすめ</p>
-              <h2 className="text-2xl font-bold text-foreground">Recommended for you</h2>
-              <p className="text-sm text-muted-foreground">
-                {loading ? "Reading your taste…" : subtitle || "Picked from your ratings & watch history"}
-              </p>
-            </div>
-          </div>
-
-          {!loading ? (
-            <button
-              type="button"
-              onClick={handleShuffle}
-              disabled={shuffling}
-              className="group flex items-center gap-1.5 rounded-full border border-border/60 bg-card/60 px-3.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-60"
-            >
-              <RefreshCw className={`h-4 w-4 transition-transform ${shuffling ? "animate-spin" : "group-hover:rotate-90"}`} />
-              <span className="hidden sm:inline">Shuffle</span>
-            </button>
-          ) : null}
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-5">
-          {loading
-            ? Array.from({ length: 6 }).map((_, index) => (
-                <div key={index} className="aspect-[3/4] rounded-2xl border border-white/5 bg-white/5 animate-pulse" />
-              ))
-            : items.map((item, index) => (
-                <AnimeCard
-                  key={item.id}
-                  id={String(item.id)}
-                  title={item.title}
-                  image={item.image}
-                  rating={item.score || undefined}
-                  episodes={item.episodes || undefined}
-                  type="anime"
-                  index={index}
-                />
-              ))}
-        </div>
-      </div>
-    </section>
-  )
+  return <section className="hk-home-section">
+    <div className="hk-section-title"><h2><small>From your watch history</small>More your kind of thing.</h2>{!loading ? <button type="button" onClick={handleShuffle} disabled={shuffling} className="flex items-center gap-2 text-xs text-muted-foreground"><RefreshCw size={13} className={shuffling ? "animate-spin" : ""} />Shuffle</button> : null}</div>
+    {subtitle && !loading ? <p className="mb-5 text-xs text-muted-foreground">{subtitle}</p> : null}
+    <div className="hk-home-posters">{loading ? Array.from({length:6},(_,index) => <div key={index} className="hk-poster-art animate-pulse" />) : items.map(item => <AnimeCard key={item.id} id={String(item.id)} title={item.title} image={item.image} rating={item.score || undefined} episodes={item.episodes || undefined} type="anime" />)}</div>
+  </section>
 }

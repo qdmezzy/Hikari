@@ -1,0 +1,2 @@
+import { InfoPage } from "../components/InfoPage";
+export default function StatusPage() { return <InfoPage code="Service status" title="All systems are shining." description="Live health for the parts of Hikari you use."><div className="status-board"><div><span>Web app</span><strong>Operational</strong></div><div><span>Anime data</span><strong>Operational</strong></div><div><span>Notifications</span><strong>Operational</strong></div><div><span>Community feed</span><strong>Operational</strong></div></div></InfoPage>; }

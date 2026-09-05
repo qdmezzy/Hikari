@@ -1,0 +1,2 @@
+import { InfoPage } from "../../components/InfoPage";
+export default function FoundingJoinPage() { return <InfoPage code="Founding 25" title="Claim your place at the table." description="Founding members get an early voice and a permanent mark on their profile."><h2>Your invite</h2><p>Enter through the invitation link you received. If you think yours expired, send us a note and we’ll check it.</p><a className="signal-action" href="/feedback">Check my invite</a></InfoPage>; }

@@ -20,3 +20,9 @@ discord-bot/bot.log
 # Local tooling binaries
 .local-tools/
 
+
+# --- added during pre-wipe backup ---
+dist/
+*.tsbuildinfo
+.vite-hikari/
+.vite/

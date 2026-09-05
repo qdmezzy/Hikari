@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import Image from "next/image"
+import { DiscoverScreen } from "@/components/discover/DiscoverScreen"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -248,7 +248,7 @@ export default function DiscoverPage() {
       if (!isSaved) {
         const { error } = await client.from("list_entries").upsert(
           { user_id: user.id, media_id: id, media_type: "ANIME", status: "plan_to_watch", progress: 0 },
-          { onConflict: "user_id,media_id" },
+          { onConflict: "user_id,media_id", ignoreDuplicates: true },
         )
         if (error) throw error
         setSaved((prev) => ({ ...prev, [id]: true }))
@@ -289,6 +289,23 @@ export default function DiscoverPage() {
 
   const toggleSpoilerSafe = () => {
     setSpoilerSafe((prev) => !prev)
+  }
+
+  const handleShare = async () => {
+    if (!currentAnime || typeof window === "undefined") return
+    const url = `${window.location.origin}${getMediaHref(currentAnime.id, currentAnime.title)}`
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: currentAnime.title, text: `Check out ${currentAnime.title} on Hikari`, url })
+      } else {
+        await navigator.clipboard.writeText(url)
+        toast.success("Link copied")
+      }
+    } catch (error) {
+      if ((error as Error)?.name !== "AbortError") {
+        toast.error("Couldn’t share this title. Please try again.")
+      }
+    }
   }
 
   const [feedError, setFeedError] = useState(false)
@@ -416,6 +433,8 @@ export default function DiscoverPage() {
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTrailerPlayerOpen || e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof HTMLElement && e.target.closest("input,textarea,select,button,a,[contenteditable], [role=dialog]"))) return
+      if (["ArrowDown","ArrowUp","j","k"].includes(e.key)) e.preventDefault()
       if (e.key === "ArrowDown" || e.key === "j") {
         if (currentIndex >= filteredFeed.length - 1) {
           if (hasMore && !loadingMore) {
@@ -433,7 +452,7 @@ export default function DiscoverPage() {
     }
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [currentAnime, currentIndex, filteredFeed.length, goToNext, goToPrev, hasMore, loadFeedPage, loadingMore, page, toggleLike, toggleSave])
+  }, [currentAnime, currentIndex, filteredFeed.length, goToNext, goToPrev, hasMore, loadFeedPage, loadingMore, page, toggleLike, toggleSave, isTrailerPlayerOpen])
 
   // Scroll/swipe handling
   useEffect(() => {
@@ -669,398 +688,5 @@ export default function DiscoverPage() {
     return `https://www.youtube-nocookie.com/embed/${trailerId}?${params.toString()}`
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navigation />
-
-      <div
-        ref={containerRef}
-        className="fixed inset-0 pt-16 lg:pt-20 overflow-hidden"
-      >
-      {currentAnime ? (
-        <AnimatePresence mode="wait" initial={false}>
-          {(
-            <motion.div
-              key={currentAnime.id}
-              initial={{ opacity: 0, y: 100 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -100 }}
-              transition={{ duration: 0.4, ease: "easeOut" }}
-              className="absolute inset-0"
-            >
-              <div className="absolute inset-0 bg-black">
-                <Image
-                  src={currentAnime.banner}
-                  alt=""
-                  fill
-                  className="object-cover"
-                  priority
-                />
-                {currentAnime.trailerId && !spoilerSafe ? (
-                  <div
-                    className={cn(
-                      "absolute inset-0 overflow-hidden transition-opacity duration-700",
-                      showTrailerFrame ? "opacity-100" : "opacity-0",
-                    )}
-                  >
-                    <iframe
-                      key={`${currentAnime.trailerId}-${isMuted ? "muted" : "sound"}`}
-                      src={getYouTubeUrl(currentAnime.trailerId)}
-                      onLoad={() => setIsTrailerLoaded(true)}
-                      className="absolute left-1/2 top-1/2 h-[140vh] w-[180vw] -translate-x-1/2 -translate-y-1/2 border-0 pointer-events-none"
-                      allow="autoplay; encrypted-media; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : null}
-                
-                <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/60 to-transparent" />
-                <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/30" />
-              </div>
-
-              <div className="relative h-full flex items-end pb-24 lg:pb-32">
-                <div className="container mx-auto px-4 lg:px-8">
-                  <div className="max-w-xl space-y-4">
-                    <div className="flex flex-wrap gap-2">
-                      <Badge className="border border-white/10 bg-white/[0.08] text-white/[0.82]">
-                        <Sparkles className="w-3 h-3 mr-1 text-white/[0.58]" />
-                        {vibeFilters.find((vibe) => vibe.id === activeVibe)?.label || "For You"}
-                      </Badge>
-                      <Badge variant="outline" className="border-white/10 bg-white/[0.06] text-white/[0.78] backdrop-blur-sm">
-                        <Star className="w-3 h-3 mr-1 fill-current text-white/[0.62]" />
-                        {currentAnime.rating}
-                      </Badge>
-                    </div>
-
-                    <h1 className="text-3xl font-bold tracking-tight text-white drop-shadow-md md:text-4xl lg:text-5xl">
-                      {currentAnime.title}
-                    </h1>
-
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {currentAnime.genres.slice(0, 5).map(genre => (
-                        <span key={genre} className="text-sm font-medium text-white/[0.68]">
-                          {genre}
-                        </span>
-                      ))}
-                    </div>
-
-                    {spoilerSafe ? (
-                      <div className="max-w-lg rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-sm text-white/[0.76] backdrop-blur-md">
-                        <div className="flex items-center gap-2 text-white">
-                          <EyeOff className="h-4 w-4 text-white/[0.62]" />
-                          <span className="font-medium">Spoiler-safe mode is on</span>
-                        </div>
-                        <p className="mt-2 text-white/[0.62]">
-                          Trailers and synopses are hidden until you turn spoilers back on.
-                        </p>
-                      </div>
-                    ) : (
-                      <p className="text-white/80 leading-relaxed line-clamp-2 text-sm md:text-base">
-                        {currentAnime.description}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-4 text-sm text-white/70">
-                      <span className="flex items-center gap-1.5">
-                        <Play className="w-4 h-4" />
-                        {currentAnime.episodes} EP
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Heart className="w-4 h-4" />
-                        {formatNumber(currentAnime.likes)}
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4" />
-                        {formatNumber(currentAnime.popularity)}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-3 pt-2">
-                      <Button 
-                        size="lg"
-                        className={cn(
-                          "font-semibold shadow-md transition-all",
-                          saved[currentAnime.id] 
-                            ? "border border-white/[0.16] bg-white/[0.14] text-white hover:bg-white/[0.18]"
-                            : "bg-primary hover:bg-primary/90 text-primary-foreground"
-                        )}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (!ensureSignedIn()) return
-                          toggleSave(currentAnime.id)
-                        }}
-                      >
-                        {saved[currentAnime.id] ? (
-                          <>
-                            <Check className="w-5 h-5 mr-2" />
-                            Added
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="w-5 h-5 mr-2" />
-                            Add to List
-                          </>
-                        )}
-                      </Button>
-                      <Button size="lg" variant="outline" className="border-white/[0.14] bg-white/[0.06] text-white/[0.88] backdrop-blur-sm hover:bg-white/[0.12] hover:text-white" asChild>
-                        <Link href={getMediaHref(currentAnime.id, currentAnime.title)}>
-                          <Info className="w-5 h-5 mr-2" />
-                          Details
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      ) : feedError ? (
-        <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="text-lg font-semibold text-foreground">Couldn&apos;t load the discover feed</p>
-          <p className="max-w-sm text-sm text-muted-foreground">
-            The catalog service is busy right now. Give it a moment, then try again.
-          </p>
-          <Button onClick={retryFeed} className="bg-primary text-primary-foreground hover:bg-primary/90">
-            Try again
-          </Button>
-        </div>
-      ) : (
-        <PageLoader label="Loading discover feed..." />
-      )}
-
-        {currentAnime ? (
-        <motion.div 
-          className="fixed bottom-28 right-5 z-30 flex flex-col gap-4 md:right-7 lg:bottom-36 lg:right-10"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <div className="flex flex-col items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className={cn(
-                "h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50",
-                liked[currentAnime?.id] && "text-red-500"
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!ensureSignedIn()) return
-                currentAnime && toggleLike(currentAnime.id)
-              }}
-            >
-              <Heart className={cn("w-6 h-6", liked[currentAnime?.id] && "fill-current")} />
-            </Button>
-            <span className="text-xs text-white/80 font-medium">
-              {formatNumber((currentAnime?.likes || 0) + (liked[currentAnime?.id] ? 1 : 0))}
-            </span>
-          </div>
-
-          <div className="flex flex-col items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className={cn(
-                "h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50",
-                saved[currentAnime?.id] && "bg-white/[0.14] text-white"
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!ensureSignedIn()) return
-                currentAnime && toggleSave(currentAnime.id)
-              }}
-            >
-              <Bookmark className={cn("w-6 h-6", saved[currentAnime?.id] && "fill-current")} />
-            </Button>
-            <span className="text-xs text-white/80 font-medium">Save</span>
-          </div>
-
-          <div className="flex flex-col items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm hover:bg-black/50"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Share2 className="w-6 h-6 text-white" />
-            </Button>
-            <span className="text-xs text-white/80 font-medium">Share</span>
-          </div>
-
-          {currentAnime?.trailerId && !spoilerSafe ? (
-            <div className="flex flex-col items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsTrailerPlayerOpen(true)
-                }}
-              >
-                <Play className="w-6 h-6 text-white" />
-              </Button>
-              <span className="text-xs text-white/80 font-medium">Player</span>
-            </div>
-          ) : null}
-
-          <div className="flex flex-col items-center gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className={cn(
-                "h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm transition-all hover:bg-black/50",
-                !spoilerSafe && !isMuted && "bg-white/[0.14] text-white",
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleMute()
-              }}
-              disabled={spoilerSafe}
-            >
-              {isMuted || spoilerSafe ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6" />}
-            </Button>
-            <span className="text-xs text-white/80 font-medium">{spoilerSafe ? "Hidden" : isMuted ? "Muted" : "Audio"}</span>
-          </div>
-        </motion.div>
-        ) : null}
-
-        {currentAnime ? (
-        <div className="fixed bottom-9 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-white/10 bg-black/32 px-2 py-2 shadow-[0_12px_36px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9 rounded-full bg-white/[0.05] text-white transition-all hover:bg-white/[0.12] disabled:opacity-30"
-            onClick={(e) => {
-              e.stopPropagation()
-              goToPrev()
-            }}
-            disabled={currentIndex === 0}
-          >
-            <ChevronUp className="h-4 w-4" />
-          </Button>
-          <div className="h-5 w-px bg-white/10" />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-9 w-9 rounded-full bg-white/[0.05] text-white transition-all hover:bg-white/[0.12] disabled:opacity-30"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (currentIndex >= filteredFeed.length - 1) {
-                if (hasMore && !loadingMore) {
-                  loadFeedPage(page + 1, true)
-                }
-                return
-              }
-              goToNext()
-            }}
-            disabled={currentIndex === filteredFeed.length - 1 && !hasMore && !loadingMore}
-          >
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-        </div>
-        ) : null}
-
-        {currentAnime ? (
-        <div className="fixed left-1/2 top-20 z-20 max-w-[calc(100vw-1rem)] -translate-x-1/2 px-2 lg:top-24">
-          <div className="mx-auto flex flex-wrap items-center justify-center gap-1.5 rounded-full border border-white/10 bg-[rgba(8,14,22,0.58)] px-2.5 py-2 shadow-[0_10px_30px_rgba(0,0,0,0.18)] backdrop-blur-lg">
-            {vibeFilters.map(vibe => (
-              <button
-                key={vibe.id}
-                className={cn(
-                  "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200",
-                  activeVibe === vibe.id
-                    ? "bg-white text-background"
-                    : "text-white/[0.68] hover:bg-white/[0.06] hover:text-white"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActiveVibe(vibe.id)
-                  setCurrentIndex(0)
-                }}
-              >
-                <vibe.icon className="h-3.5 w-3.5" />
-                <span className="whitespace-nowrap">{vibe.label}</span>
-              </button>
-            ))}
-
-            <div className="mx-1 hidden h-5 w-px bg-white/10 md:block" />
-
-            <button
-              title={spoilerSafe ? "Spoiler-safe mode is on — tap to show spoilers" : "Hide trailers & synopses (spoiler-safe)"}
-              className={cn(
-                "inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200",
-                spoilerSafe
-                  ? "bg-emerald-500/20 text-emerald-200"
-                  : "text-white/[0.68] hover:bg-white/[0.06] hover:text-white",
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleSpoilerSafe()
-              }}
-            >
-              {spoilerSafe ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-              <span className="whitespace-nowrap">Spoiler-safe{spoilerSafe ? ": On" : ""}</span>
-            </button>
-          </div>
-        </div>
-        ) : null}
-
-        {loadingMore && !isDiscoverPending ? (
-          <div className="fixed bottom-4 right-4 lg:right-8 z-20 rounded-full bg-black/35 px-3 py-1.5 text-xs font-medium text-white/75 backdrop-blur-sm">
-            Loading more...
-          </div>
-        ) : null}
-      </div>
-
-      {currentAnime?.trailerId ? (
-        <Dialog open={isTrailerPlayerOpen} onOpenChange={setIsTrailerPlayerOpen}>
-          <DialogContent className="max-w-4xl border-white/10 bg-[rgba(7,12,18,0.94)] p-0 text-white shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl" showCloseButton>
-            <DialogHeader className="border-b border-white/10 px-6 py-4">
-              <DialogTitle className="text-xl font-semibold text-white">
-                Trailer Player
-              </DialogTitle>
-              <DialogDescription className="text-white/60">
-                Pause, scrub, jump around, or fullscreen the trailer here.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="px-6 pb-6 pt-4">
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
-                <div className="relative aspect-video">
-                  <iframe
-                    src={getControllableYouTubeUrl(currentAnime.trailerId)}
-                    className="absolute inset-0 h-full w-full border-0"
-                    allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                    allowFullScreen
-                  />
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-white">{currentAnime.title}</p>
-                  <p className="text-xs text-white/55">
-                    Use the YouTube controls to pause, seek backward or forward, and go fullscreen.
-                  </p>
-                </div>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="border-white/10 bg-white/[0.04] text-white hover:bg-white/[0.08]"
-                >
-                  <Link
-                    href={`https://www.youtube.com/watch?v=${currentAnime.trailerId}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open on YouTube
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-    </div>
-  )
+  return <DiscoverScreen model={{currentAnime,containerRef,spoilerSafe,showTrailerFrame,isMuted,getYouTubeUrl,setIsTrailerLoaded,activeVibe,setActiveVibe,setCurrentIndex,vibeFilters,saved,liked,ensureSignedIn,toggleSave,toggleLike,handleShare,setIsTrailerPlayerOpen,isTrailerPlayerOpen,toggleMute,toggleSpoilerSafe,currentIndex,filteredFeed,hasMore,loadingMore,goToPrev,goToNext,loadFeedPage,page,feedError,retryFeed,getControllableYouTubeUrl}} />
 }

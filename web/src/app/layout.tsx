@@ -1,4 +1,11 @@
-import "./globals.css"
+import "./foundation.css"
+import "./redesign.css"
+import "./cinema.css"
+import "./settings-workspace.css"
+import "./discover-screen.css"
+import "./motion.css"
+import "./personal.css"
+import "./refinements.css"
 
 import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google"
 import { Toaster } from "sonner"

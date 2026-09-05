@@ -41,7 +41,7 @@ export function ThemeToggle() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="glass-strong">
+      <DropdownMenuContent align="end" className="">
         <DropdownMenuItem onClick={() => setTheme("light")} className="flex items-center gap-2 cursor-pointer">
           <Sun className="h-4 w-4" />
           <span>Light</span>

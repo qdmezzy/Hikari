@@ -663,7 +663,7 @@ export default function PublicProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="hikari-profile min-h-screen bg-background">
         <div className="mx-auto max-w-6xl px-4 pb-16 pt-28">
           <div className="h-72 animate-pulse rounded-3xl border border-border/50 bg-card/40" />
           <div className="-mt-20 grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -714,7 +714,7 @@ export default function PublicProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background" data-profile-build={PUBLIC_PROFILE_BUILD}>
+    <div className="hikari-profile min-h-screen bg-background" data-profile-build={PUBLIC_PROFILE_BUILD}>
       <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-full max-w-6xl items-center justify-between px-4">
           <Link href="/" className="inline-flex">

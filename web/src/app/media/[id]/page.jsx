@@ -1163,43 +1163,20 @@ export default function MediaPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="hikari-revamp hk-media-page min-h-screen bg-background">
       <Navigation />
-
-      <main className="pb-20 pt-16 md:pb-8 md:pt-0">
-        <div className="relative h-[50vh] overflow-hidden">
-          <img
-            src={bannerImage}
-            alt={title}
-            className="h-full w-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-transparent to-transparent" />
-        </div>
-
-        <div
-          className="relative z-10 mx-auto -mt-64 max-w-7xl animate-fade-in px-4"
-          style={{ animationDuration: "220ms" }}
-        >
+      <main className="hk-media-main">
+        <div className="hk-media-backdrop"><img src={bannerImage} alt=""/><span lang="ja">作品紹介</span></div>
+        <div className="rv-container hk-media-content">
           <div>
-            <div className="flex flex-col gap-8 lg:flex-row">
+            <div className="hk-media-opening">
               <motion.div
                 initial={{ opacity: 0, y: 24 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.34, ease: "easeOut" }}
-                className="flex-shrink-0"
+                className="hk-media-poster-column"
               >
-                <div className="relative">
-                  <div className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-primary/40 via-accent/40 to-primary/40 blur-xl opacity-60" />
-                  <div className="relative w-56 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10">
-                    <img
-                      src={posterImage}
-                      alt={title}
-                      className="aspect-[3/4] w-full object-cover"
-                    />
-                  </div>
-                </div>
-
+                <div className="hk-media-poster"><img src={posterImage} alt={title}/></div>
                 <div className="mt-6 space-y-3">
                   {user ? (
                     <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
@@ -1349,115 +1326,18 @@ export default function MediaPage() {
                 </div>
               </motion.div>
 
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.34, delay: 0.08, ease: "easeOut" }}
-                className="flex-1 space-y-6"
-              >
-                <div>
-                  <h1 className="mb-2 text-4xl font-black text-foreground md:text-5xl">
-                    {title}
-                  </h1>
-                  {originalTitle ? (
-                    <p className="text-lg text-muted-foreground">{originalTitle}</p>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap gap-3">
-                  {rating ? (
-                    <Badge className="rounded-full border border-amber-400/30 bg-amber-500/20 px-3 py-1.5 text-amber-200">
-                      <Star className="mr-1.5 h-4 w-4 fill-current" />
-                      {rating} / 10
-                    </Badge>
-                  ) : null}
-                  <Badge
-                    className={cn(
-                      "rounded-full px-3 py-1.5",
-                      isOngoing
-                        ? "border border-emerald-400/30 bg-emerald-500/20 text-emerald-200"
-                        : "border border-cyan-400/25 bg-cyan-500/15 text-cyan-100",
-                    )}
-                  >
-                    {mediaStatus}
-                  </Badge>
-                  <Badge variant="outline" className="rounded-full border-white/10 bg-[#08121d]/70 px-3 py-1.5 text-white/80">
-                    <Play className="mr-1.5 h-4 w-4" />
-                    {type}
-                  </Badge>
-                  <Badge variant="outline" className="rounded-full border-white/10 bg-[#08121d]/70 px-3 py-1.5 text-white/80">
-                    <Clock className="mr-1.5 h-4 w-4" />
-                    {duration}
-                  </Badge>
-                  {nextAiringLabel ? (
-                    <Badge variant="outline" className="rounded-full border-white/10 bg-[#08121d]/70 px-3 py-1.5 text-white/80">
-                      <Calendar className="mr-1.5 h-4 w-4" />
-                      Next {nextAiringLabel}
-                    </Badge>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-wrap gap-2.5">
-                  {(media.genres || []).map((genre) => (
-                    <Badge
-                      key={genre}
-                      variant="outline"
-                      className="rounded-full border-white/10 bg-[#08121d]/65 px-4 py-2 text-sm text-white/85"
-                    >
-                      {genre}
-                    </Badge>
-                  ))}
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  {quickFacts.map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-[22px] border border-white/10 bg-[#08121d]/75 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl"
-                    >
-                      <div className="mb-2 flex items-center gap-2 text-white/45">
-                        <item.icon className="h-4 w-4" />
-                        <span className="text-xs uppercase tracking-[0.18em]">{item.label}</span>
-                      </div>
-                      <p className="text-lg font-semibold text-white">{item.value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {watchProviders.length > 0 ? (
-                  <div
-                    className="animate-fade-in rounded-[24px] border border-white/10 bg-[#08121d]/72 p-4 shadow-[0_18px_50px_rgba(0,0,0,0.24)] backdrop-blur-xl"
-                    style={{ animationDuration: "260ms", animationDelay: "40ms" }}
-                  >
-                    <div className="mb-3 flex items-center gap-2 text-white/45">
-                      {media.type === "MANGA" ? (
-                        <Bookmark className="h-4 w-4" />
-                      ) : (
-                        <Play className="h-4 w-4" />
-                      )}
-                      <span className="text-xs uppercase tracking-[0.18em]">{providerSectionLabel}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {watchProviders.map((provider) => (
-                        <a
-                          key={provider.id}
-                          href={provider.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="group inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0c1724]/90 px-4 py-2.5 text-sm font-medium text-white/78 transition-all duration-200 hover:border-primary/35 hover:bg-white/[0.06] hover:text-white"
-                        >
-                          <span className={cn("h-2.5 w-2.5 rounded-full", getProviderColor(provider.label))} />
-                          <span>{provider.label}</span>
-                          <ExternalLink className="h-3.5 w-3.5 text-white/38 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-white/70" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </motion.div>
+              <div className="hk-media-heading">
+                <div className="hk-media-format"><span lang="ja">{media.type==="MANGA"?"漫画":"アニメ"}</span><span>{type} / {mediaStatus}</span></div>
+                {originalTitle ? <p className="hk-media-native" lang="ja">{originalTitle}</p>:null}
+                <h1>{title}</h1>
+                <p className="hk-media-genres">{(media.genres || []).join(" / ")}</p>
+                <div className="hk-media-scoreline">{rating ? <div><strong>{rating}<small>/ 10</small></strong><span>Community score</span></div>:null}<div><strong>{duration}</strong><span>Runtime</span></div>{nextAiringLabel ? <Link href="/calendar"><strong>{nextAiringLabel}</strong><span>Next broadcast ↗</span></Link>:null}</div>
+                <dl className="hk-media-facts">{quickFacts.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
+                {watchProviders.length ? <div className="hk-media-providers"><p>{providerSectionLabel}</p><div>{watchProviders.map(provider=><a href={provider.url} key={provider.id} target="_blank" rel="noopener noreferrer">{provider.label}<ExternalLink size={13}/></a>)}</div></div>:null}
+              </div>
             </div>
 
-            <Tabs defaultValue="overview" className="mt-8">
+            <Tabs defaultValue="overview" className="hk-media-tabs">
               <TabsList className="h-auto rounded-2xl border border-white/10 bg-[#08121d]/75 p-1.5 backdrop-blur-xl">
                 <TabsTrigger
                   value="overview"

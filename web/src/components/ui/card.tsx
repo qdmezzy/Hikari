@@ -7,7 +7,9 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card"
       className={cn(
-        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        // Matches .hikari-panel: flat fill, hard border, offset lift. No
+        // translucency — a card is a surface, not a pane of glass.
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-lg border border-border py-6 shadow-[var(--lift)]",
         className
       )}
       {...props}

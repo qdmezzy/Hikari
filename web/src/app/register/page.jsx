@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { AuthArtwork } from "@/components/layout/AuthArtwork"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Eye,
@@ -20,7 +21,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { FloatingDecorations, Sparkle, GlowOrb } from "@/components/common/anime-decorations"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import {
@@ -281,72 +281,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-background">
-      <div className="hidden lg:flex lg:w-1/2 relative bg-gradient-to-br from-accent/20 via-primary/10 to-background overflow-hidden">
-        <GlowOrb className="-top-20 -right-20" size="lg" color="accent" />
-        <GlowOrb className="bottom-10 left-10" size="md" color="primary" />
-        <GlowOrb className="top-1/2 left-1/3" size="sm" color="aurora" />
-
-        <FloatingDecorations density="normal" />
-
-        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20">
-          <div className="space-y-6">
-            <Link href="/" className="group inline-flex">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brand/hikari-wordmark.svg"
-                alt="Hikari"
-                className="h-24 w-auto transition-transform group-hover:scale-105"
-              />
-            </Link>
-
-            <div className="space-y-4 max-w-md">
-              <h1 className="text-4xl xl:text-5xl font-bold text-foreground leading-tight text-balance">
-                Start your anime journey today
-              </h1>
-              <p className="text-lg text-muted-foreground leading-relaxed">
-                Build your watchlist, discover new favorites, and keep your anime journey in one place.
-              </p>
-            </div>
-
-            <div className="pt-8 space-y-4">
-              {steps.map((step) => (
-                <div
-                  key={step.id}
-                  className={cn(
-                    "flex items-center gap-4 transition-all duration-300",
-                    currentStep >= step.id ? "opacity-100" : "opacity-50",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300",
-                      currentStep > step.id
-                        ? "bg-primary text-primary-foreground"
-                        : currentStep === step.id
-                          ? "bg-primary/20 text-primary border-2 border-primary"
-                          : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {currentStep > step.id ? <Check className="h-5 w-5" /> : step.id}
-                  </div>
-                  <div>
-                    <p className={cn("font-medium", currentStep >= step.id ? "text-foreground" : "text-muted-foreground")}>
-                      {step.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{step.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
-      </div>
-
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
-        <FloatingDecorations density="sparse" className="lg:hidden" />
+    <div className="hikari-revamp rv-auth min-h-screen">
+      <AuthArtwork steps={steps} currentStep={currentStep}/>
+      <div className="rv-auth-form flex-1 flex items-center justify-center p-6 sm:p-12 relative">
 
         <div className="w-full max-w-md space-y-8 relative z-10">
           <div className="lg:hidden flex justify-center">
@@ -410,7 +347,7 @@ export default function RegisterPage() {
               <div className="space-y-3">
                 <Button
                   variant="outline"
-                  className="w-full h-12 glass hover:bg-muted/50"
+                  className="w-full h-12 hover:bg-muted/50"
                   disabled={isLoading || Boolean(oauthLoading)}
                   onClick={() => handleOAuthSignIn("google")}
                   type="button"
@@ -426,7 +363,7 @@ export default function RegisterPage() {
 
                 <Button
                   variant="outline"
-                  className="w-full h-12 glass hover:bg-muted/50"
+                  className="w-full h-12 hover:bg-muted/50"
                   disabled={isLoading || Boolean(oauthLoading)}
                   onClick={() => handleOAuthSignIn("discord")}
                   type="button"
@@ -459,6 +396,7 @@ export default function RegisterPage() {
                     <Input
                       id="email"
                       type="email"
+                            autoComplete="email"
                       placeholder="you@example.com"
                       value={formData.email}
                       onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
@@ -477,6 +415,7 @@ export default function RegisterPage() {
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input
                       id="password"
+                            autoComplete="new-password"
                       type={showPassword ? "text" : "password"}
                       placeholder="Create a strong password"
                       value={formData.password}

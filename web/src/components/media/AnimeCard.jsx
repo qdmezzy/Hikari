@@ -64,80 +64,20 @@ export const AnimeCard = React.memo(function AnimeCard({
     .join(" · ")
 
   return (
-    <article
-      className={cn(
-        "group animate-rise card-elevated overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_20px_44px_-22px_rgba(16,24,40,0.35)]",
-        className,
-      )}
-      style={{ animationDelay: `${Math.min(index * 35, 400)}ms` }}
-    >
-      <div className="relative aspect-[3/4] overflow-hidden bg-secondary">
-        <Link href={href} className="absolute inset-0 z-10" aria-label={`Open ${title}`} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={normalizedAnime?.coverImage?.extraLarge || normalizedAnime?.coverImage?.large || "/placeholder.svg"}
-          alt={title}
-          className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
-        />
-
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-center justify-between p-2.5">
-          <span className="rounded-full bg-foreground/75 px-2.5 py-1 text-[11px] font-medium text-background backdrop-blur-sm">
-            {episodeCount
-              ? `${episodeCount} ${normalizedAnime?.type === "MANGA" ? "ch" : "eps"}`
-              : formatAniListStatus(normalizedAnime?.status)}
-          </span>
-          {rating ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-background/90 px-2 py-1 text-[11px] font-semibold text-foreground shadow-sm">
-              <Star className="size-3 fill-chart-3 text-chart-3" />
-              {rating}
-            </span>
-          ) : null}
-        </div>
-
-        {onQuickAdd ? (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onQuickAdd(normalizedAnime)
-            }}
-            aria-label="Add to list"
-            className="absolute bottom-2.5 right-2.5 z-20 inline-flex size-9 items-center justify-center rounded-full bg-background/90 text-foreground shadow-md backdrop-blur-sm transition-all duration-300 hover:bg-primary hover:text-primary-foreground sm:opacity-0 sm:group-hover:opacity-100"
-          >
-            {quickState === "adding" ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : quickState === "added" ? (
-              <Check className="size-4" />
-            ) : (
-              <Plus className="size-4" />
-            )}
-          </button>
-        ) : null}
+    <article className={cn("hk-catalog-card", className)}>
+      <div className="hk-catalog-cover">
+        <Link href={href} aria-label={`Open ${title}`}>
+          <img src={normalizedAnime?.coverImage?.extraLarge || normalizedAnime?.coverImage?.large || "/placeholder.svg"} alt="" loading="lazy" />
+        </Link>
+        {onQuickAdd ? <button type="button" onClick={() => onQuickAdd(normalizedAnime)} disabled={quickState === "adding" || quickState === "added"} aria-label={`${quickState === "added" ? "Already in your list:" : "Add to list:"} ${title}`}>
+          {quickState === "adding" ? <Loader2 size={16} className="animate-spin" /> : quickState === "added" ? <Check size={16} /> : <Plus size={16} />}
+        </button> : null}
       </div>
-
-      <div className="flex flex-col gap-1 p-3">
-        <h3 className="line-clamp-1 text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
-          {title}
-        </h3>
-        {meta ? <p className="truncate text-xs text-muted-foreground">{meta}</p> : null}
-        {watchLink?.url ? (
-          <a
-            href={watchLink.url}
-            target="_blank"
-            rel="noreferrer"
-            onClick={(event) => event.stopPropagation()}
-            className="relative z-20 mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border/60 bg-secondary/60 px-2.5 py-1.5 text-[11px] font-medium text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
-          >
-            <Play className="size-3 shrink-0 fill-primary text-primary" />
-            <span className="truncate">Watch on {watchLink.site}</span>
-          </a>
-        ) : (
-          <span className="mt-2 inline-flex w-fit items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground">
-            View details
-          </span>
-        )}
-      </div>
+      <div className="hk-catalog-meta"><span>{normalizedAnime?.type === "MANGA" ? "MANGA" : "ANIME"}{normalizedAnime?.startDate?.year ? ` / ${normalizedAnime.startDate.year}` : ""}</span>{rating ? <span><Star size={10} fill="currentColor" />{rating}</span> : null}</div>
+      <h3><Link href={href}>{title}</Link></h3>
+      {normalizedAnime?.title?.native && normalizedAnime.title.native !== title ? <p className="hk-catalog-native" lang="ja">{normalizedAnime.title.native}</p> : null}
+      <p className="hk-catalog-details">{episodeCount ? `${episodeCount} ${normalizedAnime?.type === "MANGA" ? episodeCount === 1 ? "chapter" : "chapters" : episodeCount === 1 ? "episode" : "episodes"}` : formatAniListStatus(normalizedAnime?.status)}{getPrimaryStudio(normalizedAnime) ? ` · ${getPrimaryStudio(normalizedAnime)}` : ""}</p>
+      {watchLink?.url ? <a className="hk-catalog-stream" href={watchLink.url} target="_blank" rel="noreferrer"><Play size={10} />Watch on {watchLink.site}</a> : null}
     </article>
   )
 })

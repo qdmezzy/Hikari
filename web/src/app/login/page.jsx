@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { AuthArtwork } from "@/components/layout/AuthArtwork"
 import Image from "next/image"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -204,110 +205,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex relative overflow-hidden bg-background">
-      <div className="fixed inset-0 pointer-events-none">
-        <div
-          className="absolute -top-1/2 -left-1/2 w-full h-full rounded-full bg-gradient-to-br from-primary/30 via-accent/20 to-transparent blur-3xl animate-pulse"
-          style={{ animationDuration: "8s" }}
-        />
-        <div
-          className="absolute -bottom-1/2 -right-1/2 w-full h-full rounded-full bg-gradient-to-tl from-accent/20 via-primary/10 to-transparent blur-3xl animate-pulse"
-          style={{ animationDuration: "10s", animationDelay: "3s" }}
-        />
-      </div>
-
-      <div className="hidden lg:flex lg:w-[55%] relative overflow-hidden">
-        <div className="absolute inset-0 grid grid-cols-3 gap-2 p-4 opacity-40">
-          {[...showcaseAnime, ...showcaseAnime, ...showcaseAnime].map((cover, index) => (
-            <motion.div
-              key={`${cover}-${index}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.05 }}
-              className="relative aspect-[3/4] rounded-xl overflow-hidden"
-            >
-              <Image src={cover} alt="" fill className="object-cover" />
-            </motion.div>
-          ))}
-        </div>
-
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/70" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/50" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-transparent to-background" />
-
-        <div className="relative z-10 flex flex-col justify-center px-12 xl:px-20">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6 }}
-            className="space-y-8 max-w-lg"
-          >
-            <Link href="/" className="group inline-flex">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/brand/hikari-wordmark.svg"
-                alt="Hikari"
-                className="h-24 w-auto transition-transform group-hover:scale-105"
-              />
-            </Link>
-
-            <div className="space-y-4">
-              <h1 className="text-5xl xl:text-6xl font-black text-foreground leading-[1.1]">
-                Welcome back,
-                <span className="block bg-gradient-to-r from-primary via-accent to-primary bg-clip-text text-transparent">
-                  Otaku
-                </span>
-              </h1>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                Continue your anime adventure. Your watchlist is waiting for you.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { icon: Play, value: "Track", label: "Episodes" },
-                { icon: Heart, value: "Save", label: "Favorites" },
-                { icon: Star, value: "Rate", label: "Your Picks" },
-              ].map((stat, index) => (
-                <motion.div
-                  key={stat.label}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-                  className="text-center p-4 rounded-2xl bg-card/30 backdrop-blur-sm border border-border/30"
-                >
-                  <stat.icon className="w-5 h-5 text-accent mx-auto mb-2" />
-                  <div className="text-2xl font-black text-foreground">{stat.value}</div>
-                  <div className="text-xs text-muted-foreground">{stat.label}</div>
-                </motion.div>
-              ))}
-            </div>
-
-            <div className="space-y-3 pt-4">
-              {[
-                "Sync with AniList & MyAnimeList instantly",
-                "AI-powered personalized recommendations",
-                "Track episodes, scores & watch time",
-              ].map((feature, index) => (
-                <motion.div
-                  key={feature}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
-                  className="flex items-center gap-3 text-muted-foreground"
-                >
-                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center flex-shrink-0">
-                    <Zap className="w-3 h-3 text-accent" />
-                  </div>
-                  <span>{feature}</span>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 relative">
+    <div className="hikari-revamp rv-auth min-h-screen">
+      <AuthArtwork />
+      <div className="rv-auth-form flex-1 flex items-center justify-center p-6 sm:p-12 relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -321,7 +221,7 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <div className="bg-card/50 backdrop-blur-xl border border-border/50 rounded-3xl p-8 shadow-2xl">
+          <div className="rv-auth-fields">
             <AnimatePresence mode="wait">
               {loginSuccess ? (
                 <motion.div
@@ -339,12 +239,12 @@ export default function LoginPage() {
                     <CheckCircle2 className="w-10 h-10 text-white" />
                   </motion.div>
                   <h2 className="text-2xl font-bold text-foreground mb-2">Welcome back!</h2>
-                  <p className="text-muted-foreground">Redirecting to your dashboard...</p>
+                  <p className="text-muted-foreground">Opening your Hikari…</p>
                 </motion.div>
               ) : (
                 <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <div className="text-center mb-8">
-                    <h2 className="text-2xl font-bold text-foreground">Sign in to your account</h2>
+                  <div className="rv-auth-heading mb-8">
+                    <h2 className="text-2xl font-bold text-foreground">Welcome back.</h2>
                     <p className="mt-2 text-muted-foreground">
                       {"Don't have an account? "}
                       <Link
@@ -357,7 +257,7 @@ export default function LoginPage() {
                   </div>
 
                   {errors.form ? (
-                    <div className="mb-6 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                    <div role="alert" className="mb-6 rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                       {errors.form}
                     </div>
                   ) : null}
@@ -422,6 +322,7 @@ export default function LoginPage() {
                           <Input
                             id="email"
                             type="email"
+                            autoComplete="email"
                             placeholder="you@example.com"
                             value={formData.email}
                             onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
@@ -445,7 +346,7 @@ export default function LoginPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="password" className="text-sm font-medium">Password</Label>
-                        <Link href="/forgot-password" className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
+                        <Link href={`/forgot-password?next=${encodeURIComponent(nextPath)}`} className="text-sm text-primary hover:text-primary/80 font-medium transition-colors">
                           Forgot?
                         </Link>
                       </div>
@@ -465,6 +366,7 @@ export default function LoginPage() {
                           />
                           <Input
                             id="password"
+                            autoComplete="current-password"
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
                             value={formData.password}
@@ -480,6 +382,7 @@ export default function LoginPage() {
                           <button
                             type="button"
                             onClick={() => setShowPassword((current) => !current)}
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                             className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                           >
                             {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -510,7 +413,7 @@ export default function LoginPage() {
 
                     <Button
                       type="submit"
-                      className="w-full h-14 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-white font-semibold text-base rounded-xl shadow-lg shadow-primary/25 transition-all group"
+                      className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-sm rounded-md transition-all group"
                       disabled={isLoading}
                     >
                       {isLoading ? (

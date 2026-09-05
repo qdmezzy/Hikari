@@ -1,0 +1,2 @@
+import { AuthExperience } from "../components/AuthExperience";
+export default function LoginPage() { return <AuthExperience mode="login" />; }

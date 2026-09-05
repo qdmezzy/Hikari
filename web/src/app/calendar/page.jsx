@@ -1,4 +1,5 @@
 "use client"
+import { ScheduleScreen } from "@/components/media/ScheduleScreen"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -17,6 +18,10 @@ import { ensurePushSubscription } from "@/lib/push-client"
 export default function CalendarPage() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true)
   const [viewMode, setViewMode] = useState("calendar")
+  const [selectedDay, setSelectedDay] = useState("all")
+  const [timeZone, setTimeZone] = useState("")
+  const [retry, setRetry] = useState(0)
+  useEffect(() => { setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone.replaceAll("_", " ")) }, [])
   const [statusFilters, setStatusFilters] = useState(["watching", "rewatching", "on_hold"])
   // "mine" = only what you track · "all" = the whole current season.
   const [scheduleScope, setScheduleScope] = useState("mine")
@@ -306,7 +311,7 @@ export default function CalendarPage() {
       isActive = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, statusFilters, scheduleScope])
+  }, [user, statusFilters, scheduleScope, retry])
 
   // A true week structure: one section per day for the next 7 days (empty days
   // included, today first), plus a "Later" bucket for everything beyond.
@@ -348,6 +353,7 @@ export default function CalendarPage() {
   }
 
   const toggleNotify = (id) => {
+    if (!user) { window.location.assign("/login?next=%2Fcalendar"); return }
     const enabling = !notifyIds.includes(id)
     setNotifyIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
     if (!user) return
@@ -382,327 +388,5 @@ export default function CalendarPage() {
   // Signed-out visitors always see the public "All Airing" view.
   const effectiveScope = user ? scheduleScope : "all"
 
-  return (
-    <div className="min-h-screen bg-background">
-        <Navigation />
-
-      <main className="pb-16 pt-24 lg:pt-28">
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <header className="animate-rise">
-            <p className="font-jp text-sm font-medium tracking-[0.3em] text-primary/70">放送予定</p>
-            <div className="mt-1 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-              <div>
-                <h1 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">Airing schedule</h1>
-                <p className="mt-2 text-pretty text-muted-foreground">
-                  {scheduleScope === "all"
-                    ? "Upcoming episodes across the whole current season."
-                    : "Upcoming episodes from the titles on your list."}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("calendar")}
-                    className={cn(
-                      "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                      viewMode === "calendar"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    Calendar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setViewMode("list")}
-                    className={cn(
-                      "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                      viewMode === "list"
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    List
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 shadow-sm">
-                  {notificationsEnabled ? (
-                    <Bell className="h-4 w-4 text-primary" />
-                  ) : (
-                    <BellOff className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <Switch
-                    checked={notificationsEnabled}
-                    onCheckedChange={handleNotificationsToggle}
-                    aria-label={notificationsEnabled ? "Disable notifications" : "Enable notifications"}
-                  />
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <div className="mt-8 flex w-fit items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
-            {[
-              { id: "mine", label: "My List" },
-              { id: "all", label: "All Airing" },
-            ].map((scope) =>
-              scope.id === "mine" && !user ? (
-                <Link
-                  key={scope.id}
-                  href="/login?next=%2Fcalendar"
-                  className="rounded-lg px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  {scope.label}
-                </Link>
-              ) : (
-                <button
-                  key={scope.id}
-                  type="button"
-                  onClick={() => setScheduleScope(scope.id)}
-                  className={cn(
-                    "rounded-lg px-4 py-1.5 text-sm font-medium transition-colors",
-                    effectiveScope === scope.id
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {scope.label}
-                </button>
-              ),
-            )}
-          </div>
-
-          {effectiveScope === "mine" ? (
-            <div className="mb-6 mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Show</span>
-              {STATUS_OPTIONS.map((status) => (
-                <button
-                  key={status.id}
-                  type="button"
-                  onClick={() => toggleStatusFilter(status.id)}
-                  className={cn(
-                    "rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
-                    statusFilters.includes(status.id)
-                      ? "bg-primary text-primary-foreground"
-                      : "border border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                  )}
-                >
-                  {status.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="mb-6 mt-4" />
-          )}
-
-          {loading || loadingSchedule ? (
-            <div className="space-y-3">
-              {Array.from({ length: 4 }).map((_, index) => (
-                <div key={index} className="card-elevated h-24 animate-pulse" />
-              ))}
-            </div>
-          ) : scheduleError ? (
-            <EmptyState icon={CalendarIcon} title="Couldn't load the schedule" description={scheduleError} />
-          ) : schedule.length === 0 ? (
-            <EmptyState
-              icon={CalendarIcon}
-              title="No upcoming episodes"
-              description={
-                effectiveScope === "all"
-                  ? "Nothing with a confirmed next-episode time right now. Check back soon."
-                  : "Add currently-airing titles to your list and their next episodes will show up here."
-              }
-              action={
-                <Button asChild>
-                  <Link href="/search">Browse titles</Link>
-                </Button>
-              }
-            />
-          ) : viewMode === "list" ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">Next up</Badge>
-                <span className="text-sm text-muted-foreground">
-                  {weekEpisodeCount} {weekEpisodeCount === 1 ? "episode" : "episodes"} airing this week
-                </span>
-              </div>
-              {schedule.map((item) => {
-                const date = new Date(item.airingAt * 1000)
-                const dateLabel = date.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })
-                const timeLabel = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-                const isNotified = notifySet.has(item.id)
-                const minutes = Math.max(Math.round(item.timeUntilAiring / 60), 0)
-                const countdown =
-                  minutes >= 1440
-                    ? `${Math.round(minutes / 1440)}d`
-                    : minutes >= 60
-                      ? `${Math.round(minutes / 60)}h`
-                      : `${minutes}m`
-                return (
-                  <div
-                    key={item.id}
-                    className="card-elevated group flex flex-col gap-4 p-3 transition-all hover:-translate-y-0.5 hover:border-primary/30 sm:flex-row sm:items-center"
-                  >
-                    <Link
-                      href={`/media/${item.id}`}
-                      className="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-secondary"
-                    >
-                      <img
-                        src={item.cover || "/placeholder.svg"}
-                        alt={item.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                    </Link>
-                    <div className="min-w-0 flex-1">
-                      <Link href={`/media/${item.id}`} className="min-w-0">
-                        <h3 className="truncate font-semibold text-foreground transition-colors group-hover:text-primary">
-                          {item.title}
-                        </h3>
-                      </Link>
-                      <p className="mt-0.5 text-sm font-medium text-primary">Episode {item.episode}</p>
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <CalendarIcon className="h-3.5 w-3.5" />
-                          {dateLabel}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5" />
-                          {timeLabel}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 self-start sm:self-auto">
-                      <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
-                        in {countdown}
-                      </span>
-                      <Button
-                        variant={isNotified ? "secondary" : "outline"}
-                        size="sm"
-                        className="gap-1.5"
-                        disabled={!notificationsEnabled}
-                        onClick={() => toggleNotify(item.id)}
-                      >
-                        {isNotified ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
-                        {isNotified ? "Notifying" : "Notify"}
-                      </Button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">Next 7 days</Badge>
-                <span className="text-sm text-muted-foreground">
-                  {weekEpisodeCount} {weekEpisodeCount === 1 ? "episode" : "episodes"} airing this week
-                </span>
-              </div>
-              {weekSections.week
-                .filter((day) => day.items.length)
-                .map((day) => (
-                  <section key={day.key} className="card-elevated p-4 md:p-5">
-                    <div className="mb-4 flex items-baseline justify-between">
-                      <div className="flex items-baseline gap-2">
-                        <h2 className={cn("text-lg font-bold", day.isToday ? "text-primary" : "text-foreground")}>
-                          {day.label}
-                        </h2>
-                        <span className="text-sm text-muted-foreground">{day.sub}</span>
-                      </div>
-                      <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                        {day.items.length} {day.items.length === 1 ? "episode" : "episodes"}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7">
-                      {day.items.map((item) => (
-                        <SchedulePosterTile
-                          key={item.id}
-                          item={item}
-                          isNotified={notifySet.has(item.id)}
-                          notificationsEnabled={notificationsEnabled}
-                          onToggleNotify={toggleNotify}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              {weekSections.later.length ? (
-                <section className="card-elevated p-4 md:p-5">
-                  <div className="mb-4 flex items-baseline justify-between">
-                    <div className="flex items-baseline gap-2">
-                      <h2 className="text-lg font-bold text-foreground">Later</h2>
-                      <span className="text-sm text-muted-foreground">beyond this week</span>
-                    </div>
-                    <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      {weekSections.later.length}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-x-3 gap-y-4 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7">
-                    {weekSections.later.map((item) => (
-                      <SchedulePosterTile
-                        key={item.id}
-                        item={item}
-                        withDate
-                        isNotified={notifySet.has(item.id)}
-                        notificationsEnabled={notificationsEnabled}
-                        onToggleNotify={toggleNotify}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </main>
-      </div>
-  )
-}
-
-function SchedulePosterTile({ item, isNotified, notificationsEnabled, onToggleNotify, withDate = false }) {
-  const timeLabel = item.date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
-  const dateLabel = item.date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
-  return (
-    <div className="group relative">
-      <Link href={`/media/${item.id}`} className="block">
-        <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-secondary ring-1 ring-border/40 transition-shadow group-hover:ring-primary/40">
-          <img
-            src={item.cover || "/placeholder.svg"}
-            alt={item.title}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/70 to-transparent" />
-          <span className="absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur-sm">
-            {withDate ? dateLabel : timeLabel}
-          </span>
-        </div>
-      </Link>
-      <button
-        type="button"
-        aria-label={isNotified ? "Stop notifying" : "Notify me"}
-        disabled={!notificationsEnabled}
-        onClick={() => onToggleNotify(item.id)}
-        className={cn(
-          "absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-opacity",
-          isNotified ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-          !notificationsEnabled && "pointer-events-none",
-        )}
-      >
-        {isNotified ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
-      </button>
-      <Link href={`/media/${item.id}`} className="mt-1.5 block">
-        <p className="line-clamp-1 text-xs font-medium text-foreground transition-colors group-hover:text-primary">
-          {item.title}
-        </p>
-        <p className="text-[11px] text-muted-foreground">Ep {item.episode}</p>
-      </Link>
-    </div>
-  )
+  return <ScheduleScreen model={{weekSections, selectedDay, setSelectedDay, timeZone, user, effectiveScope, setScheduleScope, notificationsEnabled, handleNotificationsToggle, loadingSchedule, loading, weekEpisodeCount, statusFilters, STATUS_OPTIONS, toggleStatusFilter, viewMode, setViewMode, scheduleError, setRetry, notifySet, toggleNotify}}/>
 }
