@@ -68,5 +68,7 @@ test("invite secrets are not logged, analyzed, or returned by preview and claim 
   }
   assert.doesNotMatch(previewRoute, /NextResponse\.json\([^)]*\bcode\b/)
   assert.doesNotMatch(claimRoute, /NextResponse\.json\([^)]*\bcode\b/)
-  assert.match(joinPage, /history\.replaceState\(null, "", "\/founding\/join"\)/)
+  // Retired entry point redirects server-side without reading invitation secrets.
+  assert.match(joinPage, /redirect\("\/"\)/)
+  assert.doesNotMatch(joinPage, /searchParams|location|foundingFetch/)
 })

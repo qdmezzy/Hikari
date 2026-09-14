@@ -47,6 +47,7 @@ import { syncPublicFavorites } from '@/lib/public-profile'
 import { toast } from 'sonner'
 import { buildLoginPath } from '@/lib/safe-navigation.mjs'
 import { FoundingName } from '@/components/founding/FoundingName'
+import { mediaRelations } from '@/lib/media-relations.mjs'
 
 const MEDIA_FIELDS = `
     id
@@ -92,6 +93,12 @@ const MEDIA_FIELDS = `
     seasonYear
     source
     status
+    relations {
+      edges {
+        relationType(version: 3)
+        node { id type format isAdult title { romaji english native } coverImage { large } startDate { year } }
+      }
+    }
     recommendations(sort: RATING_DESC, perPage: 8) {
       nodes {
         rating
@@ -352,86 +359,11 @@ function getMangaDexId(externalLinks = []) {
 const toSecureExternalUrl = (value) => String(value || "").replace(/^http:\/\//i, "https://")
 
 function MediaPageSkeleton() {
-  return (
-    <main className="pb-20 pt-16 md:pb-8 md:pt-0">
-      <div className="relative h-64 overflow-hidden md:h-80">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-card to-background" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%)]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-      </div>
-
-      <div className="px-4 md:px-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="relative -mt-32 flex flex-col gap-6 md:flex-row md:items-end">
-            <div className="mx-auto w-48 flex-shrink-0 md:mx-0 md:w-56">
-              <div className="aspect-[3/4] rounded-2xl border border-white/10 bg-card/70 shadow-2xl animate-pulse" />
-            </div>
-
-            <div className="flex-1 pb-4">
-              <div className="mb-3 flex flex-wrap gap-2">
-                <div className="h-7 w-24 rounded-full bg-card/70 animate-pulse" />
-                <div className="h-7 w-28 rounded-full bg-card/50 animate-pulse" />
-              </div>
-              <div className="mb-3 h-12 w-full max-w-xl rounded-2xl bg-card/80 animate-pulse" />
-              <div className="mb-6 h-6 w-56 rounded-xl bg-card/50 animate-pulse" />
-              <div className="mb-6 flex flex-wrap gap-4">
-                <div className="h-5 w-28 rounded-lg bg-card/50 animate-pulse" />
-                <div className="h-5 w-36 rounded-lg bg-card/50 animate-pulse" />
-                <div className="h-5 w-32 rounded-lg bg-card/50 animate-pulse" />
-              </div>
-              <div className="space-y-3">
-                <div className="h-4 w-full max-w-3xl rounded-lg bg-card/60 animate-pulse" />
-                <div className="h-4 w-full max-w-2xl rounded-lg bg-card/50 animate-pulse" />
-                <div className="h-4 w-4/5 max-w-xl rounded-lg bg-card/40 animate-pulse" />
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(280px,0.8fr)]">
-            <div className="rounded-3xl border border-border/50 bg-card/50 p-6 backdrop-blur-xl">
-              <div className="mb-5 flex gap-3">
-                <div className="h-10 w-36 rounded-xl bg-card/70 animate-pulse" />
-                <div className="h-10 w-28 rounded-xl bg-card/50 animate-pulse" />
-              </div>
-              <div className="space-y-3">
-                <div className="h-4 w-full rounded-lg bg-card/60 animate-pulse" />
-                <div className="h-4 w-full rounded-lg bg-card/50 animate-pulse" />
-                <div className="h-4 w-5/6 rounded-lg bg-card/40 animate-pulse" />
-                <div className="h-4 w-3/4 rounded-lg bg-card/40 animate-pulse" />
-              </div>
-            </div>
-
-            <div className="rounded-3xl border border-border/50 bg-card/40 p-6 backdrop-blur-xl">
-              <div className="mb-4 h-6 w-32 rounded-lg bg-card/70 animate-pulse" />
-              <div className="space-y-3">
-                <div className="h-12 rounded-2xl bg-card/60 animate-pulse" />
-                <div className="h-12 rounded-2xl bg-card/50 animate-pulse" />
-                <div className="h-12 rounded-2xl bg-card/40 animate-pulse" />
-                <div className="h-32 rounded-2xl bg-card/30 animate-pulse" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-  )
+  return <main className="hk-media-main" aria-busy="true"><div className="hk-media-backdrop hk-media-loading-art"/><div className="rv-container"><p className="hk-media-load-label" role="status">Loading title information…</p></div></main>
 }
 
-function MediaNotFoundState() {
-  return (
-    <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4 pt-16 md:pt-0">
-      <div className="w-full max-w-xl rounded-3xl border border-border/50 bg-card/60 p-8 text-center shadow-2xl shadow-black/20 backdrop-blur-xl">
-        <Badge className="mb-4 bg-primary/15 text-primary">Unavailable</Badge>
-        <h1 className="mb-3 text-3xl font-black text-foreground">This title could not be loaded</h1>
-        <p className="mb-6 text-muted-foreground">
-          The page opened, but AniList did not return media data for this entry.
-        </p>
-        <Button asChild className="bg-gradient-to-r from-primary to-accent text-white hover:opacity-90">
-          <Link href="/search">Browse other anime</Link>
-        </Button>
-      </div>
-    </main>
-  )
+function MediaNotFoundState({ onRetry }) {
+  return <main className="rv-main rv-container"><div className="hk-personal-empty"><span lang="ja">読み込めませんでした</span><h1 className="text-3xl mb-5">This title couldn’t load</h1><p>The catalog may be temporarily unavailable. Try loading the title again.</p><div className="flex justify-center gap-4"><Button onClick={onRetry}>Try again</Button><Button asChild variant="outline"><Link href="/search">Browse titles</Link></Button></div></div></main>
 }
 
 export default function MediaPage() {
@@ -440,6 +372,7 @@ export default function MediaPage() {
   const searchParams = useSearchParams()
   const routeValue = getRouteValue(rawId)
   const [media, setMedia] = useState(null)
+  const [mediaRetry, setMediaRetry] = useState(0)
   const [loading, setLoading] = useState(true)
   const { user } = useAuth()
   const mediaId = Number.isFinite(Number(media?.id)) ? Number(media.id) : null
@@ -539,7 +472,7 @@ export default function MediaPage() {
     return () => {
       active = false
     }
-  }, [routeValue])
+  }, [routeValue, mediaRetry])
 
   // Load existing list entry if user is logged in
   useEffect(() => {
@@ -949,7 +882,7 @@ export default function MediaPage() {
   if (!media) return (
     <div className="min-h-screen bg-background">
       <Navigation />
-      <MediaNotFoundState />
+      <MediaNotFoundState onRetry={() => setMediaRetry(value => value + 1)} />
     </div>
   )
 
@@ -1124,6 +1057,7 @@ export default function MediaPage() {
     date: review.created_at ? new Date(review.created_at).toLocaleDateString() : "",
   }))
 
+  const relatedStories = mediaRelations(media.relations?.edges)
   const similar = (media.recommendations?.nodes || [])
     .map((node) => node?.mediaRecommendation)
     .filter(Boolean)
@@ -1327,12 +1261,12 @@ export default function MediaPage() {
               </motion.div>
 
               <div className="hk-media-heading">
-                <div className="hk-media-format"><span lang="ja">{media.type==="MANGA"?"漫画":"アニメ"}</span><span>{type} / {mediaStatus}</span></div>
-                {originalTitle ? <p className="hk-media-native" lang="ja">{originalTitle}</p>:null}
+                <div className="hk-media-format"><span lang="ja">{media.type==="MANGA"?"漫画":"アニメ"}</span><span>{formatEnumLabel(media.format) || type} / {mediaStatus}</span></div>
+                {media.title?.native || originalTitle ? <p className="hk-media-native" lang={media.title?.native ? "ja" : undefined}>{media.title?.native || originalTitle}</p>:null}
                 <h1>{title}</h1>
                 <p className="hk-media-genres">{(media.genres || []).join(" / ")}</p>
                 <div className="hk-media-scoreline">{rating ? <div><strong>{rating}<small>/ 10</small></strong><span>Community score</span></div>:null}<div><strong>{duration}</strong><span>Runtime</span></div>{nextAiringLabel ? <Link href="/calendar"><strong>{nextAiringLabel}</strong><span>Next broadcast ↗</span></Link>:null}</div>
-                <dl className="hk-media-facts">{quickFacts.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
+                <dl className="hk-media-facts">{quickFacts.filter(item=>item.label!=="Duration").map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
                 {watchProviders.length ? <div className="hk-media-providers"><p>{providerSectionLabel}</p><div>{watchProviders.map(provider=><a href={provider.url} key={provider.id} target="_blank" rel="noopener noreferrer">{provider.label}<ExternalLink size={13}/></a>)}</div></div>:null}
               </div>
             </div>
@@ -1724,6 +1658,17 @@ export default function MediaPage() {
               </div>
             ) : null}
 
+            <section className="hk-related-stories" aria-labelledby="related-stories-heading">
+              <span className="hk-page-jp" lang="ja">物語のつながり</span>
+              <h2 id="related-stories-heading">Where this story connects</h2>
+              <p>Prequels, sequels, and other versions, as listed by AniList. These connections aren’t a prescribed watch order.</p>
+              <div>{relatedStories.map(item => <Link href={`/media/${item.id}`} key={item.id}>
+                <img src={item.cover} alt="" loading="lazy" onError={event => { event.currentTarget.onerror = null; event.currentTarget.src = '/placeholder.svg' }} />
+                <span><small>{item.relation}</small><strong>{item.title}</strong><span>{item.format}{item.year ? ` · ${item.year}` : ''}</span></span>
+                <ExternalLink size={14} aria-hidden="true" />
+              </Link>)}</div>
+              {!relatedStories.length ? <p>No linked stories are listed for this title yet.</p> : null}
+            </section>
             <div className="mt-8">
               <SectionHeader title={media.type === "ANIME" ? "Similar Anime" : "Related Titles"} />
               <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">

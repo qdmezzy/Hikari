@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 const require = createRequire(import.meta.url)
 const pass = ({ children }) => React.createElement(React.Fragment, null, children)
 const modules = {
+  "./FavoritePicker": { FavoritePicker: () => React.createElement("button", null, "Choose favorites") },
   "next/link": ({ children, ...props }) => React.createElement("a", props, children),
   "@/components/layout/Navigation": { Navigation: () => null },
   "@/components/common/ScrollReveal": { ScrollReveal: pass },

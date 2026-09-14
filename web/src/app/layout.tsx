@@ -6,6 +6,8 @@ import "./discover-screen.css"
 import "./motion.css"
 import "./personal.css"
 import "./refinements.css"
+import "./moderation.css"
+import "./personality.css"
 
 import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google"
 import { Toaster } from "sonner"

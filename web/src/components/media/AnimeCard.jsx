@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { mediaLengthLabel } from "@/lib/media-label.mjs"
 import Link from "next/link"
 import { Check, Loader2, Play, Plus, Star } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -67,7 +68,7 @@ export const AnimeCard = React.memo(function AnimeCard({
     <article className={cn("hk-catalog-card", className)}>
       <div className="hk-catalog-cover">
         <Link href={href} aria-label={`Open ${title}`}>
-          <img src={normalizedAnime?.coverImage?.extraLarge || normalizedAnime?.coverImage?.large || "/placeholder.svg"} alt="" loading="lazy" />
+          <img src={normalizedAnime?.coverImage?.extraLarge || normalizedAnime?.coverImage?.large || "/placeholder.svg"} alt="" loading="lazy" onError={event=>{event.currentTarget.onerror=null;event.currentTarget.src="/placeholder.svg"}} />
         </Link>
         {onQuickAdd ? <button type="button" onClick={() => onQuickAdd(normalizedAnime)} disabled={quickState === "adding" || quickState === "added"} aria-label={`${quickState === "added" ? "Already in your list:" : "Add to list:"} ${title}`}>
           {quickState === "adding" ? <Loader2 size={16} className="animate-spin" /> : quickState === "added" ? <Check size={16} /> : <Plus size={16} />}
@@ -76,7 +77,7 @@ export const AnimeCard = React.memo(function AnimeCard({
       <div className="hk-catalog-meta"><span>{normalizedAnime?.type === "MANGA" ? "MANGA" : "ANIME"}{normalizedAnime?.startDate?.year ? ` / ${normalizedAnime.startDate.year}` : ""}</span>{rating ? <span><Star size={10} fill="currentColor" />{rating}</span> : null}</div>
       <h3><Link href={href}>{title}</Link></h3>
       {normalizedAnime?.title?.native && normalizedAnime.title.native !== title ? <p className="hk-catalog-native" lang="ja">{normalizedAnime.title.native}</p> : null}
-      <p className="hk-catalog-details">{episodeCount ? `${episodeCount} ${normalizedAnime?.type === "MANGA" ? episodeCount === 1 ? "chapter" : "chapters" : episodeCount === 1 ? "episode" : "episodes"}` : formatAniListStatus(normalizedAnime?.status)}{getPrimaryStudio(normalizedAnime) ? ` · ${getPrimaryStudio(normalizedAnime)}` : ""}</p>
+      <p className="hk-catalog-details">{mediaLengthLabel(normalizedAnime)}{getPrimaryStudio(normalizedAnime) ? ` · ${getPrimaryStudio(normalizedAnime)}` : ""}</p>
       {watchLink?.url ? <a className="hk-catalog-stream" href={watchLink.url} target="_blank" rel="noreferrer"><Play size={10} />Watch on {watchLink.site}</a> : null}
     </article>
   )

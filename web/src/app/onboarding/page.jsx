@@ -60,6 +60,8 @@ export default function OnboardingPage() {
   const [goal, setGoal] = useState("")
   const [imported, setImported] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [finishError, setFinishError] = useState("")
+  const [importChoice, setImportChoice] = useState("anilist")
 
   // account step
   const [displayName, setDisplayName] = useState("")
@@ -184,9 +186,10 @@ export default function OnboardingPage() {
     setImportProgress(0)
     setImporting(true)
     try {
-      const summary = await fn({ userId: user.id, onProgress: setImportProgress })
-      setImportSummary(summary)
+      // Import happens in the preview flow after setup; never write the list here.
+      setImportChoice(fn === importFromMal ? "mal" : "anilist")
       setImported(true)
+      goNext()
     } catch (e) {
       setImportError(e?.message || "Import failed.")
     } finally {
@@ -203,8 +206,9 @@ export default function OnboardingPage() {
   /* ---- finish ---- */
   const finish = async () => {
     setFinishing(true)
+    setFinishError("")
     try {
-      await client.auth.updateUser({
+      const {error} = await client.auth.updateUser({
         data: {
           preferred_genres: genres,
           favorite_genres: genres,
@@ -212,11 +216,14 @@ export default function OnboardingPage() {
           onboarding_complete: true,
         },
       })
+      if(error) throw error
     } catch {
-      /* proceed regardless */
+      setFinishError("Your setup wasn’t saved. Please try again.")
+      setFinishing(false)
+      return
     }
     const goalRoute = GOALS.find((g) => g.id === goal)?.route || "/"
-    router.replace(nextPath !== "/" ? nextPath : imported ? "/lists" : goalRoute)
+    router.replace(imported ? `/import?source=${importChoice}&username=${encodeURIComponent(anilistName)}&next=${encodeURIComponent(nextPath !== "/" ? nextPath : "/lists")}` : nextPath !== "/" ? nextPath : goalRoute)
   }
 
   return (
@@ -348,7 +355,7 @@ export default function OnboardingPage() {
               <div className="flex flex-1 flex-col">
                 <h1 className="text-2xl font-bold tracking-tight">Bring your anime with you</h1>
                 <p className="mt-2 text-muted-foreground">
-                  Import your list so Hikari instantly knows what you&apos;ve watched, rated, and plan to watch. Don&apos;t start from zero.
+                  Choose an import source now. After setup, you’ll preview your titles and conflicts before anything is saved to your list.
                 </p>
 
                 {importSummary ? (
@@ -367,7 +374,7 @@ export default function OnboardingPage() {
                     {malConnected ? (
                       <Button className="w-full justify-between gap-2 py-6" disabled={importing} onClick={() => runImport(importFromMal)}>
                         <span className="flex items-center gap-2">
-                          <Download className="size-4" /> Import my MyAnimeList
+                          <Download className="size-4" /> Preview MyAnimeList after setup
                         </span>
                         {importing ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
                       </Button>
@@ -400,7 +407,7 @@ export default function OnboardingPage() {
                           disabled={importing || !anilistName.trim()}
                           onClick={() => runImport(({ userId, onProgress }) => importFromAniListUsername({ userId, username: anilistName, onProgress }))}
                         >
-                          {importing ? <Loader2 className="size-4 animate-spin" /> : "Import"}
+                          {importing ? <Loader2 className="size-4 animate-spin" /> : "Preview after setup"}
                         </Button>
                       </div>
                     </div>
@@ -464,6 +471,7 @@ export default function OnboardingPage() {
                   <Button variant="ghost" size="icon" onClick={goBack} aria-label="Back">
                     <ArrowLeft className="size-4" />
                   </Button>
+                  {finishError?<p role="alert" className="text-sm text-destructive">{finishError}</p>:null}
                   <Button className="ml-auto gap-2" onClick={finish} disabled={finishing}>
                     {finishing ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
                     Finish & explore

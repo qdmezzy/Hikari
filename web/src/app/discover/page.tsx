@@ -1,4 +1,5 @@
 "use client"
+import { readAllRows } from "@/lib/read-all-rows.mjs"
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { DiscoverScreen } from "@/components/discover/DiscoverScreen"
@@ -185,14 +186,63 @@ export default function DiscoverPage() {
   // Which media are already on the user's list (id -> status), to reflect the save button.
   const [savedStatus, setSavedStatus] = useState<Record<number, string>>({})
   const savingRef = useRef<Set<number>>(new Set())
+  const [hiddenTitles, setHiddenTitles] = useState<Array<{id:number;title:string}>>([])
+  const [hiddenReady, setHiddenReady] = useState("")
+  const [pendingSaveId, setPendingSaveId] = useState<number | null>(null)
+  useEffect(() => {
+    if (authLoading) return
+    const key = `hikari-hidden-discover-${user?.id || "guest"}`
+    let active=true
+    setHiddenReady("");setHiddenTitles([])
+    if(user?.id){
+      readAllRows(() => client.from("discover_hidden_titles").select("media_id,title").eq("user_id",user.id), { key: "media_id", isActive: () => active }).then(({data,error})=>{
+        if(!active)return
+        if(error){toast.error("Hidden titles couldn’t sync. Account hiding needs the latest database migration.");return}
+        setHiddenTitles((data||[]).map(item=>({id:Number(item.media_id),title:item.title})));setHiddenReady(key)
+      })
+    }else{
+      try { const values = JSON.parse(localStorage.getItem(key) || "[]"); setHiddenTitles(Array.isArray(values) ? values.filter(item => Number.isSafeInteger(item?.id) && typeof item?.title === "string") : []) } catch { setHiddenTitles([]) }
+      setHiddenReady(key)
+    }
+    const query = new URLSearchParams(window.location.search)
+    const id = Number(query.get("focus"))
+    if (user && query.get("intent") === "save" && Number.isSafeInteger(id) && id > 0) setPendingSaveId(id)
+    return()=>{active=false}
+  }, [authLoading, user?.id])
+  useEffect(() => {
+    if (user || hiddenReady !== "hikari-hidden-discover-guest") return
+    try { localStorage.setItem(hiddenReady, JSON.stringify(hiddenTitles)) } catch { toast.error("Hidden titles could not be remembered in this browser.") }
+  }, [hiddenTitles, hiddenReady, user?.id])
+  const restoreTitle = async (id:number) => {
+    if(!hiddenReady){toast.error("Hidden titles aren’t ready. Reload after setup.");return}
+    if(user){const {error}=await client.from("discover_hidden_titles").delete().eq("user_id",user.id).eq("media_id",id);if(error){toast.error("Couldn’t restore this title. Please retry.");return}}
+    setHiddenTitles(items => items.filter(item => item.id !== id))
+  }
+  const hideTitle = async (title:DiscoverItem) => {
+    if(!hiddenReady){toast.error("Hidden titles aren’t ready. Reload after setup.");return}
+    if(user){const {error}=await client.from("discover_hidden_titles").upsert({user_id:user.id,media_id:title.id,title:title.title.slice(0,300)});if(error){toast.error("This title wasn’t hidden. Please retry.");return}}
+    setHiddenTitles(items => [...items.filter(item => item.id !== title.id), {id:title.id,title:title.title}])
+    toast(user?"Hidden from your account’s feed":"Hidden from this browser’s feed", {action:{label:"Undo",onClick:()=>restoreTitle(title.id)}})
+  }
+  const hideRelatedTitles = async (titles:{id:number,title:string}[]) => {
+    if(!hiddenReady)return false
+    const additions=titles.filter(title=>!hiddenTitles.some(hidden=>hidden.id===title.id))
+    if(!additions.length)return true
+    if(user){const {error}=await client.from("discover_hidden_titles").upsert(additions.map(title=>({user_id:user.id,media_id:title.id,title:title.title.slice(0,300)})));if(error)return false}
+    setHiddenTitles(current=>[...current,...additions.filter(title=>!current.some(hidden=>hidden.id===title.id))])
+    toast(`${additions.length} titles hidden`,{action:{label:"Undo",onClick:async()=>{
+      const ids=additions.map(title=>title.id)
+      if(user){const {error}=await client.from("discover_hidden_titles").delete().eq("user_id",user.id).in("media_id",ids);if(error){toast.error("Couldn’t undo. Restore titles from the hidden list.");return}}
+      setHiddenTitles(current=>current.filter(title=>!ids.includes(title.id)))
+    }}})
+    return true
+  }
 
   useEffect(() => {
     activeVibeRef.current = activeVibe
   }, [activeVibe])
 
-  const filteredFeed = activeVibe === "all"
-    ? discoverFeed 
-    : discoverFeed.filter(item => item.vibes.includes(activeVibe))
+  const filteredFeed = discoverFeed.filter(item => !hiddenTitles.some(hidden => hidden.id === item.id) && (activeVibe === "all" || item.vibes.includes(activeVibe)))
 
   const currentAnime = filteredFeed[currentIndex] || filteredFeed[0]
   const isDiscoverPending = !currentAnime && (loadingMore || discoverFeed.length === 0)
@@ -239,48 +289,38 @@ export default function DiscoverPage() {
   }
 
   const toggleSave = async (id: number) => {
-    if (!ensureSignedIn() || !user) return
+    if (authLoading) return
+    if (!user) {
+      router.push(`/login?next=${encodeURIComponent("/discover?focus=" + id + "&intent=save")}`)
+      return
+    }
     if (savingRef.current.has(id)) return
-    const isSaved = Boolean(saved[id])
-    const status = savedStatus[id]
+    if (saved[id]) { toast.info(`Already in ${STATUS_LABELS[savedStatus[id]] || "your list"}`); return }
     savingRef.current.add(id)
     try {
-      if (!isSaved) {
-        const { error } = await client.from("list_entries").upsert(
-          { user_id: user.id, media_id: id, media_type: "ANIME", status: "plan_to_watch", progress: 0 },
-          { onConflict: "user_id,media_id", ignoreDuplicates: true },
-        )
-        if (error) throw error
-        setSaved((prev) => ({ ...prev, [id]: true }))
-        setSavedStatus((prev) => ({ ...prev, [id]: "plan_to_watch" }))
-        toast.success("Added to Plan to Watch")
-      } else if (status && status !== "plan_to_watch") {
-        
-        toast.info(`Already in your ${STATUS_LABELS[status] || "list"}`)
-      } else {
-        const { error } = await client
-          .from("list_entries")
-          .delete()
-          .eq("user_id", user.id)
-          .eq("media_id", id)
-        if (error) throw error
-        setSaved((prev) => {
-          const next = { ...prev }
-          delete next[id]
-          return next
-        })
-        setSavedStatus((prev) => {
-          const next = { ...prev }
-          delete next[id]
-          return next
-        })
-        toast.success("Removed from your list")
-      }
-    } catch {
-      toast.error("Couldn't update your list. Please try again.")
-    } finally {
-      savingRef.current.delete(id)
-    }
+      const { data, error } = await client.from("list_entries").upsert(
+        { user_id:user.id,media_id:id,media_type:"ANIME",status:"plan_to_watch",progress:0 },
+        {onConflict:"user_id,media_id",ignoreDuplicates:true},
+      ).select("id,updated_at")
+      if (error) throw error
+      const inserted = data?.[0]
+      setSaved(previous => ({...previous,[id]:true}))
+      setSavedStatus(previous => ({...previous,[id]:"plan_to_watch"}))
+      setPendingSaveId(null)
+      if (!inserted) { toast.info("This title is already in your list."); return }
+      toast.success("Saved to Plan to Watch", { action: { label:"Undo", onClick:async()=>{
+        try {
+          let query = client.from("list_entries").delete().eq("user_id",user.id).eq("id",inserted.id).eq("status","plan_to_watch").eq("progress",0)
+          if (inserted.updated_at) query = query.eq("updated_at",inserted.updated_at)
+          const {data:removed,error:undoError} = await query.select("id")
+          if (undoError) throw undoError
+          if (!removed?.length) { toast.info("That entry has changed. Manage it in My List."); return }
+          setSaved(previous => ({...previous,[id]:false}))
+          toast("Save undone")
+        } catch { toast.error("Could not undo. Your saved title is unchanged.") }
+      }}})
+    } catch { toast.error("Couldn't save this title. Please try again.") }
+    finally { savingRef.current.delete(id) }
   }
 
   const toggleMute = () => {
@@ -408,13 +448,10 @@ export default function DiscoverPage() {
       setPage(Number(resolved.pageInfo?.currentPage || nextPage))
       setHasMore(Boolean(resolved.pageInfo?.hasNextPage))
     } catch (error) {
-      if (!append) {
-        setDiscoverFeed([])
-      }
       // Circuit breaker: after repeated failures, stop auto-retrying so we don't
       // hammer the API (which is what causes the upstream 500s in the first place).
       failuresRef.current += 1
-      if (failuresRef.current >= 4) setFeedError(true)
+      setFeedError(true)
     } finally {
       loadMoreInFlightRef.current = false
       setLoadingMore(false)
@@ -424,11 +461,8 @@ export default function DiscoverPage() {
   const retryFeed = useCallback(() => {
     failuresRef.current = 0
     setFeedError(false)
-    setDiscoverFeed([])
-    setCurrentIndex(0)
-    setPage(1)
-    loadFeedPage(1)
-  }, [loadFeedPage])
+    loadFeedPage(discoverFeed.length ? page + 1 : 1, discoverFeed.length > 0)
+  }, [loadFeedPage, discoverFeed.length, page])
 
   // Keyboard navigation
   useEffect(() => {
@@ -688,5 +722,5 @@ export default function DiscoverPage() {
     return `https://www.youtube-nocookie.com/embed/${trailerId}?${params.toString()}`
   }
 
-  return <DiscoverScreen model={{currentAnime,containerRef,spoilerSafe,showTrailerFrame,isMuted,getYouTubeUrl,setIsTrailerLoaded,activeVibe,setActiveVibe,setCurrentIndex,vibeFilters,saved,liked,ensureSignedIn,toggleSave,toggleLike,handleShare,setIsTrailerPlayerOpen,isTrailerPlayerOpen,toggleMute,toggleSpoilerSafe,currentIndex,filteredFeed,hasMore,loadingMore,goToPrev,goToNext,loadFeedPage,page,feedError,retryFeed,getControllableYouTubeUrl}} />
+  return <DiscoverScreen model={{user,hideRelatedTitles,hiddenTitles,hideTitle,restoreTitle,pendingSaveId,loadingMore,currentAnime,containerRef,spoilerSafe,showTrailerFrame,isMuted,getYouTubeUrl,setIsTrailerLoaded,activeVibe,setActiveVibe,setCurrentIndex,vibeFilters,saved,liked,ensureSignedIn,toggleSave,toggleLike,handleShare,setIsTrailerPlayerOpen,isTrailerPlayerOpen,toggleMute,toggleSpoilerSafe,currentIndex,filteredFeed,hasMore,goToPrev,goToNext,loadFeedPage,page,feedError,retryFeed,getControllableYouTubeUrl}} />
 }

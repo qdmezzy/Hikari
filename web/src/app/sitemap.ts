@@ -45,7 +45,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: "/search", priority: 0.9 },
     { path: "/calendar", priority: 0.7 },
     { path: "/discord-bot", priority: 0.8 },
-    { path: "/founding", priority: 0.7 },
     { path: "/feedback", priority: 0.4 },
     { path: "/status", priority: 0.3 },
     { path: "/privacy", priority: 0.2 },

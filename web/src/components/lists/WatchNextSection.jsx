@@ -5,10 +5,12 @@ import Link from "next/link"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, ArrowUpRight } from "lucide-react"
 import { buildWatchNext } from "@/lib/ai-recommendations"
+import { useMotionPreference } from "@/hooks/useMotionPreference"
 
 // "Watch next" row for the Plan to Watch tab: the next season of anime you just
 // finished, plus your backlog ranked by taste.
 export function WatchNextSection({ entries = [] }) {
+  const reducedMotion = useMotionPreference()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   // Key the fetch on which completed/planned titles exist, so it re-runs when
@@ -71,7 +73,7 @@ export function WatchNextSection({ entries = [] }) {
   const scrollByDir = (dir) => {
     const el = scrollerRef.current
     if (!el) return
-    el.scrollBy({ left: dir * Math.max(el.clientWidth - 160, 320), behavior: "smooth" })
+    el.scrollBy({ left: dir * Math.max(el.clientWidth - 160, 320), behavior: reducedMotion ? "auto" : "smooth" })
   }
 
   if (!loading && !items.length) return null

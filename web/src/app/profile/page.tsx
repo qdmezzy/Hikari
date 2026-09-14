@@ -8,7 +8,6 @@ import RequireAuth from "@/components/common/RequireAuth"
 import client from "@/lib/client"
 import { checkHandleAvailability, isHandleTakenError, normalizeHandle, syncPublicFavorites, upsertPublicProfile } from "@/lib/public-profile"
 import { fetchAniListMediaByIds } from "@/lib/anilist"
-import { useFoundingMe } from "@/hooks/useFoundingMe"
 
 const normalizeEntryScore = (value: any) => {
   const numeric = Number(value)
@@ -44,8 +43,7 @@ const getEntryDisplayProgress = (entry: any) => {
 
 export default function ProfilePage() {
   const { user } = useAuth()
-  const founding = useFoundingMe(user)
-  const foundingNumber = founding.data?.member?.active ? founding.data.member.memberNumber : null
+  const foundingNumber = null
   const isMod = (user as any)?.app_metadata?.is_mod === true || (user as any)?.app_metadata?.isMod === true
   const [activeTab, setActiveTab] = React.useState("overview")
   const [entries, setEntries] = React.useState<any[]>([])
@@ -499,6 +497,6 @@ export default function ProfilePage() {
     profile: profileData, foundingNumber, activeTab, setActiveTab, entriesLoading, favoritesLoading,
     topGenres, customLists, xpPercentage, syncing: syncingPublicProfile, copied: shareCopied,
     sharingReady: profileSharingReady, onShare: handleShareProfile, onPublicView: handleOpenPublicView,
-    showWrapped: isMod && process.env.NEXT_PUBLIC_ENABLE_WRAPPED === "true",
+    showWrapped: true,
   }}/></RequireAuth>
 }

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { FoundingBadge } from "@/components/founding/FoundingBadge"
 import { FoundingName } from "@/components/founding/FoundingName"
 import { getMediaHref } from "@/lib/anilist"
+import { FavoritePicker } from "./FavoritePicker"
 
 const statuses = [
   { key: "watching", label: "In progress", count: "watching" },
@@ -41,7 +42,8 @@ export function ProfileScreen({ model: m }: { model: any }) {
             <div className="hk-profile-level"><span>Level {p.level}<small>{p.xp.toLocaleString()} / {p.xpToNext.toLocaleString()} XP</small></span><div role="progressbar" aria-label="Level progress" aria-valuemin={0} aria-valuemax={p.xpToNext || 1000} aria-valuenow={Math.min(p.xp,p.xpToNext || 1000)}><i style={{width:Math.min(100,Math.max(0,m.xpPercentage))+"%"}}/></div></div>
           </div>
         </div>
-        <nav className="hk-personal-tabs" aria-label="Profile sections">{[["overview","Overview"],["lists","Library"],["stats","Statistics"]].map(([id,label])=><button type="button" key={id} aria-pressed={m.activeTab===id} onClick={()=>m.setActiveTab(id)}>{label}</button>)}</nav>
+        <nav className="hk-personal-tabs" aria-label="Profile sections">{[["overview","Overview"],["lists","Library"],["stats","Statistics"]].map(([id,label])=><button type="button" key={id} aria-pressed={m.activeTab===id} onClick={()=>m.setActiveTab(id)}>{label}</button>)}<Link href="/compare">Compare favorites ↗</Link></nav>
+        {m.activeTab==="overview"?<div className="hk-collection-tools"><FavoritePicker/><Link href="/settings?section=privacy">Profile privacy ↗</Link></div>:null}
         <ScrollReveal key={m.activeTab}>
           {m.activeTab==="overview" ? <div className="hk-profile-overview"><div>
             <section className="hk-profile-section"><header><div><span className="hk-page-jp" lang="ja">好きな作品</span><h2>Favorite titles</h2></div><Link href="/favorites">All favorites <ArrowUpRight size={14}/></Link></header>{m.favoritesLoading ? <p role="status">Loading favorites…</p> : !p.favorites.length ? <p className="hk-personal-muted">Favorite a title on its anime or manga page to feature it here.</p> : <div className="hk-profile-favorites">{p.favorites.map((title:any)=><Link href={getMediaHref(title.id,title.title)} key={title.id}><img src={title.image || "/placeholder.svg"} alt="" loading="lazy"/><h3>{title.title}</h3>{title.score ? <small>Your score · {title.score}</small>:null}</Link>)}</div>}</section>

@@ -16,7 +16,6 @@ import {
 import {
   fetchAniList,
   formatAniListStatus,
-  getEpisodeCount,
   getMediaHref,
   getMediaTitle,
   getPreferredStreamingLink,
@@ -31,6 +30,8 @@ import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import { logListActivity } from "@/lib/activity-service"
 import { buildLoginPath } from "@/lib/safe-navigation.mjs"
+import { mediaLengthLabel } from "@/lib/media-label.mjs"
+import { mergeBrowseResults } from "@/lib/browse-results.mjs"
 
 function stripHtml(html: string) {
   return html.replace(/<[^>]*>/g, "")
@@ -79,6 +80,7 @@ query ($type: MediaType, $search: String, $page: Int, $perPage: Int, $genres: [S
       coverImage { extraLarge large color }
       averageScore
       episodes
+      duration
       chapters
       nextAiringEpisode { episode }
       status
@@ -111,6 +113,7 @@ type AniListMedia = {
   } | null
   averageScore?: number | null
   episodes?: number | null
+  duration?: number | null
   chapters?: number | null
   nextAiringEpisode?: {
     episode?: number | null
@@ -157,16 +160,22 @@ export default function BrowsePage() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState("")
+  const [failedAppend, setFailedAppend] = useState(false)
   const [quickState, setQuickState] = useState<QuickState>({})
 
   const requestId = useRef(0)
+  const appendLock = useRef(false)
 
   const fetchPage = async (nextPage: number, append = false) => {
+    if (append && (loading || appendLock.current)) return
+    appendLock.current = append
     const id = ++requestId.current
+    setError("")
+    setFailedAppend(false)
     if (append) setLoadingMore(true)
     else {
       setLoading(true)
-      setError("")
+      setLoadingMore(false)
     }
 
     try {
@@ -185,28 +194,23 @@ export default function BrowsePage() {
       })
       if (id !== requestId.current) return
       const pageData = (data as { Page?: any })?.Page
-      const nextResults: AniListMedia[] = pageData?.media || []
+      if (!Array.isArray(pageData?.media)) throw new Error("Catalog returned an incomplete response")
+      const nextResults: AniListMedia[] = pageData.media
       // Dedupe by id — AniList can repeat titles across pages, and duplicate
       // React keys make rows drop out ("content disappears" on Load more).
-      setResults((current) => {
-        if (!append) return nextResults
-        const seen = new Set(current.map((m) => m.id))
-        return [...current, ...nextResults.filter((m) => m?.id != null && !seen.has(m.id))]
-      })
+      setResults((current) => mergeBrowseResults(current, nextResults, append))
       setPage(pageData?.pageInfo?.currentPage || nextPage)
       setHasMore(Boolean(pageData?.pageInfo?.hasNextPage))
       setTotal(pageData?.pageInfo?.total || nextResults.length)
     } catch (loadError) {
       if (id !== requestId.current) return
       console.error("Failed to load browse results:", loadError)
-      if (!append) {
-        setResults([])
-        setHasMore(false)
-        setTotal(0)
-        setError("Could not load anime right now. Try again in a moment.")
-      }
+      setFailedAppend(append)
+      setError(append ? "Couldn't load more titles. Your current results are still here." : "Couldn't reach the catalog. Your search and filters are still here.")
+      if (!append) setHasMore(false)
     } finally {
       if (id !== requestId.current) return
+      appendLock.current = false
       if (append) setLoadingMore(false)
       else setLoading(false)
     }
@@ -214,6 +218,7 @@ export default function BrowsePage() {
 
   useEffect(() => {
     fetchPage(1)
+    return () => { requestId.current++ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQuery, selectedGenres, sortBy, mediaType])
 
@@ -227,7 +232,7 @@ export default function BrowsePage() {
     setSearchQuery(incoming)
     setActiveQuery(incoming)
     setMediaType(params.get("type")?.toLowerCase() === "manga" ? "MANGA" : "ANIME")
-    setSelectedGenres(incomingGenres)
+    setSelectedGenres(current => current.join(",") === incomingGenres.join(",") ? current : incomingGenres)
     setSortBy(incomingSort in sortOptions ? incomingSort : "popularity")
     setViewMode(params.get("view") === "list" ? "list" : "grid")
   }, [searchParams])
@@ -332,12 +337,13 @@ export default function BrowsePage() {
 
   const resultsLabel = useMemo(() => {
     if (loading) return "Searching the catalog..."
+    if (error) return results.length ? `${results.length} previously loaded titles` : "Catalog unavailable"
     if (!results.length) return `No ${mediaType === "MANGA" ? "manga" : "anime"} found`
     // AniList caps pageInfo.total at 5000, so it isn't a reliable match count for
     // searches — only show "X of N" when N is a real (sub-cap) total.
     if (total && total < 5000) return `${results.length} of ${total.toLocaleString()} titles`
     return `${results.length}${hasMore ? "+" : ""} ${results.length === 1 ? "title" : "titles"}`
-  }, [loading, results.length, total, hasMore, mediaType])
+  }, [loading, results.length, total, hasMore, mediaType, error])
 
   const hasActiveFilters = selectedGenres.length > 0 || activeQuery.length > 0
 
@@ -489,7 +495,7 @@ export default function BrowsePage() {
             <div className="rv-catalog-resultbar">
               <div>
                 <p className="text-sm font-medium text-foreground">{resultsLabel}</p>
-                {error ? <p className="text-sm text-destructive">{error}</p> : null}
+                {error ? <div role="alert" className="text-sm"><p className="text-destructive">{error}</p><button className="mt-2 min-h-11 underline underline-offset-4" onClick={() => fetchPage(failedAppend ? page + 1 : 1, failedAppend)}>Retry catalog</button></div> : null}
               </div>
               <label className="rv-sort-control"><span>Sort</span><select aria-label="Sort titles" value={sortBy} onChange={event => { const value = event.target.value as SortKey; setSortBy(value); updateSearchUrl({sortBy:value}) }}>{(Object.keys(sortLabels) as SortKey[]).map(key => <option value={key} key={key}>{sortLabels[key]}</option>)}</select></label>
               <div className="rv-catalog-views">
@@ -562,6 +568,8 @@ export default function BrowsePage() {
                     </div>
                   ))}
                 </div>
+              ) : !results.length && error ? (
+                <div className="hikari-panel p-12 text-center"><h2 className="text-xl font-semibold">The catalog couldn't load</h2><p className="mt-2 text-muted-foreground">This isn't a search result. Use Retry catalog above to try again.</p></div>
               ) : !results.length ? (
                 <div className="hikari-panel flex flex-col items-center p-12 text-center">
                   <h2 className="text-xl font-semibold">Nothing matched that search</h2>
@@ -635,10 +643,7 @@ function ListRow({
   onQuickAdd: (anime: AniListMedia) => void
 }) {
   const title = getMediaTitle(anime)
-  const isManga = anime?.type === "MANGA"
   const rating = anime?.averageScore ? Number((anime.averageScore / 10).toFixed(1)) : null
-  const unitCount = isManga ? anime?.chapters : getEpisodeCount(anime)
-  const unitLabel = isManga ? "chapters" : "episodes"
   const studio = getPrimaryStudio(anime)
   const watchLink = getPreferredStreamingLink(anime)
   const description = stripHtml(anime?.description || "")
@@ -673,7 +678,7 @@ function ListRow({
             ) : null}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {[studio, anime?.startDate?.year, unitCount ? `${unitCount} ${unitLabel}` : null]
+            {[studio, anime?.startDate?.year, mediaLengthLabel(anime)]
               .filter(Boolean)
               .join(" - ")}
           </p>

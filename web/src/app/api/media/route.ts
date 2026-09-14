@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { isAllowedOrigin } from "@/lib/api-origin"
+import { fetchMediaBatches } from "@/lib/media-fetch.mjs"
 
 // Your media API. The app calls this for media-by-ids hydration instead of
 // AniList directly. It serves from the media_cache table first and only hits
@@ -15,6 +16,7 @@ query ($ids: [Int], $perPage: Int) {
     media(id_in: $ids, sort: POPULARITY_DESC) {
       id
       type
+      format
       title { romaji english native }
       coverImage { extraLarge large color }
       bannerImage
@@ -45,27 +47,13 @@ const readFirstEnv = (...keys: string[]) => {
   return ""
 }
 
-const chunk = <T,>(arr: T[], size: number): T[][] => {
-  const out: T[][] = []
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
-  return out
-}
-
-const fetchFromAniList = async (ids: number[]) => {
-  const all: any[] = []
-  for (const batch of chunk(ids, 50)) {
-    const res = await fetch("https://graphql.anilist.co", {
+const fetchFromAniList = (ids: number[]) => fetchMediaBatches(ids, (batch: number[]) =>
+    fetch("https://graphql.anilist.co", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ query: MEDIA_BY_IDS_QUERY, variables: { ids: batch, perPage: batch.length } }),
-    })
-    if (!res.ok) continue
-    const json = await res.json().catch(() => null)
-    const media = json?.data?.Page?.media
-    if (Array.isArray(media)) all.push(...media)
-  }
-  return all
-}
+      signal: AbortSignal.timeout(8000),
+    }))
 
 export async function POST(req: Request) {
   try {
@@ -74,8 +62,9 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json().catch(() => ({}))
+    if (Array.isArray(body?.ids) && body.ids.length > 500) return NextResponse.json({ error: "Request at most 500 titles at a time" }, { status: 400 })
     const ids = Array.from(
-      new Set((Array.isArray(body?.ids) ? body.ids : []).map((v: unknown) => Number(v)).filter(Number.isFinite)),
+      new Set((Array.isArray(body?.ids) ? body.ids : []).map((v: unknown) => Number(v)).filter((id: number) => Number.isSafeInteger(id) && id > 0 && id <= 2147483647)),
     ) as number[]
     if (!ids.length) return NextResponse.json({ media: [] })
 
@@ -99,7 +88,7 @@ export async function POST(req: Request) {
       const now = Date.now()
       ;(rows || []).forEach((row: any) => {
         const fresh = now - new Date(row.fetched_at).getTime() < MEDIA_TTL_MS
-        if (fresh && row.data) cached.set(Number(row.media_id), row.data)
+        if (fresh && row.data && Object.hasOwn(row.data, "format")) cached.set(Number(row.media_id), row.data)
       })
     } catch {
       /* cache table may not exist yet — fall through to AniList */
@@ -123,7 +112,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ media: [...cached.values(), ...fetched] })
-  } catch (err) {
-    return NextResponse.json({ error: "media endpoint failed", details: String(err) }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: "The catalog is temporarily unavailable. Please retry." }, { status: 503, headers: { "Cache-Control": "no-store" } })
   }
 }

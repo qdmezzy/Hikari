@@ -117,7 +117,7 @@ export const fetchReports = async () => {
     .from("social_reports")
     .select(
       `
-      id, post_id, reporter_id, reason, status, created_at, resolution_action,
+      id, post_id, reporter_id, reason, status, created_at, resolved_at, resolved_by, resolution_action, resolution_note,
       target_type, target_id, target_label, target_url,
       target_user_id, target_user_handle, target_user_display_name, target_user_avatar_url,
       social_posts ( id, content, fandom, attached_media_title, user_handle, user_display_name, user_avatar_url, has_spoilers, is_removed )
@@ -130,46 +130,20 @@ export const fetchReports = async () => {
   return data || []
 }
 
-const REMOVABLE_TABLES = {
-  social_post: "social_posts",
-  review: "reviews",
-  clip_comment: "clip_comments",
-  clip: "fandom_clips",
-}
-
-/**
- * Resolve a report. action: "dismiss" | "escalate" | "remove" | "spoiler" | "resolve"
- */
-export const resolveReport = async ({ report, action, moderatorId }) => {
-  const now = new Date().toISOString()
-  const targetType = report.target_type || "social_post"
-  const targetId = report.target_id || report.post_id
-  const nextStatus =
-    action === "dismiss" ? "dismissed" : action === "escalate" ? "escalated" : "resolved"
-
-  if (action === "remove" && targetId && REMOVABLE_TABLES[targetType]) {
-    const { error } = await client
-      .from(REMOVABLE_TABLES[targetType])
-      .update({
-        is_removed: true,
-        removed_at: now,
-        removed_by: moderatorId,
-        removed_reason: report.reason || "moderation",
-      })
-      .eq("id", targetId)
-    if (error) throw new Error(error.message || "Could not remove content.")
+// One database transaction owns content changes, report state, and the audit entry.
+export const resolveReport = async ({ report, action, note = "" }) => {
+  const { data, error } = await client.rpc("decide_social_report", {
+    report_id: report.id,
+    decision: action,
+    expected_status: report.status || "pending",
+    expected_resolved_at: report.resolved_at || null,
+    decision_note: note.trim() || null,
+  })
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") throw new Error("Atomic moderation needs the September 6 database migration. No changes were made.")
+    throw new Error(error.message || "Could not save this decision.")
   }
-
-  if (action === "spoiler" && targetType === "social_post" && targetId) {
-    const { error } = await client.from("social_posts").update({ has_spoilers: true }).eq("id", targetId)
-    if (error) throw new Error(error.message || "Could not flag spoiler.")
-  }
-
-  const { error: reportError } = await client
-    .from("social_reports")
-    .update({ status: nextStatus, resolved_at: now, resolved_by: moderatorId, resolution_action: action })
-    .eq("id", report.id)
-  if (reportError) throw new Error(reportError.message || "Could not update report.")
+  return data
 }
 
 // ---------------------------------------------------------------------------

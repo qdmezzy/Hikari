@@ -1,7 +1,10 @@
 "use client"
 import { ScheduleScreen } from "@/components/media/ScheduleScreen"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { saveEpisodeReminder } from "@/lib/reminder-contract.mjs"
+import { readAllRows } from "@/lib/read-all-rows.mjs"
+import { buildScheduleWeek, validTimeZone } from "@/lib/schedule-domain.mjs"
 import Link from "next/link"
 import { Navigation } from "@/components/layout/Navigation"
 import { EmptyState } from "@/components/common/EmptyState"
@@ -16,12 +19,16 @@ import { toast } from "sonner"
 import { ensurePushSubscription } from "@/lib/push-client"
 
 export default function CalendarPage() {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true)
+  const [alertsReady, setAlertsReady] = useState(false)
+  const [pendingReminders, setPendingReminders] = useState([])
+  const reminderLocks = useRef(new Set())
+  const [preferencesKey, setPreferencesKey] = useState("")
+  const [pushStatus, setPushStatus] = useState("idle")
   const [viewMode, setViewMode] = useState("calendar")
   const [selectedDay, setSelectedDay] = useState("all")
   const [timeZone, setTimeZone] = useState("")
   const [retry, setRetry] = useState(0)
-  useEffect(() => { setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone.replaceAll("_", " ")) }, [])
+
   const [statusFilters, setStatusFilters] = useState(["watching", "rewatching", "on_hold"])
   // "mine" = only what you track · "all" = the whole current season.
   const [scheduleScope, setScheduleScope] = useState("mine")
@@ -55,11 +62,12 @@ export default function CalendarPage() {
   }
   `
 
-  // Whole current-season airing schedule (for the "All Airing" tab).
+  // Include ongoing shows from older seasons, not just the current season.
   const ALL_AIRING_QUERY = `
-  query ($season: MediaSeason, $seasonYear: Int, $perPage: Int) {
-    Page(perPage: $perPage) {
-      media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: POPULARITY_DESC, isAdult: false) {
+  query ($page: Int, $perPage: Int) {
+    Page(page: $page, perPage: $perPage) {
+      pageInfo { hasNextPage }
+      media(type: ANIME, status: RELEASING, sort: ID, isAdult: false) {
         id
         title { romaji english }
         coverImage { large }
@@ -70,16 +78,6 @@ export default function CalendarPage() {
   }
   `
 
-  const getCurrentSeason = () => {
-    const now = new Date()
-    const month = now.getMonth() + 1
-    const year = now.getFullYear()
-    if (month <= 3) return { season: "WINTER", year }
-    if (month <= 6) return { season: "SPRING", year }
-    if (month <= 9) return { season: "SUMMER", year }
-    return { season: "FALL", year }
-  }
-
   const chunkIds = (ids, size) => {
     const batches = []
     for (let i = 0; i < ids.length; i += size) {
@@ -89,87 +87,37 @@ export default function CalendarPage() {
   }
 
   useEffect(() => {
-    if (!loading && !user) {
-      setSchedule([])
-      setLoadingSchedule(false)
-    }
-  }, [loading, user])
+    if (loading) return
+    const key = "hikari-schedule-v2-" + (user?.id || "guest")
+    try {
+      const prefs = JSON.parse(localStorage.getItem(key) || "{}")
+      setViewMode(prefs.viewMode === "list" ? "list" : "calendar")
+      setScheduleScope(prefs.scope === "all" ? "all" : "mine")
+      setTimeZone(validTimeZone(prefs.timeZone) ? prefs.timeZone : Intl.DateTimeFormat().resolvedOptions().timeZone)
+      setStatusFilters(Array.isArray(prefs.statuses) ? prefs.statuses.filter(value => STATUS_OPTIONS.some(option => option.id === value)) : ["watching", "rewatching", "on_hold"])
+    } catch { setTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone) }
+    setPreferencesKey(key)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user?.id])
 
   useEffect(() => {
-    if (!user || typeof window === "undefined") return
-    const storedFilters = window.localStorage.getItem(`hikari-calendar-statuses-${user.id}`)
-    const storedNotify = window.localStorage.getItem(`hikari-calendar-notify-${user.id}`)
-    const storedNotifsEnabled = window.localStorage.getItem(`hikari-calendar-notifs-${user.id}`)
-    if (storedNotifsEnabled !== null) {
-      setNotificationsEnabled(storedNotifsEnabled !== "0")
-    }
-
-    if (storedFilters) {
-      try {
-        const parsed = JSON.parse(storedFilters)
-        if (Array.isArray(parsed) && parsed.length) {
-          setStatusFilters(parsed)
-        }
-      } catch {}
-    }
-
-    if (storedNotify) {
-      try {
-        const parsed = JSON.parse(storedNotify)
-        if (Array.isArray(parsed)) {
-          setNotifyIds(parsed)
-        }
-      } catch {}
-    }
-
-    // The episode_alerts table is what the push cron reads, so it's the
-    // source of truth — merge it with any older localStorage-only bells and
-    // migrate those up.
-    const syncAlerts = async () => {
-      try {
-        const { data } = await client.from("episode_alerts").select("media_id").eq("user_id", user.id)
-        const dbIds = (data || []).map((row) => Number(row.media_id)).filter(Number.isFinite)
-        let localIds = []
-        try {
-          localIds = (JSON.parse(storedNotify || "[]") || []).map(Number).filter(Number.isFinite)
-        } catch {}
-        const merged = Array.from(new Set([...dbIds, ...localIds]))
-        if (merged.length) setNotifyIds(merged)
-        const missing = merged.filter((id) => !dbIds.includes(id))
-        if (missing.length) {
-          void client
-            .from("episode_alerts")
-            .upsert(missing.map((media_id) => ({ user_id: user.id, media_id })), {
-              onConflict: "user_id,media_id",
-            })
-        }
-      } catch {
-        /* table may not exist yet — bells still work locally */
-      }
-    }
-    syncAlerts()
-  }, [user])
+    if (!preferencesKey || preferencesKey !== "hikari-schedule-v2-" + (user?.id || "guest")) return
+    try { localStorage.setItem(preferencesKey, JSON.stringify({ viewMode, scope: scheduleScope, timeZone, statuses: statusFilters })) } catch {}
+  }, [preferencesKey, viewMode, scheduleScope, timeZone, statusFilters, user?.id])
 
   useEffect(() => {
-    if (!user || typeof window === "undefined") return
-    window.localStorage.setItem(
-      `hikari-calendar-statuses-${user.id}`,
-      JSON.stringify(statusFilters),
-    )
-  }, [statusFilters, user])
-
-  useEffect(() => {
-    if (!user || typeof window === "undefined") return
-    window.localStorage.setItem(
-      `hikari-calendar-notify-${user.id}`,
-      JSON.stringify(notifyIds),
-    )
-  }, [notifyIds, user])
-
-  useEffect(() => {
-    if (!user || typeof window === "undefined") return
-    window.localStorage.setItem(`hikari-calendar-notifs-${user.id}`, notificationsEnabled ? "1" : "0")
-  }, [notificationsEnabled, user])
+    let active = true
+    setNotifyIds([])
+    setAlertsReady(false)
+    if (!user) return
+    readAllRows(() => client.from("episode_alerts").select("media_id").eq("user_id", user.id), { key: "media_id", isActive: () => active }).then(({ data, error }) => {
+      if (!active) return
+      if (error) { toast.error("Saved reminders could not load. Refresh to retry."); return }
+      setNotifyIds((data || []).map(row => Number(row.media_id)).filter(Number.isFinite))
+      setAlertsReady(true)
+    }).catch(() => { if (active) toast.error("Saved reminders could not load. Refresh to retry.") })
+    return () => { active = false }
+  }, [user?.id, retry])
 
   useEffect(() => {
     let isActive = true
@@ -195,20 +143,29 @@ export default function CalendarPage() {
           }))
           .sort((a, b) => a.airingAt - b.airingAt)
 
-      // "All Airing" — the whole current season, regardless of your list.
+      // "All Airing" — next announced episodes for currently releasing shows.
       if (effectiveScope === "all") {
         try {
-          const { season, year } = getCurrentSeason()
+          const allMedia = new Map()
+          for (let page = 1; ; page++) {
+          if (!isActive) return
+          if (page > 40) throw new Error("The airing catalog is too large to load fully. Please try My Shows.")
           const res = await fetch("/api/anilist", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: ALL_AIRING_QUERY, variables: { season, seasonYear: year, perPage: 50 } }),
+            body: JSON.stringify({ query: ALL_AIRING_QUERY, variables: { page, perPage: 50 } }),
+            signal: AbortSignal.timeout(15000),
           })
           const json = await res.json()
           if (!res.ok || json?.errors) {
             throw new Error(json?.errors?.[0]?.message || "Failed to load airing schedule.")
           }
-          const upcoming = toUpcoming(json?.data?.Page?.media ?? [])
+          const result = json?.data?.Page
+          if (!Array.isArray(result?.media) || typeof result?.pageInfo?.hasNextPage !== "boolean") throw new Error("The airing catalog returned an incomplete page. Please retry.")
+          for (const media of result.media) allMedia.set(media.id, media)
+          if (!result.pageInfo.hasNextPage) break
+          }
+          const upcoming = toUpcoming([...allMedia.values()])
           if (isActive) {
             setSchedule(upcoming)
             setLoadingSchedule(false)
@@ -229,12 +186,12 @@ export default function CalendarPage() {
         return
       }
 
-      const { data, error } = await client
+      const { data, error } = await readAllRows(() => client
         .from("list_entries")
         .select("media_id, status, media_type")
         .eq("user_id", user.id)
         .eq("media_type", "ANIME")
-        .in("status", statusFilters)
+        .in("status", statusFilters), { key: "media_id", isActive: () => isActive })
 
       if (!isActive) return
 
@@ -261,6 +218,7 @@ export default function CalendarPage() {
           const res = await fetch("/api/anilist", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(15000),
             body: JSON.stringify({
               query: AIRING_QUERY,
               variables: { ids: batch, perPage: batch.length },
@@ -315,31 +273,7 @@ export default function CalendarPage() {
 
   // A true week structure: one section per day for the next 7 days (empty days
   // included, today first), plus a "Later" bucket for everything beyond.
-  const weekSections = useMemo(() => {
-    const now = new Date()
-    const week = []
-    const byKey = new Map()
-    for (let i = 0; i < 7; i += 1) {
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i)
-      const section = {
-        key: d.toDateString(),
-        label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : d.toLocaleDateString("en-US", { weekday: "long" }),
-        sub: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        isToday: i === 0,
-        items: [],
-      }
-      week.push(section)
-      byKey.set(section.key, section)
-    }
-    const later = []
-    schedule.forEach((item) => {
-      const date = new Date(item.airingAt * 1000)
-      const section = byKey.get(date.toDateString())
-      if (section) section.items.push({ ...item, date })
-      else later.push({ ...item, date })
-    })
-    return { week, later }
-  }, [schedule])
+  const weekSections = useMemo(() => buildScheduleWeek(schedule, timeZone || "UTC"), [schedule, timeZone])
 
   const weekEpisodeCount = useMemo(
     () => weekSections.week.reduce((sum, day) => sum + day.items.length, 0),
@@ -352,41 +286,37 @@ export default function CalendarPage() {
     )
   }
 
-  const toggleNotify = (id) => {
+  const toggleNotify = async (id) => {
     if (!user) { window.location.assign("/login?next=%2Fcalendar"); return }
+    if (!alertsReady || reminderLocks.current.has(id)) return
     const enabling = !notifyIds.includes(id)
-    setNotifyIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]))
-    if (!user) return
-
-    if (enabling) {
-      void client
-        .from("episode_alerts")
-        .upsert({ user_id: user.id, media_id: id }, { onConflict: "user_id,media_id" })
-      void ensurePushSubscription().then((status) => {
-        if (status === "subscribed") {
-          toast.success("You'll get a notification when the episode airs.")
-        } else if (status === "denied") {
-          toast.error("Notifications are blocked for this site — allow them in your browser settings.")
-        }
-      })
-    } else {
-      void client.from("episode_alerts").delete().eq("user_id", user.id).eq("media_id", id)
+    reminderLocks.current.add(id)
+    setPendingReminders(previous => [...previous, id])
+    try {
+      await saveEpisodeReminder(client, user.id, id, enabling)
+      setNotifyIds(previous => enabling ? [...new Set([...previous, id])] : previous.filter(value => value !== id))
+      toast.success(enabling ? "Reminder saved. Browser delivery is optional." : "Reminder removed.")
+    } catch (error) {
+      toast.error(error.message || "Reminder wasn't saved. Try again.")
+    } finally {
+      reminderLocks.current.delete(id)
+      setPendingReminders(previous => previous.filter(value => value !== id))
     }
   }
 
-  const handleNotificationsToggle = (enabled) => {
-    setNotificationsEnabled(enabled)
-    if (enabled) {
-      void ensurePushSubscription().then((status) => {
-        if (status === "denied") {
-          toast.error("Notifications are blocked for this site — allow them in your browser settings.")
-        }
-      })
-    }
+  const enablePush = async () => {
+    if (pushStatus === "pending") return
+    setPushStatus("pending")
+    const status = await ensurePushSubscription()
+    setPushStatus(status)
+    if (status === "subscribed") toast.success("This browser is subscribed to notifications.")
+    else if (status === "denied") toast.error("Browser notifications are blocked. Your saved reminders haven't changed.")
+    else if (status === "unsupported") toast.info("Push isn't available in this browser or isn't configured yet.")
+    else toast.error("Browser subscription wasn't saved. Try again.")
   }
 
   // Signed-out visitors always see the public "All Airing" view.
   const effectiveScope = user ? scheduleScope : "all"
 
-  return <ScheduleScreen model={{weekSections, selectedDay, setSelectedDay, timeZone, user, effectiveScope, setScheduleScope, notificationsEnabled, handleNotificationsToggle, loadingSchedule, loading, weekEpisodeCount, statusFilters, STATUS_OPTIONS, toggleStatusFilter, viewMode, setViewMode, scheduleError, setRetry, notifySet, toggleNotify}}/>
+  return <ScheduleScreen model={{weekSections, selectedDay, setSelectedDay, timeZone, setTimeZone, user, effectiveScope, setScheduleScope, alertsReady, pendingReminders, pushStatus, enablePush, loadingSchedule, loading, weekEpisodeCount, statusFilters, STATUS_OPTIONS, toggleStatusFilter, viewMode, setViewMode, scheduleError, setRetry, notifySet, toggleNotify}}/>
 }

@@ -19,6 +19,8 @@ query ($page: Int, $perPage: Int) {
       bannerImage
       averageScore
       episodes
+      format
+      duration
       nextAiringEpisode { episode airingAt }
       description(asHtml: false)
       genres
@@ -40,6 +42,8 @@ query ($season: MediaSeason, $seasonYear: Int, $page: Int, $perPage: Int) {
       coverImage { extraLarge large }
       averageScore
       episodes
+      format
+      duration
       nextAiringEpisode { episode airingAt }
       status
       description(asHtml: false)
@@ -143,6 +147,8 @@ const mapMediaToHomeAnime = (media: any, rank?: number) => ({
   banner: media?.bannerImage || media?.coverImage?.extraLarge || media?.coverImage?.large || "/placeholder.svg",
   rating: media?.averageScore ? Number((media.averageScore / 10).toFixed(1)) : undefined,
   episodes: getEpisodeCount(media) || undefined,
+  format: media?.format,
+  duration: media?.duration,
   description: sanitizeDescription(media?.description),
   heroDescription: getHeroDescription(media?.description),
   genres: Array.isArray(media?.genres) ? media.genres : [],
@@ -175,6 +181,8 @@ export type AnimeItem = {
   cover: string
   rating?: number
   episodes?: number
+  format?: string
+  duration?: number
   status?: string
   genres?: string[]
   rank?: number

@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { PersonalUpdates } from "@/components/common/PersonalUpdates"
 
 const discordCommunityUrl = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"
 
@@ -86,5 +87,6 @@ export default function FeedbackPage() {
       <div className="hk-feedback-field"><Label htmlFor="feedback-email">Email <span>· optional</span></Label><Input type="email" autoComplete="email" id="feedback-email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="If we need to follow up" disabled={submitting}/><p>Only used to follow up on this message.</p></div>
       <footer><p>Please don’t include passwords or other sensitive information.</p><Button type="submit" disabled={submitting || !message.trim()}>{submitting ? "Sending…" : "Send feedback"}<Send size={14}/></Button></footer>
     </form>}</div><aside><span lang="ja">改善のために</span><h2>A useful bug report</h2><ol><li>What were you trying to do?</li><li>What happened instead?</li><li>Which page and device were you using?</li></ol><hr/><h2>Looking for a conversation?</h2><p>You can also talk with the community on Discord.</p><Link href={discordCommunityUrl}>Visit the Discord ↗</Link></aside></div>
+    <PersonalUpdates userId={user?.id} kind="feedback" revision={Number(done)}/>
   </main></div>
 }

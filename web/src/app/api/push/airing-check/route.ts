@@ -1,157 +1,109 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
+import { createHash, timingSafeEqual } from "node:crypto"
 import webpush from "web-push"
+import { processPushJob } from "@/lib/push-job.mjs"
 
-// Called by the scheduled GitHub Action every ~30 minutes. Finds tracked
-// titles whose next episode airs inside the coming window (or just aired)
-// and sends a web push to every subscribed browser of each alerting user.
-
-const WINDOW_MS = 40 * 60 * 1000
-
-const AIRING_QUERY = `
-query ($ids: [Int]) {
-  Page(perPage: 50) {
-    media(id_in: $ids, type: ANIME) {
-      id
-      title { romaji english }
-      nextAiringEpisode { airingAt episode }
-    }
-  }
-}
-`
-
-const readFirstEnv = (...keys: string[]) => {
-  for (const key of keys) {
-    const value = String(process.env[key] || "").trim()
-    if (value) return value
-  }
-  return ""
-}
-
-const chunk = <T,>(arr: T[], size: number): T[][] => {
-  const out: T[][] = []
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
-  return out
-}
+export const runtime = "nodejs"
+export const maxDuration = 60
+const env = (...names: string[]) => names.map(name => process.env[name]?.trim()).find(Boolean) || ""
+const digest = (value: string) => createHash("sha256").update(value).digest("hex")
+const QUERY = `query ($ids:[Int]) { Page(perPage:50) { media(id_in:$ids,type:ANIME) { id title { english romaji } nextAiringEpisode { airingAt episode } } } }`
 
 export async function POST(req: Request) {
+  const secret = env("CRON_SECRET")
+  const provided = req.headers.get("x-cron-key") || new URL(req.url).searchParams.get("key") || ""
+  if (!secret || !timingSafeEqual(Buffer.from(digest(secret)), Buffer.from(digest(provided)))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  const url = env("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
+  const key = env("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY")
+  const publicKey = env("VAPID_PUBLIC_KEY", "NEXT_PUBLIC_VAPID_PUBLIC_KEY")
+  const privateKey = env("VAPID_PRIVATE_KEY")
+  if (!url || !key || !publicKey || !privateKey) return NextResponse.json({ error: "Push not configured" }, { status: 503 })
+  const admin = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+  webpush.setVapidDetails(env("VAPID_SUBJECT") || "mailto:hello@hikari.app", publicKey, privateKey)
+  const started = Date.now()
+  let enqueued = 0, sent = 0, retried = 0, cancelled = 0, dead = 0, sourceFailures = 0
   try {
-    const cronSecret = readFirstEnv("CRON_SECRET")
-    const provided =
-      req.headers.get("x-cron-key") || new URL(req.url).searchParams.get("key") || ""
-    if (!cronSecret || provided !== cronSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Without migration 09, fail closed before any sends.
+    const { error: queueError } = await admin.from("push_delivery_jobs").select("id").limit(0)
+    if (queueError) return NextResponse.json({ error: "Notification queue is not ready" }, { status: 503 })
+    const mediaIds = new Set<number>()
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await admin.from("episode_alerts").select("user_id,media_id")
+        .order("user_id").order("media_id").range(offset, offset + 499)
+      if (error) { sourceFailures++; break }
+      for (const row of data || []) mediaIds.add(row.media_id)
+      if ((data?.length || 0) < 500) break
+      if (Date.now() - started > 10000) { sourceFailures++; break }
     }
-
-    const url = readFirstEnv("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL")
-    const serviceKey = readFirstEnv("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY")
-    const vapidPublic = readFirstEnv("VAPID_PUBLIC_KEY", "NEXT_PUBLIC_VAPID_PUBLIC_KEY")
-    const vapidPrivate = readFirstEnv("VAPID_PRIVATE_KEY")
-    if (!url || !serviceKey || !vapidPublic || !vapidPrivate) {
-      return NextResponse.json({ error: "Push not configured" }, { status: 500 })
-    }
-
-    webpush.setVapidDetails(
-      readFirstEnv("VAPID_SUBJECT") || "mailto:hello@hikari.app",
-      vapidPublic,
-      vapidPrivate,
-    )
-
-    const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
-
-    const { data: alerts, error: alertsError } = await admin
-      .from("episode_alerts")
-      .select("user_id, media_id, last_notified_episode")
-    if (alertsError) return NextResponse.json({ error: alertsError.message }, { status: 500 })
-    if (!alerts?.length) return NextResponse.json({ ok: true, sent: 0, reason: "no alerts" })
-
-    const mediaIds = Array.from(new Set(alerts.map((a) => Number(a.media_id)).filter(Number.isFinite)))
-    const airingById = new Map<number, { title: string; episode: number; airingAt: number }>()
-
-    for (const batch of chunk(mediaIds, 50)) {
-      const res = await fetch("https://graphql.anilist.co", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ query: AIRING_QUERY, variables: { ids: batch } }),
-      })
-      if (!res.ok) continue
-      const json = await res.json().catch(() => null)
-      for (const media of json?.data?.Page?.media || []) {
-        const next = media?.nextAiringEpisode
-        if (!next?.airingAt || !next?.episode) continue
-        airingById.set(Number(media.id), {
-          title: media.title?.english || media.title?.romaji || "An anime you track",
-          episode: Number(next.episode),
-          airingAt: Number(next.airingAt) * 1000,
+    const ids = [...mediaIds]
+    for (let offset = 0; offset < ids.length; offset += 50) {
+      if (Date.now() - started > 20000) { sourceFailures++; break }
+      try {
+        const response = await fetch("https://graphql.anilist.co", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: QUERY, variables: { ids: ids.slice(offset, offset + 50) } }),
+          signal: AbortSignal.timeout(5000),
         })
-      }
-    }
-
-    const now = Date.now()
-    const due = alerts.filter((alert) => {
-      const airing = airingById.get(Number(alert.media_id))
-      if (!airing) return false
-      return airing.airingAt <= now + WINDOW_MS && airing.episode > Number(alert.last_notified_episode || 0)
-    })
-    if (!due.length) return NextResponse.json({ ok: true, sent: 0, reason: "nothing due" })
-
-    const userIds = Array.from(new Set(due.map((a) => a.user_id)))
-    const { data: subs } = await admin
-      .from("push_subscriptions")
-      .select("user_id, endpoint, p256dh, auth")
-      .in("user_id", userIds)
-    const subsByUser = new Map<string, any[]>()
-    for (const sub of subs || []) {
-      const list = subsByUser.get(sub.user_id) || []
-      list.push(sub)
-      subsByUser.set(sub.user_id, list)
-    }
-
-    let sent = 0
-    const deadEndpoints: string[] = []
-
-    for (const alert of due) {
-      const airing = airingById.get(Number(alert.media_id))
-      if (!airing) continue
-      const minutes = Math.max(Math.round((airing.airingAt - now) / 60000), 0)
-      const body =
-        minutes > 1
-          ? `Episode ${airing.episode} airs in about ${minutes} minutes.`
-          : `Episode ${airing.episode} is airing now!`
-      const payload = JSON.stringify({
-        title: airing.title,
-        body,
-        url: `/media/${alert.media_id}`,
-        tag: `airing-${alert.media_id}-${airing.episode}`,
-      })
-
-      for (const sub of subsByUser.get(alert.user_id) || []) {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-            payload,
-          )
-          sent += 1
-        } catch (err: any) {
-          if (err?.statusCode === 404 || err?.statusCode === 410) {
-            deadEndpoints.push(sub.endpoint)
-          }
+        if (!response.ok) { sourceFailures++; continue }
+        const json = await response.json()
+        if (json.errors) sourceFailures++
+        for (const media of json?.data?.Page?.media || []) {
+          const next = media.nextAiringEpisode
+          if (!next?.episode || !next?.airingAt) continue
+          const airing = Number(next.airingAt) * 1000
+          if (airing > Date.now() + 2400000 || airing < Date.now() - 86400000) continue
+          const { data, error } = await admin.rpc("enqueue_episode_push", {
+            p_media_id: media.id, p_episode: next.episode,
+            p_title: media.title?.english || media.title?.romaji || "An anime you track",
+            p_airing_at: new Date(airing).toISOString(),
+          })
+          if (error) sourceFailures++
+          else enqueued += Number(data || 0)
         }
-      }
-
-      await admin
-        .from("episode_alerts")
-        .update({ last_notified_episode: airing.episode })
-        .eq("user_id", alert.user_id)
-        .eq("media_id", alert.media_id)
+      } catch { sourceFailures++ }
     }
-
-    if (deadEndpoints.length) {
-      await admin.from("push_subscriptions").delete().in("endpoint", deadEndpoints)
+    // Existing retries drain even if AniList is offline or no new episode is due.
+    while (Date.now() - started < 45000) {
+      const { data, error } = await admin.rpc("claim_episode_push")
+      if (error) throw new Error("Queue claim failed")
+      const job = data?.[0]
+      if (!job) break
+      const state = await processPushJob(job, {
+        currentSubscription: async (current: any) => {
+          const { data: reminder, error: reminderError } = await admin.from("episode_alerts")
+            .select("media_id").eq("user_id", current.user_id).eq("media_id", current.media_id).maybeSingle()
+          if (reminderError) throw new Error("Consent lookup failed")
+          if (!reminder) return null
+          for (let offset = 0; ; offset += 100) {
+            const { data: subs, error: subError } = await admin.from("push_subscriptions")
+              .select("endpoint,p256dh,auth").eq("user_id", current.user_id).order("endpoint").range(offset, offset + 99)
+            if (subError) throw new Error("Subscription lookup failed")
+            const sub = subs?.find(s => digest(s.endpoint) === current.endpoint_hash)
+            if (sub) return sub
+            if ((subs?.length || 0) < 100) return null
+          }
+        },
+        send: async (sub: any, payload: any) => webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          JSON.stringify(payload), { timeout: 5000, TTL: 3600 },
+        ),
+        finish: async (current: any, state: string, code: string | null) => {
+          const { data: saved, error: saveError } = await admin.rpc("finish_episode_push", {
+            p_id: current.id, p_token: current.lease_token, p_state: state, p_code: code,
+          })
+          if (saveError || saved !== true) throw new Error("Queue receipt failed")
+        },
+      })
+      if (state === "sent") sent++
+      else if (state === "pending") retried++
+      else if (state === "cancelled") cancelled++
+      else dead++
     }
-
-    return NextResponse.json({ ok: true, sent, due: due.length, pruned: deadEndpoints.length })
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    return NextResponse.json({ ok: sourceFailures === 0, enqueued, sent, retried, cancelled, dead, sourceFailures }, { status: sourceFailures ? 503 : 200 })
+  } catch {
+    return NextResponse.json({ error: "Notification processing failed; pending jobs remain retryable", sent }, { status: 503 })
   }
 }

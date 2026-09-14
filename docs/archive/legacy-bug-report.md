@@ -1,3 +1,7 @@
+# Historical bug report
+
+Retained from the earlier interface. These findings need reproduction against the current redesign; this is not the current task list.
+
 🐛 BUGS FOUND
 🔴 Critical
 1. Discover page is completely broken

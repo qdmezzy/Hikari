@@ -160,16 +160,16 @@ export function CollectionsSection({ user }) {
   return (
     <section className="rv-collections">
       <div className="rv-collection-toolbar">
-        <div><h2>Collections</h2><p>Group titles independently of their watch or reading status.</p></div>
+        <div><span className="hk-shelf-note" lang="ja">本棚 / YOUR OWN LITTLE ARCHIVE</span><h2>Collections</h2><p>Comfort watches. Beautiful disasters. Whatever belongs together to you.</p></div>
         <Button onClick={() => setOpen(true)}><Plus size={16} />New collection</Button>
       </div>
       {loading ? <div className="rv-collection-grid" role="status" aria-label="Loading collections">{[1,2,3].map(i => <div key={i} className="rv-collection-cover animate-pulse" />)}</div> : loadError ? (
         <div className="rv-error" role="alert"><p>{loadError}</p><Button variant="outline" onClick={loadLists}>Try again</Button></div>
-      ) : lists.length ? <div className="rv-collection-grid">{lists.map(list => {
+      ) : lists.length ? <div className="rv-collection-grid">{lists.map((list, shelfIndex) => {
         const meta = listMeta[list.id]
-        return <article key={list.id} className="rv-collection-card">
+        return <article key={list.id} className="rv-collection-card" data-shelf={shelfIndex % 3}>
           <Link href={`/lists/${list.id}`} aria-label={`Open ${list.name}`}>
-            <div className="rv-collection-cover">{meta?.covers?.length ? meta.covers.map((cover, i) => <img key={i} src={cover} alt="" loading="lazy" />) : <BookMarked size={32} strokeWidth={1.2} />}</div>
+            <div className="rv-collection-cover"><span className="hk-shelf-spine" aria-hidden="true">{list.name}</span>{meta?.covers?.length ? meta.covers.map((cover, i) => <img key={i} src={cover} alt="" loading="lazy" />) : <span className="hk-shelf-blank" lang="ja">余白</span>}<span className="hk-shelf-label">{list.is_public ? "OPEN SHELF" : "PERSONAL COPY"}</span></div>
           </Link>
           <div className="rv-collection-card-footer">
             <div className="min-w-0"><h3><Link href={`/lists/${list.id}`}>{list.name}</Link></h3><small>{list.is_public ? <Globe size={12} /> : <Lock size={12} />}{list.is_public ? "Public" : "Only you"}<span>·</span>{meta ? `${meta.count} titles` : "Collection"}</small></div>

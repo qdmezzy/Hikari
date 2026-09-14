@@ -947,9 +947,10 @@ function CommunityExperience({ user, isMod }) {
       <Navigation />
       <main className="rv-container rv-main">
         <header className="rv-community-masthead">
-          <div><span className="hk-page-jp" lang="ja">みんなの広場</span><h1>Community</h1><p>Activity, discussions, and reviews.</p></div>
+          <div><span className="hk-page-jp" lang="ja">みんなの広場 / AFTER THE CREDITS</span><h1>Still thinking<br/>about that ending?</h1><p>You’re in good company. Watch notes, honest reviews, and the conversations in between.</p><span className="hk-community-seal" lang="ja" aria-label="Community">語ろう</span></div>
           <div className="rv-community-covers" aria-hidden="true">{Array.from(covers.values()).filter(Boolean).slice(0,5).map((cover,index) => <img key={index} src={cover} alt="" />)}</div>
         </header>
+        <div className="hk-collection-tools"><Link href="/clubs">This season’s watch club ↗</Link></div>
         <div className="rv-community-layout">
           <aside className="hk-community-tabs">
             {[{id:"activity",label:"Activity",icon:Heart},{id:"discussions",label:"Discussions",icon:MessageCircle},{id:"reviews",label:"Reviews",icon:Star}].map(item => <button key={item.id} type="button" aria-pressed={communityView === item.id} onClick={() => setCommunityView(item.id)}><item.icon size={17} />{item.label}</button>)}

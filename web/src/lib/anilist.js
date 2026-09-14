@@ -4,6 +4,7 @@ query ($ids: [Int], $perPage: Int) {
     media(id_in: $ids, sort: POPULARITY_DESC) {
       id
       type
+      format
       title { romaji english native }
       coverImage { extraLarge large color }
       bannerImage
@@ -66,7 +67,7 @@ export const fetchAniList = async (query, variables = {}) => {
 // Media metadata (covers/titles/etc.) is stable, so cache it per session to
 // avoid refetching the same titles on every navigation.
 const mediaCache = new Map()
-const MEDIA_CACHE_KEY = "hikari:media-cache:v1"
+const MEDIA_CACHE_KEY = "hikari:media-cache:v2"
 const MEDIA_CACHE_CAP = 400
 let mediaCacheHydrated = false
 
@@ -114,18 +115,23 @@ export const fetchAniListMediaByIds = async (ids = []) => {
     // Falls back to the AniList proxy if /api/media is unavailable.
     let mediaList = []
     try {
+      for (const batch of chunkIds(missing, 100)) {
       const res = await fetch("/api/media", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: missing }),
+        body: JSON.stringify({ ids: batch }),
+        signal: AbortSignal.timeout(25000),
       })
       if (res.ok) {
         const json = await res.json()
-        mediaList = Array.isArray(json?.media) ? json.media : []
+        if (!Array.isArray(json?.media)) throw new Error("Incomplete media response")
+        mediaList.push(...json.media)
       } else {
         throw new Error("media endpoint error")
       }
+      }
     } catch {
+      mediaList = []
       for (const batch of chunkIds(missing, 50)) {
         const data = await fetchAniList(MEDIA_BY_IDS_QUERY, { ids: batch, perPage: batch.length })
         mediaList.push(...(data?.Page?.media || []))

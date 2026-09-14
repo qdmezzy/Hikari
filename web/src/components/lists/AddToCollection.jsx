@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { BookMarked, Check, Loader2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -14,8 +14,14 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import client from "@/lib/client"
+import { createCollectionWithTitle } from "@/lib/collection-save.mjs"
+import { readAllRows } from "@/lib/read-all-rows.mjs"
 
-export function AddToCollection({ user, mediaId, mediaType = "ANIME", className }) {
+export function AddToCollection(props) {
+  return <CollectionPicker key={`${props.user?.id}:${props.mediaId}`} {...props} />
+}
+
+function CollectionPicker({ user, mediaId, mediaType = "ANIME", className }) {
   const [open, setOpen] = useState(false)
   const [lists, setLists] = useState([])
   const [memberOf, setMemberOf] = useState(new Set())
@@ -23,32 +29,54 @@ export function AddToCollection({ user, mediaId, mediaType = "ANIME", className 
   const [busyId, setBusyId] = useState(null)
   const [newName, setNewName] = useState("")
   const [creating, setCreating] = useState(false)
+  const [loadError, setLoadError] = useState("")
+  const requestId = useRef(0)
+  const writeLock = useRef(false)
 
   const numericMediaId = Number(mediaId)
+  const userId = user?.id
 
   const load = useCallback(async () => {
-    if (!user || !Number.isFinite(numericMediaId)) return
+    if (!userId || !Number.isSafeInteger(numericMediaId) || numericMediaId <= 0) return
+    const request = ++requestId.current
     setLoading(true)
-    const [{ data: listData }, { data: itemData }] = await Promise.all([
-      client
+    setLoadError("")
+    try {
+    const { data: listData, error: listError } = await readAllRows(() => client
         .from("custom_lists")
-        .select("id, name, is_public")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false }),
-      client.from("custom_list_items").select("list_id, media_id").eq("media_id", numericMediaId),
-    ])
-    setLists(listData || [])
+        .select("id, name, is_public, updated_at")
+        .eq("user_id", userId), { isActive: () => request === requestId.current })
+    if (listError) throw new Error("Collection loading failed")
+    const itemData = []
+    // Query only owned collections, not every public collection containing this title.
+    for (let offset = 0; offset < listData.length; offset += 100) {
+      if (request !== requestId.current) return
+      const ids = listData.slice(offset, offset + 100).map(list => list.id)
+      const { data, error } = await readAllRows(() => client.from("custom_list_items")
+        .select("id, list_id, media_id").eq("media_id", numericMediaId).in("list_id", ids),
+        { isActive: () => request === requestId.current })
+      if (error) throw new Error("Collection membership loading failed")
+      itemData.push(...data)
+    }
+    if (request !== requestId.current) return
+    setLists([...(listData || [])].sort((a,b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()))
     const owned = new Set((listData || []).map((l) => l.id))
     setMemberOf(new Set((itemData || []).filter((i) => owned.has(i.list_id)).map((i) => i.list_id)))
-    setLoading(false)
-  }, [user, numericMediaId])
+    } catch {
+      if (request === requestId.current) setLoadError("Couldn't load your collections. Try again.")
+    } finally {
+      if (request === requestId.current) setLoading(false)
+    }
+  }, [userId, numericMediaId])
 
   useEffect(() => {
     if (open) load()
+    return () => { requestId.current++ }
   }, [open, load])
 
   const toggleMembership = async (list) => {
-    if (!user || busyId) return
+    if (!user || writeLock.current || loading || loadError) return
+    writeLock.current = true
     const isMember = memberOf.has(list.id)
     setBusyId(list.id)
     try {
@@ -79,36 +107,30 @@ export function AddToCollection({ user, mediaId, mediaType = "ANIME", className 
       console.error("Failed to update collection:", err)
       toast.error("Couldn't update that collection.")
     } finally {
+      writeLock.current = false
       setBusyId(null)
     }
   }
 
   const handleCreateAndAdd = async (e) => {
     e.preventDefault()
-    if (!user || creating) return
+    if (!user || writeLock.current || loading || loadError) return
     const trimmed = newName.trim()
     if (!trimmed) return
+    writeLock.current = true
     setCreating(true)
     try {
-      const { data: list, error } = await client
-        .from("custom_lists")
-        .insert({ user_id: user.id, name: trimmed, is_public: false })
-        .select("id, name, is_public")
-        .single()
-      if (error) throw error
-      await client.from("custom_list_items").insert({
-        list_id: list.id,
-        media_id: numericMediaId,
-        media_type: mediaType || "ANIME",
-      })
+      const { list, added } = await createCollectionWithTitle(client, user.id, trimmed, numericMediaId, mediaType)
       setLists((prev) => [list, ...prev])
-      setMemberOf((prev) => new Set(prev).add(list.id))
+      if (added) setMemberOf((prev) => new Set(prev).add(list.id))
       setNewName("")
-      toast.success(`Added to ${list.name}`)
+      if (added) toast.success(`Added to ${list.name}`)
+      else toast.error(`Created ${list.name}, but the title wasn't added. Select the collection to retry.`)
     } catch (err) {
       console.error("Failed to create collection:", err)
       toast.error("Couldn't create that collection.")
     } finally {
+      writeLock.current = false
       setCreating(false)
     }
   }
@@ -126,7 +148,7 @@ export function AddToCollection({ user, mediaId, mediaType = "ANIME", className 
         Add to Collection
       </Button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(value) => { if (!writeLock.current) setOpen(value) }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add to collection</DialogTitle>
@@ -138,6 +160,8 @@ export function AddToCollection({ user, mediaId, mediaType = "ANIME", className 
               <div className="flex items-center justify-center py-6 text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
+            ) : loadError ? (
+              <div role="alert" className="space-y-3 py-4 text-sm"><p>{loadError}</p><Button variant="outline" onClick={load}>Retry</Button></div>
             ) : lists.length ? (
               lists.map((list) => {
                 const isMember = memberOf.has(list.id)
@@ -146,7 +170,8 @@ export function AddToCollection({ user, mediaId, mediaType = "ANIME", className 
                     key={list.id}
                     type="button"
                     onClick={() => toggleMembership(list)}
-                    disabled={busyId === list.id}
+                    disabled={Boolean(busyId) || creating}
+                    aria-pressed={isMember}
                     className={cn(
                       "flex w-full items-center justify-between rounded-xl border p-3 text-left transition-colors",
                       isMember ? "border-accent/50 bg-accent/10" : "border-border/50 hover:border-accent/40",
@@ -173,9 +198,10 @@ export function AddToCollection({ user, mediaId, mediaType = "ANIME", className 
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="New collection name"
+              aria-label="New collection name"
               maxLength={80}
             />
-            <Button type="submit" disabled={creating || !newName.trim()}>
+            <Button type="submit" aria-label="Create collection and add title" disabled={creating || Boolean(busyId) || loading || Boolean(loadError) || !newName.trim()}>
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
             </Button>
           </form>

@@ -41,6 +41,8 @@ Hikari is a modern anime & manga tracker built for speed and a clean, spoiler-sa
 
 ## Repository layout
 
+The active redesign is in **`web/`**, served at **localhost:3000**. `hikari-new/` is a separate prototype, not the active app. See [workspace guide](docs/workspace-guide.md) and [product roadmap](docs/product-roadmap.md).
+
 ```
 web/               Next.js web app
 Hikari Extension/  Browser extension (auto-tracking)

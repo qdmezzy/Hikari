@@ -11,6 +11,8 @@ import { Progress } from "@/components/ui/progress"
 import { Upload, Link2, CheckCircle2, AlertCircle, ArrowRight } from "lucide-react"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
+import { downloadJson } from "@/lib/export-library.mjs"
+import { getSafeNextPath } from "@/lib/safe-navigation.mjs"
 
 const importSources = [
   {
@@ -289,8 +291,16 @@ export default function ImportPage() {
   const [progress, setProgress] = useState(0)
   const [importError, setImportError] = useState("")
   const [importSummary, setImportSummary] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [mergeExisting, setMergeExisting] = useState(false)
   const [selectedFileName, setSelectedFileName] = useState("")
   const [malConnected, setMalConnected] = useState(false)
+  useEffect(()=>{
+    const source=searchParams.get("source")
+    if(importSources.some(item=>item.key===source))setSelectedSource(source)
+    const initialUsername=searchParams.get("username")
+    if(initialUsername)setUsername(initialUsername.slice(0,100))
+  },[searchParams])
   const selectedSourceMeta = useMemo(
     () => importSources.find((source) => source.key === selectedSource),
     [selectedSource],
@@ -371,27 +381,18 @@ export default function ImportPage() {
   }
 
   const upsertEntries = async (entries) => {
-    if (!entries.length) {
-      setProgress(100)
-      return
+    let written=0
+    for(const row of entries){
+      const {_existing,_updatedAt,...values}=row
+      const result = _existing
+        ? await client.from("list_entries").update(values).eq("user_id",user.id).eq("media_id",values.media_id).eq("updated_at",_updatedAt).select("media_id")
+        : await client.from("list_entries").upsert(values,{onConflict:"user_id,media_id",ignoreDuplicates:true}).select("media_id")
+      if(result.error) throw new Error(`Import stopped after ${written} saved entries. ${result.error.message}`)
+      if(!result.data?.length) throw new Error(`Your list changed during import. ${written} entries were saved; refresh the preview before continuing.`)
+      written++
+      setProgress(Math.round(written/entries.length*100))
     }
-    const stripDates = (rows) => rows.map(({ started_at, finished_at, ...rest }) => rest)
-    const batches = chunk(entries, 100)
-    let processed = 0
-    for (const batch of batches) {
-      let { error } = await client.from("list_entries").upsert(batch, { onConflict: "user_id,media_id" })
-      // Fall back if started_at/finished_at aren't migrated yet.
-      if (error && /started_at|finished_at|column/i.test(error.message || "")) {
-        ;({ error } = await client
-          .from("list_entries")
-          .upsert(stripDates(batch), { onConflict: "user_id,media_id" }))
-      }
-      if (error) {
-        throw error
-      }
-      processed += batch.length
-      setProgress(Math.round((processed / entries.length) * 100))
-    }
+    return written
   }
 
   // Non-destructive: for entries you already have on Hikari, only fill gaps and
@@ -401,10 +402,11 @@ export default function ImportPage() {
   const dateOnly = (value) => (value ? String(value).slice(0, 10) : null)
 
   const buildImportPayload = async (entries) => {
-    const { data: existingRows } = await client
+    const { data: existingRows, error: existingError } = await client
       .from("list_entries")
-      .select("media_id, status, progress, score, started_at, finished_at")
+      .select("media_id, status, progress, score, started_at, finished_at, updated_at")
       .eq("user_id", user.id)
+    if (existingError) throw new Error("Your existing list could not be checked. Nothing has been imported.")
     const existingByMedia = new Map((existingRows || []).map((row) => [Number(row.media_id), row]))
 
     const rows = []
@@ -412,14 +414,16 @@ export default function ImportPage() {
       const existing = existingByMedia.get(Number(entry.mediaId))
       const importedScore = normalizeScore(Number(entry.score))
       const merged = {
+        _existing: Boolean(existing),
+        _updatedAt: existing?.updated_at,
         user_id: user.id,
         media_id: entry.mediaId,
         media_type: entry.mediaType,
         status: existing ? existing.status : normalizeStatus(entry.status || "plan_to_watch"),
         progress: Math.max(Number(entry.progress) || 0, Number(existing?.progress) || 0),
         score: existing ? existing.score ?? importedScore : importedScore,
-        started_at: entry.startedAt || dateOnly(existing?.started_at) || null,
-        finished_at: entry.finishedAt || dateOnly(existing?.finished_at) || null,
+        started_at: dateOnly(existing?.started_at) || entry.startedAt || null,
+        finished_at: dateOnly(existing?.finished_at) || entry.finishedAt || null,
       }
 
       // Skip rows that wouldn't change anything (avoids touching updated_at).
@@ -483,23 +487,37 @@ export default function ImportPage() {
     }
 
     const payload = await buildImportPayload(normalized)
-    await upsertEntries(payload)
+    setPreview({payload, total:normalized.length, anime:normalized.filter(entry=>entry.mediaType==="ANIME").length,manga:normalized.filter(entry=>entry.mediaType==="MANGA").length,unmatched:unmatchedCount})
+    return
 
-    const animeCount = normalized.filter((entry) => entry.mediaType === "ANIME").length
-    const mangaCount = normalized.filter((entry) => entry.mediaType === "MANGA").length
+  }
 
-    setImportSummary({
-      total: normalized.length,
-      anime: animeCount,
-      manga: mangaCount,
-      unmatched: unmatchedCount,
-    })
+  const confirmImport = async () => {
+    if(!preview || importing) return
+    setImporting(true)
+    setImportError("")
+    try{
+      const chosen=preview.payload.filter(row=>mergeExisting || !row._existing)
+      const written=await upsertEntries(chosen)
+      setImportSummary({total:written,anime:chosen.filter(row=>row.media_type==="ANIME").length,manga:chosen.filter(row=>row.media_type==="MANGA").length,unmatched:preview.unmatched})
+      setPreview(null)
+      setProgress(100)
+    }catch(error){setImportError(error.message || "Import failed.");setPreview(null)}
+    finally{setImporting(false)}
+  }
+  const exportList = async () => {
+    try{
+      const {data,error}=await client.from("list_entries").select("media_id,media_type,status,progress,score,started_at,finished_at").eq("user_id",user.id)
+      if(error) throw error
+      downloadJson("hikari-library.json",{format:"hikari-library",version:1,entries:data || []})
+    }catch{setImportError("Your library could not be exported. Try again.")}
   }
 
   const handleFileImport = async (file) => {
     if (!file) return
     setImportError("")
     setImportSummary(null)
+    setPreview(null)
     setProgress(0)
     setImporting(true)
     setSelectedFileName(file.name)
@@ -517,6 +535,11 @@ export default function ImportPage() {
       }
 
       const json = JSON.parse(text)
+      if (json?.format === "hikari-library" && json.version === 1 && Array.isArray(json.entries)) {
+        await finalizeImport(json.entries.map(row=>({mediaId:Number(row.media_id),mediaType:row.media_type,status:row.status,progress:row.progress,score:row.score,startedAt:row.started_at,finishedAt:row.finished_at})))
+        setImporting(false)
+        return
+      }
       const isAniList =
         Boolean(json?.MediaListCollection) ||
         Boolean(json?.data?.MediaListCollection) ||
@@ -553,6 +576,7 @@ export default function ImportPage() {
   const handleMalImport = async () => {
     setImportError("")
     setImportSummary(null)
+    setPreview(null)
     setProgress(0)
     setImporting(true)
 
@@ -595,6 +619,7 @@ export default function ImportPage() {
 
     setImportError("")
     setImportSummary(null)
+    setPreview(null)
     setProgress(0)
     setImporting(true)
 
@@ -638,12 +663,12 @@ export default function ImportPage() {
       <div className="min-h-screen bg-background">
         <Navigation />
 
-      <main className="pb-20 pt-16 md:pb-8">
+      <main className="rv-main rv-container hk-import-journal">
         <div className="px-4 py-8 md:px-8">
           <div className="mx-auto max-w-4xl">
             <div className="mb-8 text-center">
-              <h1 className="mb-2 text-2xl font-bold text-foreground md:text-3xl">Import Your Lists</h1>
-              <p className="text-muted-foreground">Bring your existing anime and manga lists to Hikari</p>
+              <span className="hk-page-jp" lang="ja">引っ越し / BRING YOUR HISTORY</span><h1 className="mb-2 text-2xl font-bold text-foreground md:text-3xl">Your next chapter starts here.</h1>
+              <p className="text-muted-foreground">Preview first. Keep your progress. Nothing changes until you confirm.</p><Button variant="outline" className="mt-4" onClick={exportList}>Export my Hikari library</Button>
             </div>
 
             <div className="mb-8 grid gap-4 md:grid-cols-3">
@@ -742,6 +767,7 @@ export default function ImportPage() {
               </CardContent>
             </Card>
 
+            {preview ? <section className="hk-import-preview" aria-label="Import preview"><span className="hk-page-jp">BEFORE YOU BRING IT OVER</span><h2>Check your import</h2><p>{preview.total} matched titles · {preview.unmatched} unmatched · {preview.payload.filter(row=>!row._existing).length} new · {preview.payload.filter(row=>row._existing).length} existing entries with possible updates.</p><p>Unchanged entries are skipped. Existing status and scores stay yours; progress never moves backward.</p><label><input type="checkbox" checked={mergeExisting} onChange={event=>setMergeExisting(event.target.checked)}/> Also fill missing dates/scores and advance progress on existing entries</label><div className="hk-import-preview-rows">{preview.payload.slice(0,12).map(row=><div key={row.media_id}><span>#{row.media_id} · {row.media_type}</span><span>{row._existing?"Update if selected":"Add new"} · progress {row.progress}</span></div>)}</div><div className="hk-collection-tools"><Button disabled={importing} onClick={confirmImport}>Confirm import</Button><Button variant="outline" disabled={importing} onClick={()=>setPreview(null)}>Cancel — change nothing</Button></div></section>:null}
             {(importing || importSummary) && (
               <Card className="mt-8 bg-card">
                 <CardHeader>
@@ -786,8 +812,8 @@ export default function ImportPage() {
                   )}
 
                   {importSummary && (
-                    <Button className="w-full gap-2" onClick={() => router.push("/lists")}>
-                      Go to My List
+                    <Button className="w-full gap-2" onClick={() => router.push(getSafeNextPath(searchParams?.get("next"), "/lists"))}>
+                      Continue
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   )}

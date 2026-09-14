@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, BookMarked, Globe, Lock, Plus, Pencil, Share2, Trash2 } from "lucide-react"
+import { collectionExport, downloadJson } from "@/lib/export-library.mjs"
+import { readAllRows } from "@/lib/read-all-rows.mjs"
 import { toast } from "sonner"
 import { Navigation } from "@/components/layout/Navigation"
 import { Button } from "@/components/ui/button"
@@ -13,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { CollectionTitlePicker } from "@/components/lists/CollectionTitlePicker"
+import { CollectionPublishing } from "@/components/lists/CollectionPublishing"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import { fetchAniListMediaByIds, getMediaTitle, getMediaHref } from "@/lib/anilist"
@@ -34,7 +37,9 @@ export default function CustomListPage() {
   const [editError, setEditError] = useState("")
   const [removeTarget, setRemoveTarget] = useState<any>(null)
   const [removing, setRemoving] = useState(false)
-  const [sort, setSort] = useState("newest")
+  const [sort, setSort] = useState("shelf")
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [toolBusy, setToolBusy] = useState(false)
   const [query, setQuery] = useState("")
   const owner = Boolean(user?.id && list?.user_id === user.id)
 
@@ -46,9 +51,9 @@ export default function CustomListPage() {
     setMetadataError(false)
     const load = async () => {
       try {
-        const { data: collection, error: listError } = await client.from("custom_lists").select("id, user_id, name, description, is_public, created_at").eq("id", listId).single()
+        const { data: collection, error: listError } = await client.from("custom_lists").select("*").eq("id", listId).single()
         if (listError || !collection) throw new Error("This collection is private, unavailable, or no longer exists.")
-        const { data, error: itemsError } = await client.from("custom_list_items").select("id, list_id, media_id, media_type, added_at").eq("list_id", listId).order("added_at", { ascending: false })
+        const { data, error: itemsError } = await readAllRows(() => client.from("custom_list_items").select("*").eq("list_id", listId), { isActive: () => active })
         if (itemsError) throw new Error("We couldn’t load the titles in this collection.")
         let media = new Map()
         try { media = await fetchAniListMediaByIds((data || []).map(item => Number(item.media_id))) }
@@ -92,15 +97,50 @@ export default function CustomListPage() {
     if (!owner || !removeTarget || removing) return
     setRemoving(true)
     try {
-      const { error: removeError } = await client.from("custom_list_items").delete().eq("id", removeTarget.id).eq("list_id", listId)
+      const ids = removeTarget.batch ? removeTarget.ids : [removeTarget.id]
+      const { data: removed, error: removeError } = await client.from("custom_list_items").delete().in("id", ids).eq("list_id", listId).select("id")
       if (removeError) throw removeError
-      setItems(current => current.filter(item => item.id !== removeTarget.id))
+      if (removed?.length !== ids.length) {
+        setSelectedIds([])
+        setRemoveTarget(null)
+        setRevision(current => current + 1)
+        toast.message("Some titles had already changed. Reloading the collection to show its current contents.")
+        return
+      }
+      setItems(current => current.filter(item => !ids.includes(item.id)))
+      setSelectedIds([])
       setRemoveTarget(null)
       toast.success("Removed from this collection. Your tracking progress is unchanged.")
     } catch { toast.error("Couldn’t remove that title. Try again.") }
     finally { setRemoving(false) }
   }
-  const visibleItems = items.filter(item => getMediaTitle(item.media).toLowerCase().includes(query.trim().toLowerCase())).sort((a,b) => sort === "title" ? getMediaTitle(a.media).localeCompare(getMediaTitle(b.media)) : new Date(b.added_at).getTime() - new Date(a.added_at).getTime())
+  const shelfItems = [...items].sort((a,b)=>(a.position ?? Number.MAX_SAFE_INTEGER)-(b.position ?? Number.MAX_SAFE_INTEGER) || new Date(b.added_at).getTime()-new Date(a.added_at).getTime() || String(a.id).localeCompare(String(b.id)))
+  const duplicate = async () => {
+    if (!owner || toolBusy) return
+    setToolBusy(true)
+    try {
+      const {data,error:copyError}=await client.rpc("duplicate_own_collection",{source_id:listId})
+      if(copyError) throw copyError
+      toast.success("Private copy created.")
+      window.location.assign("/lists/"+data)
+    } catch { toast.error("Couldn’t duplicate. The collection-tools migration must be installed first. Your original is unchanged.") }
+    finally { setToolBusy(false) }
+  }
+  const moveTitle = async (id:string,direction:number) => {
+    if(!owner || toolBusy) return
+    const before=shelfItems.map(item=>item.id)
+    const index=before.indexOf(id), destination=index+direction
+    if(destination<0 || destination>=before.length) return
+    const after=[...before];[after[index],after[destination]]=[after[destination],after[index]]
+    setToolBusy(true)
+    try{
+      const {error:orderError}=await client.rpc("reorder_own_collection",{collection_id:listId,ordered_ids:after,expected_ids:before})
+      if(orderError) throw orderError
+      setItems(current=>current.map(item=>({...item,position:after.indexOf(item.id)+1})))
+    }catch{toast.error("Order wasn’t saved. Refresh and retry; collection tools require the database migration.")}
+    finally{setToolBusy(false)}
+  }
+  const visibleItems = shelfItems.filter(item => getMediaTitle(item.media).toLowerCase().includes(query.trim().toLowerCase())).sort((a,b) => sort === "title" ? getMediaTitle(a.media).localeCompare(getMediaTitle(b.media)) : sort === "newest" ? new Date(b.added_at).getTime() - new Date(a.added_at).getTime() : 0)
   const share = async () => {
     if (!list?.is_public) return
     try { await navigator.clipboard.writeText(window.location.origin + "/lists/" + listId); toast.success("Public collection link copied.") }
@@ -112,27 +152,33 @@ export default function CustomListPage() {
     <main className="rv-container rv-main" style={{ maxWidth: 1040 }}>
       <Link href="/lists?view=collections" className="mb-8 inline-flex items-center gap-2 text-sm text-muted-foreground"><ArrowLeft size={15} />Collections</Link>
       {loading ? <div className="rv-empty" role="status">Opening your collection…</div> : error ? <div className="rv-empty"><h1 className="mb-3 text-2xl">Collection unavailable</h1><p role="alert">{error}</p><div className="flex justify-center gap-2"><Button variant="outline" onClick={() => setRevision(value => value + 1)}>Try again</Button>{!user ? <Button asChild><Link href={`/login?next=${encodeURIComponent("/lists/" + listId)}`}>Sign in</Link></Button> : null}</div></div> : <>
-        <header className="rv-page-heading">
+        <header className="rv-page-heading hk-collection-heading">
           <div><p className="rv-kicker">{list.is_public ? "A public collection" : "Private collection"}</p><h1>{list.name}</h1>{list.description ? <p>{list.description}</p> : null}<div className="mt-5 flex items-center gap-2 text-xs text-muted-foreground">{list.is_public ? <Globe size={13} /> : <Lock size={13} />}{list.is_public ? "Public" : "Private"}<span>·</span>{items.length} {items.length === 1 ? "title" : "titles"}</div></div>
           <div className="flex flex-wrap gap-2">
             {list.is_public ? <Button variant="outline" size="icon" aria-label="Copy public collection link" onClick={share}><Share2 size={16} /></Button> : null}
             {owner ? <><Button variant="outline" onClick={() => { setDraft({ name: list.name, description: list.description || "", is_public: list.is_public }); setEditError(""); setEditOpen(true) }}><Pencil size={15} />Edit</Button><Button onClick={() => setAddOpen(true)}><Plus size={16} />Add titles</Button></> : null}
           </div>
         </header>
+        <div className="hk-collection-panorama" aria-label="Collection cover">{[...shelfItems].sort((a,b)=>Number(Number(b.media_id)===list.cover_media_id)-Number(Number(a.media_id)===list.cover_media_id)).slice(0,5).map(item=><img key={item.id} src={item.media?.coverImage?.large || "/placeholder.svg"} alt="" />)}<span lang="ja">私の選集</span></div>
         {metadataError ? <p role="status" className="mb-4 text-sm text-muted-foreground">Cover art and title details are temporarily unavailable. Your saved collection is intact.</p> : null}
+        {owner ? <div className="hk-collection-tools"><Button variant="outline" disabled={toolBusy} onClick={duplicate}>Duplicate as private</Button><Button variant="outline" onClick={()=>downloadJson("hikari-collection.json",collectionExport(list,shelfItems))}>Export JSON</Button><span>{list.is_public?"Anyone with the link can view this shelf.":"Only you can see this shelf."}</span></div>:null}
         {items.length ? <>
           <div className="rv-library-search border-y border-border py-4">
             <Input aria-label="Search this collection" placeholder="Find a title in this collection…" value={query} onChange={event => setQuery(event.target.value)} />
-            <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span className="hidden sm:inline">Sort</span><select aria-label="Sort collection" value={sort} onChange={event => setSort(event.target.value)} className="rounded-md border border-border bg-card px-3 py-2 text-foreground"><option value="newest">Recently added</option><option value="title">Title A–Z</option></select></label>
+            <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span className="hidden sm:inline">Sort</span><select aria-label="Sort collection" value={sort} onChange={event => setSort(event.target.value)} className="rounded-md border border-border bg-card px-3 py-2 text-foreground"><option value="shelf">Shelf order</option><option value="newest">Recently added</option><option value="title">Title A–Z</option></select></label>
           </div>
+          {owner ? <div className="hk-collection-tools"><Button variant="outline" onClick={()=>setSelectedIds(selectedIds.length ? [] : visibleItems.map(item=>item.id))}>{selectedIds.length ? "Clear selection" : "Select visible titles"}</Button><Button variant="outline" disabled={!selectedIds.length} onClick={()=>setRemoveTarget({batch:true,ids:[...selectedIds],media:{title:{english:`${selectedIds.length} selected titles`}}})}>Remove selected ({selectedIds.length})</Button></div>:null}
           {visibleItems.map((item, index) => <article className="rv-collection-row" key={item.id}>
+            {owner ? <input type="checkbox" aria-label={`Select ${getMediaTitle(item.media)}`} checked={selectedIds.includes(item.id)} onChange={()=>setSelectedIds(current=>current.includes(item.id)?current.filter(id=>id!==item.id):[...current,item.id])}/>:null}
             <span className="hidden w-6 text-xs text-muted-foreground sm:block">{String(index + 1).padStart(2, "0")}</span>
             <img src={item.media?.coverImage?.large || "/placeholder.svg"} alt="" loading="lazy" />
             <div className="min-w-0 flex-1"><h3><Link href={getMediaHref(item.media_id, getMediaTitle(item.media))}>{item.media ? getMediaTitle(item.media) : `Title #${item.media_id}`}</Link></h3><p>{item.media_type === "MANGA" ? "Manga" : "Anime"}{item.media?.averageScore ? ` · ${item.media.averageScore / 10} average score` : ""}</p></div>
+            {owner && sort==="shelf" && !query ? <div className="hk-reorder"><button aria-label={`Move ${getMediaTitle(item.media)} earlier`} disabled={toolBusy || index===0} onClick={()=>moveTitle(item.id,-1)}>↑</button><button aria-label={`Move ${getMediaTitle(item.media)} later`} disabled={toolBusy || index===visibleItems.length-1} onClick={()=>moveTitle(item.id,1)}>↓</button></div>:null}
             {owner ? <Button variant="ghost" size="icon" aria-label={`Remove ${getMediaTitle(item.media)} from this collection`} onClick={() => setRemoveTarget(item)}><Trash2 size={15} /></Button> : null}
           </article>)}
           {!visibleItems.length ? <p className="py-12 text-center text-muted-foreground">No titles match “{query}”.</p> : null}
         </> : <div className="rv-empty"><BookMarked className="mx-auto mb-5 text-muted-foreground" size={36} strokeWidth={1.2} /><h2>No titles yet</h2><p>{owner ? "Choose titles from your library. They’ll stay in your tracking list, too." : "The curator hasn’t added any titles yet."}</p>{owner ? <Button onClick={() => setAddOpen(true)}><Plus size={16} />Choose titles</Button> : null}</div>}
+        <CollectionPublishing collection={list} user={user} owner={owner} items={shelfItems} onCover={id=>setList(current=>({...current,cover_media_id:id}))} />
       </>}
     </main>
     {owner ? <>

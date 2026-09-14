@@ -9,12 +9,13 @@ import { RecommendedForYou } from "./RecommendedForYou"
 import { Button } from "@/components/ui/button"
 import { ScrollReveal } from "@/components/common/ScrollReveal"
 import { getMediaHref } from "@/lib/anilist"
+import { mediaLengthLabel } from "@/lib/media-label.mjs"
 import type { AnimeItem, useHomeData } from "@/hooks/useHomeData"
 
 export function HomePoster({ anime }: { anime: AnimeItem }) {
   return <Link className="hk-poster" href={getMediaHref(anime.id, anime.title)}>
     <div className="hk-poster-art"><Image src={anime.cover} alt="" fill sizes="(max-width: 640px) 135px, (max-width: 1180px) 22vw, 14vw" /></div>
-    <div className="hk-poster-meta"><span>{anime.episodes ? `${anime.episodes} episodes` : anime.status || "Anime"}</span>{anime.rating ? <span>★ {anime.rating}</span> : null}</div>
+    <div className="hk-poster-meta"><span>{mediaLengthLabel(anime)}</span>{anime.rating ? <span>★ {anime.rating}</span> : null}</div>
     <h3>{anime.title}</h3>
   </Link>
 }
@@ -34,6 +35,7 @@ export function HomeScreen({ data: d }: { data: ReturnType<typeof useHomeData> }
     <main id="main-content">
       <FeaturedCinema items={d.featuredAnime} index={d.currentFeatured} onSelect={d.setCurrentFeatured} onAdd={d.handleAddFeatured} adding={d.addingFeatured} loading={d.homeLoading} error={d.homeError} onRetry={d.retry} paused={d.carouselPaused} running={d.carouselRunning} onPause={() => d.setCarouselPaused(value => !value)} onFocus={d.setCarouselFocused} />
       <div className="hk-home-body">
+        <nav className="hk-journal-strip" aria-label="Your next stop"><div><span lang="ja">寄り道</span><p>A little detour.</p><small>Find a story. Make room for it.</small></div><Link href="/discover"><small>01 / FIND</small><strong>Let a trailer<br/>change your plans.</strong><ArrowUpRight size={19}/></Link><Link href="/calendar"><small>02 / KEEP UP</small><strong>See what’s<br/>on tonight.</strong><ArrowUpRight size={19}/></Link><Link href="/lists?view=collections"><small>03 / KEEP CLOSE</small><strong>A shelf for<br/>your kind of story.</strong><ArrowUpRight size={19}/></Link></nav>
         <ScrollReveal><section className="hk-home-section" aria-labelledby="watching-heading">
           <div className="hk-section-title"><h2 id="watching-heading"><small lang="ja">視聴中</small>Continue watching</h2><Link href="/lists">My List <ArrowUpRight size={15} /></Link></div>
           {d.continueLoading ? <p role="status" className="text-sm text-muted-foreground">Loading your watch log…</p> : d.continueError ? <p role="alert" className="text-sm text-muted-foreground">{d.continueError} <Link href="/lists" className="underline">Open My List</Link></p> : d.continueWatching.length ? <div className="hk-watch-strip">
@@ -69,7 +71,7 @@ export function HomeScreen({ data: d }: { data: ReturnType<typeof useHomeData> }
           <Link href={process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"}><h3>Join the Discord <ArrowUpRight size={18} /></h3><p>Talk about what you're watching with the Hikari community.</p></Link>
           <Link href="/discord-bot"><h3>Hikari for Discord <ArrowUpRight size={18} /></h3><p>Tracking and airing alerts, right inside your server.</p></Link>
         </nav>
-        <footer className="hk-footer"><span>Hikari · Anime & manga</span><nav aria-label="Footer"><Link href="/founding">The Founding 25</Link><Link href="/feedback">Feedback</Link><Link href="/status">Status</Link><Link href="/terms">Terms</Link><Link href="/privacy">Privacy</Link></nav></footer>
+        <footer className="hk-footer"><span>Hikari · Anime & manga</span><nav aria-label="Footer"><Link href="/feedback">Feedback</Link><Link href="/status">Status</Link><Link href="/terms">Terms</Link><Link href="/privacy">Privacy</Link></nav></footer>
       </div>
     </main>
   </div>

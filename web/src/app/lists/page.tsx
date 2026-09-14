@@ -515,7 +515,7 @@ function ListPageContent() {
       <main className="rv-container rv-main">
         <div className="mx-auto">
           <header className="rv-page-heading">
-            <div><p className="hk-page-jp" lang="ja">マイリスト</p><h1>My List</h1><p>Track episodes and chapters, or organize your collections.</p></div>
+            <div><p className="hk-page-jp" lang="ja">私の記録 / THE WATCH JOURNAL</p><h1>My List<span className="hk-ink-dot">.</span></h1><p>Halfway through, saving for later, or never getting over it.</p></div>
             <Button variant="outline" asChild><Link href="/search"><Plus size={16} />Find a title</Link></Button>
           </header>
           <div className="rv-tabs" aria-label="Library views">
@@ -523,7 +523,7 @@ function ListPageContent() {
             <button type="button" aria-pressed={libraryView === "collections"} onClick={() => changeView("collections")}>Collections</button>
           </div>
           {libraryView === "collections" ? <CollectionsSection user={user} /> : <>
-          <div className="rv-library-search"><Input aria-label="Search your tracking list" placeholder="Find something in your list…" value={listQuery} onChange={event => setListQuery(event.target.value)} /><Link href="/onboarding" className="ml-auto text-xs text-muted-foreground hover:text-foreground">Import a list</Link></div>
+          <div className="rv-library-search"><Input aria-label="Search your tracking list" placeholder="Find something in your list…" value={listQuery} onChange={event => setListQuery(event.target.value)} /><Link href="/import" className="ml-auto text-xs text-muted-foreground hover:text-foreground">Import a list</Link></div>
           {entriesError ? <p className="mb-4 text-sm text-rose-400">{entriesError}</p> : null}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="hk-tracking-layout">
@@ -574,7 +574,7 @@ function ListPageContent() {
                             <Link href="/search">Browse titles</Link>
                           </Button>
                           <Button asChild variant="outline">
-                            <Link href="/onboarding">Import your list</Link>
+                            <Link href="/import">Import your list</Link>
                           </Button>
                         </>
                       }
