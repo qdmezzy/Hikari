@@ -1,0 +1,21 @@
+.rv-community .rv-main{padding-top:28px}
+.rv-community .rv-community-masthead{min-height:0;margin:0;padding:28px 0 32px;border-bottom:1px solid var(--border);align-items:end}
+.rv-community .rv-community-masthead h1{font-size:clamp(48px,6vw,78px);line-height:1;letter-spacing:-.07em;font-weight:550;margin:14px 0 12px}
+.rv-community .rv-community-masthead p{max-width:550px;font-size:14px;line-height:1.6;color:var(--muted-foreground)}
+.rv-community .rv-community-covers{max-width:220px;height:110px;border:0;padding:0;transform:none;overflow:hidden}
+.rv-community .rv-community-covers img{height:95px;width:62px;border:2px solid var(--background);border-radius:1px;transform:rotate(4deg);box-shadow:3px 3px 0 var(--border)}
+.rv-community .rv-community-covers img:nth-child(even){transform:translateY(8px) rotate(-4deg)}
+.hk-community-club{display:flex;justify-content:space-between;align-items:center;gap:15px;margin:17px 0 32px;font-size:11px}.hk-community-club span{font-size:9px;letter-spacing:.16em;color:var(--muted-foreground)}.hk-community-club a{border-bottom:1px solid var(--primary);padding-bottom:4px;color:var(--foreground)}
+.rv-community .rv-community-layout{grid-template-columns:minmax(0,1fr) 240px;gap:38px}
+.rv-community .hk-community-tabs{grid-column:1/-1;display:flex;gap:24px;border-bottom:1px solid var(--border);margin-bottom:-12px}
+.rv-community .hk-community-tabs button{min-height:44px;padding:0 2px 11px;border-bottom:2px solid transparent;font-size:12px;color:var(--muted-foreground)}
+.rv-community .hk-community-tabs button[aria-pressed=true]{color:var(--foreground);border-bottom-color:var(--primary)}
+.rv-community .rv-community-feed{grid-column:1}.rv-community .rv-community-noticeboard{grid-column:2;border:0;padding:0}
+.rv-community .rv-feed-heading{border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:16px}.rv-community .rv-feed-heading h2{font-size:17px;font-weight:600}
+.rv-community .rv-status-composer{border:1px solid var(--border);background:var(--card);margin-bottom:14px}
+.rv-community .rv-status-composer textarea{border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent}
+.rv-community .rv-activity-stream article{border-radius:2px;background:var(--card);box-shadow:none;margin-bottom:12px}
+.rv-community .rv-community-noticeboard>.rv-feed-heading h2{font-size:11px;letter-spacing:.13em;color:var(--primary)}
+.rv-community .rv-community-note{border:1px solid var(--border);padding:17px;margin-top:20px}.rv-community .rv-community-note h3{font-size:15px;margin-top:0}.rv-community .rv-community-note p{margin-top:8px}
+@media(max-width:950px){.rv-community .rv-community-layout{grid-template-columns:1fr}.rv-community .rv-community-noticeboard{grid-column:1;border-top:1px solid var(--border);padding-top:20px}.rv-community .rv-community-covers{display:none}}
+@media(max-width:600px){.rv-community .rv-main{padding-top:12px}.rv-community .rv-community-masthead{padding:20px 0 24px}.rv-community .rv-community-masthead h1{font-size:49px}.hk-community-club span{display:none}.rv-community .hk-community-tabs{gap:16px}}

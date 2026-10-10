@@ -1,0 +1,23 @@
+.hikari-profile{--hk-profile-ink:var(--foreground)}
+.hikari-profile>header{background:var(--background);backdrop-filter:none}
+.hk-public-banner{height:220px!important;background:#28322f}
+.hk-public-banner>div:first-child{background:#28322f!important}.hk-public-banner>div:first-child span{display:none}
+.hk-public-banner>div:nth-last-child(-n+2){background:linear-gradient(to top,var(--background),transparent 80%)!important}
+.hk-public-heading{margin-top:-72px!important;border-bottom:1px solid var(--border);padding-bottom:28px;margin-bottom:0!important}
+.hk-public-avatar{height:118px!important;width:118px!important;border:5px solid var(--background)!important;border-radius:4px!important;box-shadow:4px 4px 0 var(--border)!important}
+.hk-public-avatar>div{background:#4b5837;color:#f4eddc}
+.hk-public-level{display:block;margin-top:8px;font-size:9px;letter-spacing:.14em;color:var(--muted-foreground)}
+.hk-public-eyebrow{display:block;margin:6px 0 13px;font-size:9px;letter-spacing:.2em;font-weight:700;color:var(--primary)}
+.hk-public-heading h1{font-size:clamp(30px,3.5vw,48px)!important;font-weight:600!important;letter-spacing:-.055em}
+.hk-public-heading p.text-lg{font-size:13px}.hk-public-heading button{border-radius:3px}
+.hk-public-stats{margin-top:21px!important;gap:0!important;border-top:1px solid var(--border)}
+.hk-public-stat{min-width:105px!important;padding:13px 25px 0 0!important;margin-right:25px;background:none!important;box-shadow:none!important;border-radius:0!important;border-right:1px solid var(--border)}
+.hk-public-stat:last-child{border-right:0}.hk-public-stat svg{width:15px;height:15px}.hk-public-stat p:last-child{font-size:20px}.hk-public-stat p:first-child{letter-spacing:.12em}
+.hikari-profile nav button{border-radius:0!important}.hikari-profile nav .rounded-md{border-radius:2px}
+.hikari-profile .rounded-2xl.border.border-border\/50.bg-card\/50{border-radius:4px;background:var(--card);box-shadow:4px 4px 0 color-mix(in oklab,var(--border) 65%,transparent);backdrop-filter:none}
+.hikari-profile .rounded-2xl.border.border-border\/50.bg-card\/50 h2{font-size:17px;letter-spacing:-.025em}
+.hikari-profile .rounded-2xl.border.border-border\/50.bg-card\/50 h2 svg{color:var(--primary);width:16px;height:16px}
+.hikari-profile .rounded-xl.bg-muted\/30{border-radius:2px;background:var(--muted)}
+.hikari-profile .rounded-xl.bg-muted\/30 .rounded-full{width:5px;height:5px;border-radius:0}
+.hikari-profile .rounded-2xl.border.border-border\/50.bg-card\/40{border-radius:3px;background:transparent}
+@media(max-width:640px){.hk-public-banner{height:170px!important}.hk-public-avatar{height:90px!important;width:90px!important}.hk-public-heading{margin-top:-55px!important}.hk-public-stat{min-width:75px!important;margin-right:11px;padding-right:10px!important}.hk-public-stat p:last-child{font-size:18px}}

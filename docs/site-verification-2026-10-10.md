@@ -25,6 +25,11 @@
 - Turning Public profile off returned a private page title, but the guest briefly still saw previously loaded profile details. The public profile API now sends `no-store` for all responses so a changed privacy setting does not leave a cacheable public response.
 - Password recovery, real notification delivery, and cross-account authenticated moderation remain untested. No global push sweep was triggered.
 
+## Follow-up fixes from visual review
+
+- Existing Hikari accounts linked to Discord or Google now bypass social onboarding when their email identity already has a Hikari handle. New social-only accounts still complete setup. This was checked with focused routing tests; a full Discord OAuth round-trip should be retested by the owner.
+- Onboarding uses a Hikari editorial layout and clearer first-step copy. Community has a shorter, content-first masthead and a tighter feed. The public profile uses a compact banner, flatter stats, simpler cards, and shows “My profile” for a signed-in visitor instead of sign-in buttons.
+
 ## Remaining migration actions
 
 1. With a test account, complete a MyAnimeList OAuth import and verify the imported list appears in Hikari.

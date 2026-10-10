@@ -22,10 +22,11 @@ import { Label } from "@/components/ui/label"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
 import { cn } from "@/lib/utils"
-import { needsAuthOnboarding, getUserHandle } from "@/lib/auth-onboarding"
+import { needsAuthOnboarding, getUserHandle, hasOauthProvider } from "@/lib/auth-onboarding"
 import { checkHandleAvailability, normalizeHandle, upsertPublicProfile } from "@/lib/public-profile"
 import { importFromAniListUsername, importFromMal } from "@/lib/import-service"
 import { getSafeNextPath } from "@/lib/safe-navigation.mjs"
+import "./onboarding.css"
 
 const VIBES = [
   "Action", "Adventure", "Comedy", "Drama", "Fantasy", "Romance",
@@ -82,7 +83,7 @@ export default function OnboardingPage() {
 
   // Skip onboarding entirely if already complete.
   useEffect(() => {
-    if (!loading && user?.user_metadata?.onboarding_complete === true) {
+    if (!loading && user && (user.user_metadata?.onboarding_complete === true || (hasOauthProvider(user) && !needsAuthOnboarding(user)))) {
       router.replace(nextPath)
     }
   }, [loading, user, nextPath, router])
@@ -228,14 +229,15 @@ export default function OnboardingPage() {
 
   return (
     <RequireAuth>
-      <div className="relative min-h-screen overflow-hidden bg-background">
-        <div className="pointer-events-none fixed inset-0 overflow-hidden">
-          <div className="absolute -left-1/4 -top-1/4 size-[60%] rounded-full bg-gradient-to-br from-primary/20 to-transparent blur-3xl" />
-          <div className="absolute -bottom-1/4 -right-1/4 size-[55%] rounded-full bg-gradient-to-tl from-accent/15 to-transparent blur-3xl" />
-        </div>
-
-        <div className="relative mx-auto flex min-h-screen max-w-xl flex-col px-4 py-8">
-          <div className="mb-8">
+      <div className="hk-onboarding min-h-screen bg-background">
+        <div className="hk-onboarding-layout">
+          <aside className="hk-onboarding-intro" aria-hidden="true">
+            <span className="hk-onboarding-edition">光 · アニメと漫画</span>
+            <div><span className="hk-onboarding-chapter">YOUR WATCH JOURNAL / 01</span><strong>Make it<br />yours.</strong><p>A place for the stories you love and the ones you haven’t met yet.</p></div>
+            <span className="hk-onboarding-mark">光</span>
+          </aside>
+          <main className="hk-onboarding-main">
+          <div className="mb-8 hk-onboarding-progress">
             <div className="mb-2 flex items-center justify-between text-xs text-muted-foreground">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-6 w-auto" />
@@ -243,9 +245,9 @@ export default function OnboardingPage() {
                 Step {stepIndex + 1} of {steps.length}
               </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-1 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-primary to-accent transition-all duration-500"
+                className="h-full bg-primary transition-all duration-500"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -253,18 +255,16 @@ export default function OnboardingPage() {
 
           <div key={step} className="flex flex-1 flex-col animate-rise">
             {step === "welcome" && (
-              <div className="flex flex-1 flex-col items-center justify-center text-center">
-                <div className="mb-6 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-accent text-white shadow-lg">
-                  <Sparkles className="size-8" />
-                </div>
+              <div className="hk-onboarding-welcome flex flex-1 flex-col justify-center">
+                <span className="hk-onboarding-step">01 / A NEW CHAPTER</span>
                 <h1 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
-                  Welcome to Hikari
+                  Your corner of Hikari.
                 </h1>
                 <p className="mt-3 max-w-sm text-pretty text-muted-foreground">
-                  Discover what to watch next, track your progress, and build lists you&apos;ll actually use. Let&apos;s set you up — it takes under a minute.
+                  Pick what you like, bring your list if you have one, and start watching. You can change everything later.
                 </p>
                 <Button size="lg" className="mt-8 w-full max-w-xs gap-2" onClick={goNext}>
-                  Get started <ArrowRight className="size-4" />
+                  Set up my space <ArrowRight className="size-4" />
                 </Button>
               </div>
             )}
@@ -480,6 +480,7 @@ export default function OnboardingPage() {
               </div>
             )}
           </div>
+          </main>
         </div>
       </div>
     </RequireAuth>

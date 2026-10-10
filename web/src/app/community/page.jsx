@@ -39,6 +39,7 @@ import {
 } from "@/lib/community-content-service"
 import { fetchAniListMediaByIds } from "@/lib/anilist"
 import { awardXp, XP_ACTIONS } from "@/lib/xp"
+import "./community.css"
 
 const DISCORD_COMMUNITY_URL = process.env.NEXT_PUBLIC_DISCORD_INVITE_URL || "/discord-bot"
 
@@ -947,10 +948,10 @@ function CommunityExperience({ user, isMod }) {
       <Navigation />
       <main className="rv-container rv-main">
         <header className="rv-community-masthead">
-          <div><span className="hk-page-jp" lang="ja">みんなの広場 / AFTER THE CREDITS</span><h1>Still thinking<br/>about that ending?</h1><p>You’re in good company. Watch notes, honest reviews, and the conversations in between.</p><span className="hk-community-seal" lang="ja" aria-label="Community">語ろう</span></div>
-          <div className="rv-community-covers" aria-hidden="true">{Array.from(covers.values()).filter(Boolean).slice(0,5).map((cover,index) => <img key={index} src={cover} alt="" />)}</div>
+          <div><span className="hk-page-jp" lang="ja">みんなの広場 / AFTER THE CREDITS</span><h1>Community<span className="hk-ink-dot">.</span></h1><p>Finished something good? Say what stayed with you. See what everyone else is watching, reading, and recommending.</p></div>
+          <div className="rv-community-covers" aria-hidden="true">{Array.from(covers.values()).filter(Boolean).slice(0,4).map((cover,index) => <img key={index} src={cover} alt="" />)}</div>
         </header>
-        <div className="hk-collection-tools"><Link href="/clubs">This season’s watch club ↗</Link></div>
+        <div className="hk-community-club"><span>01 / YOUR CORNER OF HIKARI</span><Link href="/clubs">This season’s watch club ↗</Link></div>
         <div className="rv-community-layout">
           <aside className="hk-community-tabs">
             {[{id:"activity",label:"Activity",icon:Heart},{id:"discussions",label:"Discussions",icon:MessageCircle},{id:"reviews",label:"Reviews",icon:Star}].map(item => <button key={item.id} type="button" aria-pressed={communityView === item.id} onClick={() => setCommunityView(item.id)}><item.icon size={17} />{item.label}</button>)}

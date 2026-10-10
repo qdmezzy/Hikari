@@ -21,9 +21,11 @@ export const needsAuthOnboarding = (user) => {
   if (!hasOauthProvider(user)) return false
 
   const hasHandle = Boolean(getUserHandle(user))
-  const setupComplete = user?.user_metadata?.oauth_setup_complete === true
-  const passwordSet = user?.user_metadata?.oauth_password_set === true
-
-  return !hasHandle || !setupComplete || !passwordSet
+  if (user?.user_metadata?.onboarding_complete === true) return false
+  // An email account may link Discord or Google later. Its original handle is
+  // already the Hikari account setup; linking must not restart onboarding.
+  if (hasHandle && getProviders(user).includes('email')) return false
+  if (hasHandle && user?.user_metadata?.oauth_setup_complete === true) return false
+  return true
 }
 

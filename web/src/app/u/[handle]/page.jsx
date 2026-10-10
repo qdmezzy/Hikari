@@ -33,6 +33,7 @@ import { fetchPublicProfileByHandle, normalizeHandle } from "@/lib/public-profil
 import { fetchAniListMediaByIds, formatCompactNumber, getMediaHref, getMediaTitle } from "@/lib/anilist"
 import { FoundingBadge } from "@/components/founding/FoundingBadge"
 import { FoundingName } from "@/components/founding/FoundingName"
+import "./public-profile.css"
 
 const publicTabs = [
   { id: "overview", label: "Overview", icon: User },
@@ -723,17 +724,12 @@ export default function PublicProfilePage() {
             <img src="/brand/hikari-wordmark.svg" alt="Hikari" className="h-10 w-auto" />
           </Link>
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="rounded-xl" asChild>
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button size="sm" className="rounded-xl bg-primary hover:bg-primary/90" asChild>
-              <Link href="/register">Sign up</Link>
-            </Button>
+            {authUser ? <Button variant="outline" size="sm" asChild><Link href="/profile">My profile</Link></Button> : <><Button variant="outline" size="sm" asChild><Link href="/login">Sign in</Link></Button><Button size="sm" asChild><Link href="/register">Sign up</Link></Button></>}
           </div>
         </div>
       </header>
 
-      <div className="relative h-56 overflow-hidden pt-16 sm:h-72 md:h-80">
+      <div className="hk-public-banner relative h-56 overflow-hidden pt-16 sm:h-72 md:h-80">
         {userData.banner ? (
           <img src={userData.banner} alt={`${userData.name} banner`} className="h-full w-full object-cover" />
         ) : (
@@ -744,7 +740,7 @@ export default function PublicProfilePage() {
       </div>
 
       <div className="mx-auto max-w-6xl px-4">
-        <div className="relative -mt-24 mb-8">
+        <div className="hk-public-heading relative -mt-24 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: isLoaded ? 1 : 0, y: isLoaded ? 0 : 20 }}
@@ -753,8 +749,7 @@ export default function PublicProfilePage() {
           >
             <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-start">
               <div className="relative">
-                <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-primary via-accent to-primary opacity-60 blur" />
-                <div className="relative h-36 w-36 overflow-hidden rounded-2xl border-4 border-background bg-muted shadow-2xl sm:h-44 sm:w-44">
+                <div className="hk-public-avatar relative h-36 w-36 overflow-hidden rounded-2xl border-4 border-background bg-muted shadow-2xl sm:h-44 sm:w-44">
                   {userData.avatar ? (
                     <img src={userData.avatar} alt={userData.name} className="h-full w-full object-cover" />
                   ) : (
@@ -768,12 +763,11 @@ export default function PublicProfilePage() {
                     <Crown className="h-5 w-5 text-white" />
                   </div>
                 ) : null}
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-primary to-accent px-4 py-1.5 shadow-lg">
-                  <span className="text-sm font-bold text-white">Lvl {userData.level}</span>
-                </div>
+                <span className="hk-public-level">LEVEL {userData.level}</span>
               </div>
 
               <div className="flex-1 pt-4 sm:pt-8">
+                <span className="hk-public-eyebrow">HIKARI / MEMBER PROFILE</span>
                 <div className="mb-2 flex flex-wrap items-center gap-3">
                   <h1 className="text-3xl font-black text-foreground sm:text-4xl"><FoundingName handle={userData.username} memberNumber={userData.foundingMemberNumber} showBadge={false}>{userData.name}</FoundingName></h1>
                   {userData.foundingMemberNumber ? <FoundingBadge memberNumber={userData.foundingMemberNumber} /> : null}
@@ -830,7 +824,7 @@ export default function PublicProfilePage() {
                 </div>
 
                 {userData.privacy.showStats ? (
-                  <div className="mt-5 flex flex-wrap gap-2.5 xl:flex-nowrap">
+                  <div className="hk-public-stats mt-5 flex flex-wrap gap-2.5 xl:flex-nowrap">
                   {[
                     { label: "Completed", value: userData.stats.completed, icon: CheckCircle, color: "text-emerald-400" },
                     { label: "Watched", value: userData.stats.daysWatched, icon: Clock, color: "text-cyan-400" },
@@ -842,7 +836,7 @@ export default function PublicProfilePage() {
                       initial={{ opacity: 0, scale: 0.92 }}
                       animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.92 }}
                       transition={{ duration: 0.35, delay: 0.08 + index * 0.05 }}
-                      className="min-w-[118px] rounded-2xl bg-card/55 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:bg-card/70"
+                      className="hk-public-stat min-w-[118px] rounded-2xl bg-card/55 px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-sm transition-all hover:bg-card/70"
                     >
                       <div className="flex items-center gap-2.5">
                         <stat.icon className={cn("h-[18px] w-[18px] shrink-0", stat.color)} />
