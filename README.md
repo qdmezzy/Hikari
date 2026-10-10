@@ -26,9 +26,8 @@ Hikari is a modern anime & manga tracker built for speed and a clean, spoiler-sa
 - **Import** — pull your existing lists from **MyAnimeList** (OAuth) and **AniList** in a couple of clicks.
 - **Stats & Wrapped** — time watched, streaks, top genres, achievements, and a shareable year-in-review.
 - **Personal calendar** — upcoming episodes for the shows you're watching, with notifications.
-- **AI recommendations** — chat-driven "what should I watch" tuned to your taste.
 - **Social** — follow people, post, comment, and a community feed.
-- **Auto-tracking extension** — watch on a supported site and your progress updates itself.
+- **Auto-tracking extension** — watch on a supported site and your progress updates itself. (still in prog)
 
 ## Tech stack
 
