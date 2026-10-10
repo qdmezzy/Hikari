@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next"
 import { createClient } from "@supabase/supabase-js"
 
-const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://hikari.raycodes.net").replace(/\/$/, "")
+import { siteUrl } from "@/lib/site-url"
 
 const getPublicMedia = async () => {
   try {

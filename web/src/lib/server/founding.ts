@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto"
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js"
 import { isFoundingModerator, normalizeFoundingHandle, normalizeFoundingInviteCode } from "@/lib/founding-domain.mjs"
+import { siteUrl } from "@/lib/site-url"
 
 const getConfig = () => {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
@@ -46,8 +47,7 @@ export const hashFoundingInviteCode = (value: unknown) => {
 }
 
 export const getFoundingJoinUrl = (request: Request, code: string) => {
-  const configured = (process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/$/, "")
-  const origin = configured || new URL(request.url).origin
+  const origin = process.env.NEXT_PUBLIC_APP_URL ? siteUrl : new URL(request.url).origin
   return `${origin}/founding/join#code=${encodeURIComponent(code)}`
 }
 

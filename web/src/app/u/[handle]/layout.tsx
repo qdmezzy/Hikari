@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { createClient } from "@supabase/supabase-js"
 
-const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://hikari.raycodes.net").replace(/\/$/, "")
+import { siteUrl } from "@/lib/site-url"
 
 const normalizeHandle = (value: string) =>
   String(value || "").replace(/^@/, "").trim().toLowerCase().replace(/[^a-z0-9_]/g, "")

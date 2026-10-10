@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://hikari.raycodes.net"
+import { siteUrl } from "@/lib/site-url"
 const canonicalUrl = `${siteUrl.replace(/\/$/, "")}/discord-bot`
 
 export const metadata: Metadata = {

@@ -30,6 +30,6 @@ export default async function CollectionImage({params}:{params:Promise<{id:strin
  return new ImageResponse(<div style={{display:"flex",width:"100%",height:"100%",background:"#e8e3d5",color:"#202820",padding:52,flexDirection:"column",justifyContent:"space-between"}}>
   <div style={{display:"flex",justifyContent:"space-between",fontSize:18,letterSpacing:3}}><span>HIKARI / PERSONAL SHELVES</span><span>OPEN SHELF</span></div>
   <div style={{display:"flex",gap:35,alignItems:"center"}}><div style={{display:"flex",flexDirection:"column",width:480,gap:20}}><div style={{display:"flex",fontSize:52,lineHeight:1.06}}>{collection.name}</div><div style={{display:"flex",fontSize:19,lineHeight:1.5}}>{(collection.description||"").slice(0,150)}</div><div style={{display:"flex",fontSize:17}}>By {creator.data?.display_name||creator.data?.handle||"a Hikari member"}</div></div><div style={{display:"flex",gap:9,flex:1}}>{posters.slice(0,3).map((src,index)=><img key={src} src={src} width={155} height={230} style={{objectFit:"cover",transform:`rotate(${index%2?3:-3}deg)`}} alt=""/>)}</div></div>
-  <div style={{display:"flex",borderTop:"1px solid #889180",paddingTop:20,fontSize:16}}>hikari.raycodes.net/lists/{id}</div>
+  <div style={{display:"flex",borderTop:"1px solid #889180",paddingTop:20,fontSize:16}}>hikari.raycodes.me/lists/{id}</div>
  </div>,{...size,headers:{"Cache-Control":"no-store"}})
 }

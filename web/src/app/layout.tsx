@@ -15,6 +15,7 @@ import { Analytics } from "@vercel/analytics/next"
 import { AuthProvider } from "@/components/context/AuthProvider"
 import { ThemeProvider } from "@/components/theme/theme-provider"
 import { EmailVerificationBanner } from "@/components/common/EmailVerificationBanner"
+import { siteUrl } from "@/lib/site-url"
 
 const geist = Geist({
   subsets: ["latin"],
@@ -33,8 +34,6 @@ const notoJp = Noto_Sans_JP({
   variable: "--font-jp",
   display: "swap",
 })
-
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://hikari.raycodes.net"
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
