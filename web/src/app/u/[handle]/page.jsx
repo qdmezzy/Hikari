@@ -496,6 +496,7 @@ export default function PublicProfilePage() {
   }, [activeTab, visibleTabs])
 
   const stats = React.useMemo(() => {
+    if (profile?.show_watch_activity === false && profile?.shared_stats) return profile.shared_stats
     const watchingCount = entries.filter((entry) => entry.status === "watching" || entry.status === "rewatching").length
     const completedCount = entries.filter((entry) => entry.status === "completed").length
     const onHoldCount = entries.filter((entry) => entry.status === "on_hold").length
@@ -564,7 +565,7 @@ export default function PublicProfilePage() {
       longestStreak,
       rewatches,
     }
-  }, [entries])
+  }, [entries, profile])
 
   // Only the user's real saved favorites (max 4 shown).
   const overviewFavorites = React.useMemo(
