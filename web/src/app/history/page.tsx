@@ -6,6 +6,7 @@ import { ArrowUpRight, Search } from "lucide-react"
 import { Navigation } from "@/components/layout/Navigation"
 import RequireAuth from "@/components/common/RequireAuth"
 import { Button } from "@/components/ui/button"
+import { SiteSelect } from "@/components/ui/site-select"
 import { ScrollReveal } from "@/components/common/ScrollReveal"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
@@ -215,7 +216,7 @@ export default function WatchHistoryPage() {
   return <RequireAuth><div className="hikari-revamp min-h-screen bg-background"><Navigation/>
     <main className="rv-main hk-personal"><div className="rv-container">
       <header className="hk-personal-heading"><div><span className="hk-page-jp" lang="ja">視聴と読書の記録</span><h1>History</h1><p>Your latest update for each title, ordered by when you last tracked it.</p></div><Link href="/lists">Manage My List <ArrowUpRight size={16}/></Link></header>
-      <div className="hk-personal-toolbar"><label className="hk-personal-search"><Search size={17}/><input aria-label="Search your history" placeholder="Find a title in your history…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></label><select aria-label="History media type" value={mediaFilter} onChange={e=>setMediaFilter(e.target.value)}><option value="all">Anime & manga</option><option value="ANIME">Anime</option><option value="MANGA">Manga</option></select></div>
+      <div className="hk-personal-toolbar"><label className="hk-personal-search"><Search size={17}/><input aria-label="Search your history" placeholder="Find a title in your history…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></label><SiteSelect ariaLabel="History media type" value={mediaFilter} onValueChange={setMediaFilter} options={[{value:"all",label:"Anime & manga"},{value:"ANIME",label:"Anime"},{value:"MANGA",label:"Manga"}]} /></div>
       {loadingEntries ? <p role="status" className="hk-personal-empty">Loading your history…</p> : <>
         {entriesError ? <p role="alert" className="hk-personal-notice">{entriesError} <button onClick={()=>setReload(value=>value+1)}>Try again</button></p>:null}
         {!groupedEntries.length ? <div className="hk-personal-empty"><span lang="ja">ここからはじまる</span><h2>{searchQuery || mediaFilter!=="all" ? "No matching updates" : "Your watch log starts here"}</h2><p>{searchQuery || mediaFilter!=="all" ? "Try another title or show all media." : "Track an episode or chapter in My List to see your latest progress here."}</p>{searchQuery || mediaFilter!=="all" ? <Button variant="outline" onClick={()=>{setSearchQuery("");setMediaFilter("all")}}>Clear filters</Button>:<Button variant="outline" asChild><Link href="/lists">Open My List</Link></Button>}</div>:

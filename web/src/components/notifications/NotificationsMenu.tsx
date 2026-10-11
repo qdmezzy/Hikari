@@ -18,7 +18,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import {
   fetchNotifications,
@@ -131,28 +130,7 @@ const getNotificationIcon = (type?: string) => {
   }
 }
 
-const getNotificationAccent = (type?: string) => {
-  switch (type) {
-    case "episode":
-    case "preair":
-    case "digest":
-      return "text-cyan-300 bg-cyan-500/10"
-    case "favorite":
-      return "text-rose-300 bg-rose-500/10"
-    case "list":
-      return "text-emerald-300 bg-emerald-500/10"
-    case "follow":
-      return "text-violet-300 bg-violet-500/10"
-    case "post":
-      return "text-fuchsia-300 bg-fuchsia-500/10"
-    case "discover":
-      return "text-amber-300 bg-amber-500/10"
-    case "report":
-      return "text-orange-300 bg-orange-500/10"
-    default:
-      return "text-white/80 bg-white/10"
-  }
-}
+const getNotificationAccent = () => "text-primary bg-primary/10"
 
 export function NotificationsMenu({ user }: NotificationsMenuProps) {
   const router = useRouter()
@@ -283,12 +261,12 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
       <PopoverContent
         align="end"
         sideOffset={10}
-        className="w-[calc(100vw-1.5rem)] max-w-[360px] rounded-3xl border-white/10 bg-[#07111c]/95 p-0 text-white shadow-2xl shadow-black/40 backdrop-blur-2xl"
+        className="w-[calc(100vw-1.5rem)] max-w-[360px] rounded-lg border-border bg-popover p-0 text-popover-foreground shadow-xl hide-scrollbar"
       >
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <p className="text-sm font-semibold text-white">Notifications</p>
-            <p className="text-xs text-white/45">
+            <p className="text-sm font-semibold text-foreground">Notifications</p>
+            <p className="text-xs text-muted-foreground">
               {unreadCount > 0 ? `${unreadCount} unread` : "All caught up"}
             </p>
           </div>
@@ -297,7 +275,7 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 rounded-xl px-2.5 text-xs text-white/65 hover:bg-white/10 hover:text-white"
+              className="h-8 rounded-md px-2.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
               onClick={handleMarkAllRead}
               disabled={!notifications.length || unreadCount === 0}
             >
@@ -307,7 +285,7 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-xl text-white/65 hover:bg-white/10 hover:text-white"
+              className="h-8 w-8 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
               onClick={() => {
                 setOpen(false)
                 router.push("/settings")
@@ -320,7 +298,7 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
         </div>
 
         {notifications.length ? (
-          <ScrollArea className="h-[360px]">
+          <div className="max-h-[min(360px,60vh)] overflow-y-auto hide-scrollbar">
             <div className="space-y-2 p-3">
               {notifications.map((notification) => {
                 const Icon = getNotificationIcon(notification.type)
@@ -332,15 +310,15 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
                     type="button"
                     onClick={() => handleNotificationClick(notification)}
                     className={cn(
-                      "w-full rounded-2xl border border-white/8 bg-white/[0.035] p-3 text-left transition-all hover:border-white/15 hover:bg-white/[0.06]",
-                      !notification.read && "border-primary/20 bg-primary/[0.06]",
+                      "w-full rounded-md border border-border bg-card p-3 text-left transition-colors hover:bg-secondary",
+                      !notification.read && "border-primary/30 bg-primary/5",
                     )}
                   >
                     <div className="flex items-start gap-3">
                       <div
                         className={cn(
                           "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl",
-                          getNotificationAccent(notification.type),
+                          getNotificationAccent(),
                         )}
                       >
                         <Icon className="h-4 w-4" />
@@ -349,9 +327,9 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="line-clamp-1 text-sm font-semibold text-white">{notification.title}</p>
+                            <p className="line-clamp-1 text-sm font-semibold text-foreground">{notification.title}</p>
                             {notification.message ? (
-                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-white/58">
+                              <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                                 {notification.message}
                               </p>
                             ) : null}
@@ -362,12 +340,12 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
                         </div>
 
                         <div className="mt-2 flex items-center justify-between gap-2">
-                          <span className="text-[11px] uppercase tracking-[0.18em] text-white/35">
+                          <span className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
                             {formatRelativeTime(notification.created_at)}
                           </span>
                           <Badge
                             variant="outline"
-                            className="border-white/10 bg-white/[0.03] text-[10px] uppercase tracking-[0.18em] text-white/45"
+                            className="border-border bg-secondary/40 text-[10px] uppercase tracking-[0.18em] text-muted-foreground"
                           >
                             {notification.type || "system"}
                           </Badge>
@@ -378,14 +356,14 @@ export function NotificationsMenu({ user }: NotificationsMenuProps) {
                 )
               })}
             </div>
-          </ScrollArea>
+          </div>
         ) : (
           <div className="px-5 py-10 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-white/[0.04]">
-              <BellRing className="h-6 w-6 text-white/45" />
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-border bg-secondary/40">
+              <BellRing className="h-5 w-5 text-muted-foreground" />
             </div>
-            <p className="mt-4 text-sm font-medium text-white">Nothing new yet</p>
-            <p className="mt-1 text-xs leading-5 text-white/45">
+            <p className="mt-4 text-sm font-medium text-foreground">Nothing new yet</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
               New episode alerts, social updates, reports, and list activity will show up here.
             </p>
           </div>

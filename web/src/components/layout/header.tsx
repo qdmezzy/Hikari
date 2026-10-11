@@ -161,7 +161,7 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
               <>
                 <NotificationsMenu user={authUser} />
 
-                <DropdownMenu>
+                <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
                     <Button 
                       variant="ghost" 
@@ -191,7 +191,7 @@ export const Header = React.memo(function Header({ user, authUser, authLoading =
                       </FoundingName>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56 rounded-xl p-1.5 bg-card border-border/50">
+                  <DropdownMenuContent align="end" sideOffset={8} className="w-56 rounded-lg border-border bg-popover p-1.5 text-popover-foreground shadow-xl hide-scrollbar">
                     <DropdownMenuItem asChild>
                       <Link href="/profile" className="flex items-center gap-3 px-3 py-2.5 cursor-pointer rounded-lg">
                         <User className="h-4 w-4 text-muted-foreground" />

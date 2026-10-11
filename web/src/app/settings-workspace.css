@@ -14,6 +14,9 @@
 .hk-setting-field { display: grid; grid-template-columns: 115px minmax(0,1fr); gap: 16px; align-items: start; padding: 13px 0; }
 .hk-setting-field > label { padding-top: 10px; font-size: 12px; }
 .hk-setting-field input,.hk-setting-field textarea,.hk-setting-field select { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 10px 12px; min-height: 38px; color: var(--foreground); font-size: 12px; width: 100%; }
+.hk-setting-field .hk-setting-select { min-height: 38px; height: auto; width: 100%; border: 1px solid var(--border); border-radius: 4px; background: var(--card); padding: 9px 12px; color: var(--foreground); font-size: 12px; box-shadow: none; }
+.hk-setting-field .hk-setting-select:focus-visible { outline: none; box-shadow: none; border-color: var(--muted-foreground); }
+.hk-setting-select-content { border-color: var(--border); background: var(--popover); color: var(--popover-foreground); }
 .hk-setting-field textarea { resize: vertical; }
 .hk-setting-field p,.hk-setting-toggle p,.hk-settings-note { font-size: 11px; color: var(--muted-foreground); line-height: 1.8; margin-top: 7px; }
 .hk-setting-toggle { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 15px 0; border-bottom: 1px solid var(--border); }

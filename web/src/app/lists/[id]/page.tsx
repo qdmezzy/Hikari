@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { SiteSelect } from "@/components/ui/site-select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { CollectionTitlePicker } from "@/components/lists/CollectionTitlePicker"
 import { CollectionPublishing } from "@/components/lists/CollectionPublishing"
@@ -165,7 +166,7 @@ export default function CustomListPage() {
         {items.length ? <>
           <div className="rv-library-search border-y border-border py-4">
             <Input aria-label="Search this collection" placeholder="Find a title in this collection…" value={query} onChange={event => setQuery(event.target.value)} />
-            <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span className="hidden sm:inline">Sort</span><select aria-label="Sort collection" value={sort} onChange={event => setSort(event.target.value)} className="rounded-md border border-border bg-card px-3 py-2 text-foreground"><option value="shelf">Shelf order</option><option value="newest">Recently added</option><option value="title">Title A–Z</option></select></label>
+            <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground"><span className="hidden sm:inline">Sort</span><SiteSelect ariaLabel="Sort collection" value={sort} onValueChange={setSort} options={[{value:"shelf",label:"Shelf order"},{value:"newest",label:"Recently added"},{value:"title",label:"Title A–Z"}]} /></div>
           </div>
           {owner ? <div className="hk-collection-tools"><Button variant="outline" onClick={()=>setSelectedIds(selectedIds.length ? [] : visibleItems.map(item=>item.id))}>{selectedIds.length ? "Clear selection" : "Select visible titles"}</Button><Button variant="outline" disabled={!selectedIds.length} onClick={()=>setRemoveTarget({batch:true,ids:[...selectedIds],media:{title:{english:`${selectedIds.length} selected titles`}}})}>Remove selected ({selectedIds.length})</Button></div>:null}
           {visibleItems.map((item, index) => <article className="rv-collection-row" key={item.id}>

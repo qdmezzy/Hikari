@@ -5,6 +5,7 @@ import { Search, ArrowUpRight } from "lucide-react"
 import { Navigation } from "@/components/layout/Navigation"
 import RequireAuth from "@/components/common/RequireAuth"
 import { Button } from "@/components/ui/button"
+import { SiteSelect } from "@/components/ui/site-select"
 import { AnimeCard } from "@/components/media/AnimeCard"
 import { ScrollReveal } from "@/components/common/ScrollReveal"
 import { fetchAniListMediaByIds, getMediaTitle } from "@/lib/anilist"
@@ -37,7 +38,7 @@ export default function FavoritesPage() {
   },[titles,query,sort])
   return <RequireAuth><div className="hikari-revamp min-h-screen bg-background"><Navigation/><main className="rv-main hk-personal"><div className="rv-container">
     <header className="hk-personal-heading"><div><span className="hk-page-jp" lang="ja">お気に入りの作品</span><h1>Favorites</h1><p>The anime and manga you’ve favorited. Your own collection of standouts.</p></div><Link href="/search">Browse titles <ArrowUpRight size={16}/></Link></header>
-    <div className="hk-personal-toolbar"><label className="hk-personal-search"><Search size={17}/><input aria-label="Search favorite titles" placeholder="Find a favorite…" value={query} onChange={e=>setQuery(e.target.value)}/></label><select aria-label="Sort favorite titles" value={sort} onChange={e=>setSort(e.target.value)}><option value="saved">Saved order</option><option value="name">Title A–Z</option></select></div>
+    <div className="hk-personal-toolbar"><label className="hk-personal-search"><Search size={17}/><input aria-label="Search favorite titles" placeholder="Find a favorite…" value={query} onChange={e=>setQuery(e.target.value)}/></label><SiteSelect ariaLabel="Sort favorite titles" value={sort} onValueChange={setSort} options={[{value:"saved",label:"Saved order"},{value:"name",label:"Title A–Z"}]} /></div>
     {loading ? <p role="status" className="hk-personal-empty">Loading favorite titles…</p> : error ? <div role="alert" className="hk-personal-empty"><p>{error}</p><Button variant="outline" onClick={()=>setRetry(n=>n+1)}>Try again</Button></div> : results.length ? <ScrollReveal><div className="hk-favorite-grid">{results.map(anime=><AnimeCard key={anime.id} anime={anime}/>)}</div></ScrollReveal> : <div className="hk-personal-empty"><span lang="ja">好きな作品を、ここに。</span><h2>{query ? "No matching favorites" : "Your favorite titles belong here"}</h2><p>{query ? "Try another title." : "Tap the heart on an anime or manga page to add it here."}</p>{query ? <Button variant="outline" onClick={()=>setQuery("")}>Clear search</Button> : <Button asChild variant="outline"><Link href="/search">Find a title</Link></Button>}</div>}
   </div></main></div></RequireAuth>
 }

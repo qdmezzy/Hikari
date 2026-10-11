@@ -443,10 +443,11 @@ export default function DiscoverPage() {
         })
       } else if (!append) {
         setDiscoverFeed([])
+        setFeedError(true)
       }
 
       setPage(Number(resolved.pageInfo?.currentPage || nextPage))
-      setHasMore(Boolean(resolved.pageInfo?.hasNextPage))
+      setHasMore(Boolean(resolved.items.length && resolved.pageInfo?.hasNextPage))
     } catch (error) {
       // Circuit breaker: after repeated failures, stop auto-retrying so we don't
       // hammer the API (which is what causes the upstream 500s in the first place).
@@ -722,5 +723,5 @@ export default function DiscoverPage() {
     return `https://www.youtube-nocookie.com/embed/${trailerId}?${params.toString()}`
   }
 
-  return <DiscoverScreen model={{user,hideRelatedTitles,hiddenTitles,hideTitle,restoreTitle,pendingSaveId,loadingMore,currentAnime,containerRef,spoilerSafe,showTrailerFrame,isMuted,getYouTubeUrl,setIsTrailerLoaded,activeVibe,setActiveVibe,setCurrentIndex,vibeFilters,saved,liked,ensureSignedIn,toggleSave,toggleLike,handleShare,setIsTrailerPlayerOpen,isTrailerPlayerOpen,toggleMute,toggleSpoilerSafe,currentIndex,filteredFeed,hasMore,goToPrev,goToNext,loadFeedPage,page,feedError,retryFeed,getControllableYouTubeUrl}} />
+  return <DiscoverScreen model={{user,hideRelatedTitles,hiddenTitles,hideTitle,restoreTitle,pendingSaveId,loadingMore,feedReady:tasteResolved && (discoverFeed.length > 0 || !hasMore || feedError),currentAnime,containerRef,spoilerSafe,showTrailerFrame,isMuted,getYouTubeUrl,setIsTrailerLoaded,activeVibe,setActiveVibe,setCurrentIndex,vibeFilters,saved,liked,ensureSignedIn,toggleSave,toggleLike,handleShare,setIsTrailerPlayerOpen,isTrailerPlayerOpen,toggleMute,toggleSpoilerSafe,currentIndex,filteredFeed,hasMore,goToPrev,goToNext,loadFeedPage,page,feedError,retryFeed,getControllableYouTubeUrl}} />
 }

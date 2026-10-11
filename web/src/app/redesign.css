@@ -9,7 +9,7 @@
 .hikari-revamp button:disabled { cursor: not-allowed; }
 .hikari-revamp [data-slot="button"] { box-shadow: none; border-radius: 6px; }
 .hikari-revamp :is(input,textarea,[data-slot="select-trigger"]) { box-shadow: none; border-radius: 6px; }
-.hikari-revamp :is(a,button,input,textarea,select):focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; }
+.hikari-revamp :is(a,button,input,textarea,select):focus-visible { outline: 1px solid var(--primary); outline-offset: 2px; }
 .hikari-revamp .hikari-panel { box-shadow: none; border-radius: 6px; background: var(--card); }
 .rv-navigation > .container { max-width: 1480px; }
 .rv-navigation nav { flex-shrink: 0; gap: 2px; }

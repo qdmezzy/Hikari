@@ -10,7 +10,12 @@
 .hk-discover-top h1 { font-size: 16px; font-weight: 500; letter-spacing: -.02em; }
 .hk-discover-top > div { display: flex; gap: 16px; align-items: center; }
 .hk-discover-top label { font-size: 10px; color: #fffa; }
-.hk-discover-top select { padding: 8px 28px 8px 12px; border: 1px solid #fff3; background: #111214b3; border-radius: 3px; font-size: 11px; color: #f3f2ee; }
+.hk-discover-top .hk-discover-feed-label { font-size: 10px; color: #fffa; }
+.hk-discover-top .hk-discover-feed-trigger { width: 126px; height: 36px; border: 1px solid #fff3; background: #111214d9; border-radius: 4px; font-size: 11px; color: #f3f2ee; }
+.hk-discover-top .hk-discover-feed-trigger:focus-visible { outline: none; border-color: #fff8; box-shadow: none; }
+.hk-discover-feed-menu { border-color: #38393c; background: #191a1d; color: #eeede8; }
+.hk-discover-feed-menu [data-radix-collection-item]:focus { background: #32312c; color: #eeede8; }
+@media(max-width:760px) { .hk-discover-top .hk-discover-feed-label { display: none; } }
 .hk-discover-caption { position: absolute; left: 40px; bottom: 112px; width: min(590px,calc(100% - 100px)); transition: opacity .25s; }
 .hk-discover-caption.is-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
 .hk-discover-category { display: flex; gap: 20px; color: #fffa; font-size: 11px; margin-bottom: 18px; }

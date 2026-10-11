@@ -161,6 +161,8 @@
 .hk-appbar-mobile { display: flex; gap: 10px; align-items: center; }
 .hk-appbar-search { display: flex; align-items: center; flex: 1; max-width: 410px; gap: 12px; color: var(--muted-foreground); }
 .hk-appbar-search input { background: transparent; border: 0; box-shadow: none; padding: 0; font-size: 12px; height: 36px; border-radius: 0; }
+.hk-appbar-search input:focus-visible { outline: none; border-bottom: 1px solid var(--muted-foreground); box-shadow: none; }
+.hk-appbar-actions button[aria-label="Open account menu"]:focus-visible { outline: none; background: var(--secondary); }
 .hk-appbar-search button { border: 1px solid var(--border); border-radius: 3px; padding: 1px 6px; font-size: 12px; }
 .hk-appbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .hk-appbar-actions [data-slot="button"] { border-radius: 4px; font-size: 11px; box-shadow: none; }

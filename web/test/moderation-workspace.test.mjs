@@ -23,6 +23,7 @@ function render({ user = member, loading = false, section = "reports", rows = []
     "@/hooks/useAuth": () => ({ user, loading }),
     "@/components/common/RequireAuth": ({ children }) => user ? children : React.createElement("p", null, "Authentication required"),
     "@/components/ui/dialog": Object.fromEntries(["Dialog", "DialogContent", "DialogHeader", "DialogTitle", "DialogDescription", "DialogFooter"].map((key) => [key, () => null])),
+    "@/components/ui/site-select": { SiteSelect: ({ value, options, ariaLabel }) => React.createElement("select", { value, "aria-label": ariaLabel, readOnly: true }, options.map(option => React.createElement("option", { key: option.value, value: option.value }, option.label))) },
     "@/lib/admin-service": {},
     "@/lib/community-content-service": {},
   }

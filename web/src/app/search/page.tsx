@@ -25,6 +25,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import { Navigation } from "@/components/layout/Navigation"
+import { SiteSelect } from "@/components/ui/site-select"
 import { AnimeCard } from "@/components/media/AnimeCard"
 import useAuth from "@/hooks/useAuth"
 import client from "@/lib/client"
@@ -162,6 +163,7 @@ export default function BrowsePage() {
   const [error, setError] = useState("")
   const [failedAppend, setFailedAppend] = useState(false)
   const [quickState, setQuickState] = useState<QuickState>({})
+  const [savedIds, setSavedIds] = useState<Set<number>>(new Set())
 
   const requestId = useRef(0)
   const appendLock = useRef(false)
@@ -221,6 +223,20 @@ export default function BrowsePage() {
     return () => { requestId.current++ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQuery, selectedGenres, sortBy, mediaType])
+
+  useEffect(() => {
+    let active = true
+    if (!user?.id || !results.length) {
+      setSavedIds(new Set())
+      return () => { active = false }
+    }
+    const ids = results.map((item) => item.id)
+    void client.from("list_entries").select("media_id").eq("user_id", user.id).in("media_id", ids).then(({ data, error }) => {
+      if (!active || error) return
+      setSavedIds(new Set((data || []).map((row) => Number(row.media_id))))
+    })
+    return () => { active = false }
+  }, [user?.id, results])
 
   // Treat the URL as the durable search state so refresh, sharing, and browser
   // back/forward navigation restore the same query and filters.
@@ -291,18 +307,22 @@ export default function BrowsePage() {
       router.push(buildLoginPath(`/search${searchParams.toString() ? `?${searchParams.toString()}` : ""}`))
       return
     }
+    if (savedIds.has(mediaId)) {
+      toast.info("Already in your list")
+      return
+    }
 
     setQuickState((current) => ({ ...current, [mediaId]: "adding" }))
 
     // Add to Plan to Watch/Read without clobbering an existing entry. Use the
     // media's own type (not the toggle) so a manga is never saved as an anime.
     const entryType = anime?.type === "MANGA" ? "MANGA" : "ANIME"
-    const { error } = await client
+    const { data, error } = await client
       .from("list_entries")
       .upsert(
         { user_id: user.id, media_id: mediaId, media_type: entryType, status: "plan_to_watch", progress: 0 },
         { onConflict: "user_id,media_id", ignoreDuplicates: true },
-      )
+      ).select("media_id")
 
     if (error) {
       setQuickState((current) => {
@@ -314,6 +334,12 @@ export default function BrowsePage() {
       return
     }
 
+    setSavedIds((current) => new Set(current).add(mediaId))
+    if (!data?.length) {
+      setQuickState((current) => ({ ...current, [mediaId]: "added" }))
+      toast.info("Already in your list")
+      return
+    }
     toast.success(`Added "${getMediaTitle(anime)}" to Plan to ${entryType === "MANGA" ? "Read" : "Watch"}`)
 
     void logListActivity({
@@ -326,13 +352,6 @@ export default function BrowsePage() {
     })
 
     setQuickState((current) => ({ ...current, [mediaId]: "added" }))
-    window.setTimeout(() => {
-      setQuickState((current) => {
-        const next = { ...current }
-        delete next[mediaId]
-        return next
-      })
-    }, 1600)
   }
 
   const resultsLabel = useMemo(() => {
@@ -497,7 +516,7 @@ export default function BrowsePage() {
                 <p className="text-sm font-medium text-foreground">{resultsLabel}</p>
                 {error ? <div role="alert" className="text-sm"><p className="text-destructive">{error}</p><button className="mt-2 min-h-11 underline underline-offset-4" onClick={() => fetchPage(failedAppend ? page + 1 : 1, failedAppend)}>Retry catalog</button></div> : null}
               </div>
-              <label className="rv-sort-control"><span>Sort</span><select aria-label="Sort titles" value={sortBy} onChange={event => { const value = event.target.value as SortKey; setSortBy(value); updateSearchUrl({sortBy:value}) }}>{(Object.keys(sortLabels) as SortKey[]).map(key => <option value={key} key={key}>{sortLabels[key]}</option>)}</select></label>
+              <div className="rv-sort-control"><span>Sort</span><SiteSelect ariaLabel="Sort titles" value={sortBy} onValueChange={value => { const next = value as SortKey; setSortBy(next); updateSearchUrl({sortBy:next}) }} options={(Object.keys(sortLabels) as SortKey[]).map(key => ({value:key,label:sortLabels[key]}))} /></div>
               <div className="rv-catalog-views">
                 <button
                   type="button"
@@ -591,7 +610,7 @@ export default function BrowsePage() {
                       key={anime.id}
                       anime={anime}
                       index={index}
-                      quickState={quickState[anime.id] || "idle"}
+                      quickState={quickState[anime.id] || (savedIds.has(anime.id) ? "added" : "idle")}
                       onQuickAdd={handleQuickAdd}
                     />
                   ))}
@@ -603,7 +622,7 @@ export default function BrowsePage() {
                       key={anime.id}
                       anime={anime}
                       index={index}
-                      quickState={quickState[anime.id] || "idle"}
+                      quickState={quickState[anime.id] || (savedIds.has(anime.id) ? "added" : "idle")}
                       onQuickAdd={handleQuickAdd}
                     />
                   ))}

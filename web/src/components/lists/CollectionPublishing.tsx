@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import client from "@/lib/client"
 import { Button } from "@/components/ui/button"
+import { SiteSelect } from "@/components/ui/site-select"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -66,7 +67,7 @@ export function CollectionPublishing({collection,user,owner,items,onCover}:{coll
   }
   return <section className="hk-personal-updates" aria-label="Collection updates"><header><h2>Notes from this shelf</h2>{!owner&&collection.is_public?(user?<Button variant="outline" disabled={busy||!ready} onClick={changeFollow}>{following?"Unfollow":"Follow collection"}</Button>:<Link href={`/login?next=${encodeURIComponent('/lists/'+collection.id)}`}>Sign in to follow</Link>):null}</header>
     {creator?<p>Curated by <Link href={`/u/${encodeURIComponent(creator.handle)}`}>{creator.display_name||creator.handle}</Link></p>:<p>Curated by a Hikari member. Their profile isn’t publicly available.</p>}
-    {owner?<div className="hk-collection-tools"><label htmlFor="collection-cover">Cover title </label><select id="collection-cover" value={collection.cover_media_id||""} disabled={busy} onChange={event=>chooseCover(event.target.value)}><option value="">Use shelf order</option>{items.map(item=><option key={item.id} value={item.media_id}>{getMediaTitle(item.media)}</option>)}</select><Button variant="outline" onClick={()=>setPreview(true)}>Preview public visibility</Button></div>:null}
+    {owner?<div className="hk-collection-tools"><label htmlFor="collection-cover">Cover title </label><SiteSelect id="collection-cover" ariaLabel="Cover title" value={String(collection.cover_media_id||"default")} disabled={busy} onValueChange={value=>void chooseCover(value==="default"?"":value)} options={[{value:"default",label:"Use shelf order"},...items.map(item=>({value:String(item.media_id),label:getMediaTitle(item.media)}))]} className="max-w-[260px]" /><Button variant="outline" onClick={()=>setPreview(true)}>Preview public visibility</Button></div>:null}
     {collection.is_public?<p><a href={`/lists/${collection.id}/opengraph-image`} target="_blank" rel="noopener noreferrer">Open shareable cover ↗</a> Includes your public creator credit and collection link. Copies already shared cannot be retracted by making the collection private later.</p>:null}
     <p>Editing a shelf is quiet. Only an update deliberately published by its curator notifies followers.</p>
     {error?<p role="alert">{error} <button onClick={()=>setRevision(value=>value+1)}>Retry</button></p>:!ready?<p role="status">Loading updates…</p>:null}

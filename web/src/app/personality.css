@@ -22,3 +22,7 @@
   .hk-discover-caption{bottom:calc(160px + env(safe-area-inset-bottom,0px))}
 }
 @media(max-width:360px){.hk-discover-dock{left:12px;right:12px}.hk-discover-tools button{width:40px}}
+.hk-airdates-month .hk-time-zone-picker { font-size: 10px; display: grid; gap: 5px; }
+.hk-airdates-month .hk-time-zone-trigger { width: 210px; max-width: 100%; height: 36px; background: var(--card); border: 1px solid var(--border); padding: 7px 10px; border-radius: 4px; color: var(--foreground); }
+.hk-time-zone-menu { border-color: var(--border); background: var(--popover); color: var(--popover-foreground); }
+@media(max-width:760px) { .hk-airdates-month .hk-time-zone-trigger { max-width: 190px; } }

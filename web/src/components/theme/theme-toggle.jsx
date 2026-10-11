@@ -29,7 +29,7 @@ export function ThemeToggle() {
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative group hover:bg-primary/10">
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all duration-300 dark:-rotate-90 dark:scale-0 text-primary" />
@@ -41,7 +41,7 @@ export function ThemeToggle() {
           </span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="">
+      <DropdownMenuContent align="end" sideOffset={8} className="w-36 rounded-lg border-border bg-popover p-1.5 text-popover-foreground shadow-xl hide-scrollbar">
         <DropdownMenuItem onClick={() => setTheme("light")} className="flex items-center gap-2 cursor-pointer">
           <Sun className="h-4 w-4" />
           <span>Light</span>
