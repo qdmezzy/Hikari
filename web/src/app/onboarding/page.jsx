@@ -41,6 +41,14 @@ const GOALS = [
   { id: "browse", label: "Just browsing", desc: "Keep it light and simple", icon: Coffee, route: "/" },
 ]
 
+const STEP_LABELS = {
+  welcome: "Welcome",
+  account: "Your account",
+  vibe: "Your taste",
+  import: "Bring your list",
+  goal: "Start watching",
+}
+
 export default function OnboardingPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -231,10 +239,26 @@ export default function OnboardingPage() {
     <RequireAuth>
       <div className="hk-onboarding min-h-screen bg-background">
         <div className="hk-onboarding-layout">
-          <aside className="hk-onboarding-intro" aria-hidden="true">
-            <span className="hk-onboarding-edition">光 · アニメと漫画</span>
-            <div><span className="hk-onboarding-chapter">YOUR WATCH JOURNAL / 01</span><strong>Make it<br />yours.</strong><p>A place for the stories you love and the ones you haven’t met yet.</p></div>
-            <span className="hk-onboarding-mark">光</span>
+          <aside className="hk-onboarding-intro" aria-label="Setup progress">
+            <div className="hk-onboarding-intro-top">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/hikari-wordmark.svg" alt="Hikari" />
+              <span>光 · アニメと漫画</span>
+            </div>
+            <div className="hk-onboarding-intro-content">
+              <span className="hk-onboarding-chapter">GETTING STARTED</span>
+              <h2>Set up your space.</h2>
+              <p>A few choices before you start watching.</p>
+              <ol className="hk-onboarding-steps">
+                {steps.map((item, index) => (
+                  <li key={item} className={index === stepIndex ? "is-current" : index < stepIndex ? "is-complete" : ""} aria-current={index === stepIndex ? "step" : undefined}>
+                    <span className="hk-onboarding-step-number">{index < stepIndex ? <Check size={14} aria-hidden="true" /> : String(index + 1).padStart(2, "0")}</span>
+                    <span>{STEP_LABELS[item]}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <span className="hk-onboarding-intro-foot">Your Hikari account</span>
           </aside>
           <main className="hk-onboarding-main">
           <div className="mb-8 hk-onboarding-progress">
