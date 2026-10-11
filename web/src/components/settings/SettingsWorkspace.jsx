@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AccountCredentials } from "./AccountCredentials"
-import { DiscordDeliverySettings } from "./DiscordDeliverySettings"
 
 function Field({label, hint, value, onChange, options, type="text", multiline=false, maxLength}) {
   const id = useId()
@@ -63,7 +62,6 @@ export function SettingsWorkspace({model:m}) {
 
   if(activeSection==='notifications') return <>
     <Group title="Delivery" note="Choose how Hikari can reach you."><Setting label="Email" checked={notifications.emailEnabled} onChange={value => m.updateNotificationState({emailEnabled:value})}/><Setting label="Push notifications" hint="Browser permission is also required." checked={notifications.pushEnabled} onChange={value => m.updateNotificationState({pushEnabled:value})}/></Group>
-    <DiscordDeliverySettings userId={m.user?.id} />
     <Group title="What reaches you" note="Set each type of update independently."><table className="hk-notification-matrix"><thead><tr><th scope="col">Update</th><th scope="col">Email</th><th scope="col">Push</th></tr></thead><tbody>{alertRows.map(([label,email,push]) => <tr key={label}><th scope="row">{label}</th>{[email,push].map((key,index) => <td key={index}>{key ? <input type="checkbox" aria-label={`${label}: ${index===0?'email':'push'}`} checked={notifications[key]} onChange={e => m.updateNotificationState({[key]:e.target.checked})}/> : <span aria-label="Not available">—</span>}</td>)}</tr>)}</tbody></table></Group>
     <Group title="Quiet hours" note="Pause push alerts during these hours."><Setting label="Enable quiet hours" checked={notifications.quietHoursEnabled} onChange={value => m.updateNotificationState({quietHoursEnabled:value})}/><Field label="From" type="time" value={notifications.quietHoursStart} onChange={value => m.updateNotificationState({quietHoursStart:value})}/><Field label="Until" type="time" value={notifications.quietHoursEnd} onChange={value => m.updateNotificationState({quietHoursEnd:value})}/></Group>
   </>
