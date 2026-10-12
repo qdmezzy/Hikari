@@ -1135,15 +1135,15 @@ export default function MediaPage() {
                         side="bottom"
                         align="start"
                         sideOffset={8}
-                        avoidCollisions={false}
-                        className="max-h-[70vh] w-80 overflow-y-auto p-0"
+                        collisionPadding={12}
+                        className="w-[min(340px,calc(100vw-24px))] max-h-[var(--radix-popover-content-available-height)] overflow-y-auto p-0 hide-scrollbar"
                       >
                         <div className="overflow-hidden rounded-xl border border-border/50 bg-card/95 shadow-2xl backdrop-blur-xl">
                           <div className="border-b border-border/50 p-4">
                             <h4 className="font-medium">Add to List</h4>
                             <p className="text-xs text-muted-foreground">Choose a status and update progress</p>
                           </div>
-                          <div className="space-y-1.5 p-3">
+                          <div className="grid grid-cols-2 gap-1.5 p-3">
                             {listOptions.map((option) => {
                               const isActive = status === option.value
                               return (
@@ -1151,20 +1151,20 @@ export default function MediaPage() {
                                   key={option.value}
                                   onClick={() => setStatus(option.value)}
                                   className={cn(
-                                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-all duration-200",
+                                    "flex min-h-11 w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors",
                                     isActive
                                       ? "bg-primary/10 text-foreground"
                                       : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
                                   )}
                                 >
-                                  <option.icon className={cn("h-4 w-4", option.color)} />
+                                  <option.icon className={cn("h-4 w-4 shrink-0", option.color)} />
                                   <span>{option.label}</span>
                                   {isActive ? <Check className="ml-auto h-4 w-4 text-primary" /> : null}
                                 </button>
                               )
                             })}
                           </div>
-                          <div className="space-y-3 px-4 pb-4">
+                          <div className="space-y-3 border-t border-border/50 px-4 pt-3 pb-4">
                             <div className="space-y-2">
                               <Label htmlFor="progress">Progress</Label>
                               <Input
@@ -1238,7 +1238,7 @@ export default function MediaPage() {
                 </div>
 
                 {user ? (
-                  <div className="mt-4 rounded-2xl border border-border/60 bg-secondary/30 p-4">
+                  <div className="mt-4 rounded-lg border border-border/60 bg-card p-3">
                     <p className="mb-2 text-sm font-medium text-foreground">Your rating</p>
                     <StarRating value={entryScore} onChange={handleRate} />
                   </div>

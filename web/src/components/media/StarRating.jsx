@@ -11,8 +11,8 @@ export function StarRating({ value = 0, onChange, disabled = false, className })
   const active = hover || value
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
-      <div className="flex items-center" onMouseLeave={() => setHover(0)}>
+    <div className={cn("flex flex-col gap-2", className)}>
+      <div className="grid grid-cols-10 gap-0.5" onMouseLeave={() => setHover(0)}>
         {Array.from({ length: 10 }).map((_, i) => {
           const score = i + 1
           return (
@@ -22,13 +22,13 @@ export function StarRating({ value = 0, onChange, disabled = false, className })
               disabled={disabled}
               onMouseEnter={() => setHover(score)}
               onClick={() => onChange?.(score === value ? 0 : score)}
-              className="p-0.5 transition-transform hover:scale-110 disabled:cursor-not-allowed"
+              className="flex aspect-square min-w-0 items-center justify-center rounded-sm transition-colors hover:bg-primary/10 disabled:cursor-not-allowed"
               aria-label={`Rate ${score} out of 10`}
             >
               <Star
                 className={cn(
-                  "h-5 w-5 transition-colors",
-                  score <= active ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40",
+                  "h-4 w-4 transition-colors",
+                  score <= active ? "fill-primary text-primary" : "text-muted-foreground/45",
                 )}
               />
             </button>
@@ -36,20 +36,19 @@ export function StarRating({ value = 0, onChange, disabled = false, className })
         })}
       </div>
 
-      <span className="min-w-[3.5rem] text-sm font-semibold text-foreground">
-        {active ? `${active}/10` : <span className="text-muted-foreground">Not rated</span>}
+      <div className="flex min-h-5 items-center justify-between gap-2"><span className="text-xs font-medium text-foreground">
+        {active ? `${active} / 10` : <span className="text-muted-foreground">Choose a score</span>}
       </span>
-
       {value > 0 && !disabled ? (
         <button
           type="button"
           onClick={() => onChange?.(0)}
-          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+          className="inline-flex items-center gap-1 rounded-sm px-1 py-0.5 text-xs text-muted-foreground transition-colors hover:text-destructive"
         >
           <X className="h-3 w-3" />
           Clear
         </button>
-      ) : null}
+      ) : null}</div>
     </div>
   )
 }

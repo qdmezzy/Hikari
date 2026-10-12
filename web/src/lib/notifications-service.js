@@ -58,9 +58,9 @@ export async function insertOwnNotification(userId, notification = {}) {
     metadata: notification.metadata || null,
     dedupe_key: notification.dedupeKey || null,
   }
-  const { error } = await client
-    .from("notifications")
-    .upsert(row, { onConflict: "user_id,dedupe_key", ignoreDuplicates: true })
+  // The dedupe constraint is a partial unique index. PostgREST's column-based
+  // upsert cannot target it, so insert and treat a duplicate as already sent.
+  const { error } = await client.from("notifications").insert(row)
   if (error && error.code !== "23505") {
     console.error("Failed to insert notification:", error)
   }
