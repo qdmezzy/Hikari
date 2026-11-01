@@ -12,7 +12,7 @@ export function StarRating({ value = 0, onChange, disabled = false, className })
 
   return (
     <div className={cn("flex flex-col gap-2", className)}>
-      <div className="grid grid-cols-10 gap-0.5" onMouseLeave={() => setHover(0)}>
+      <div className="grid grid-cols-5 gap-0.5 sm:grid-cols-10" onMouseLeave={() => setHover(0)}>
         {Array.from({ length: 10 }).map((_, i) => {
           const score = i + 1
           return (
