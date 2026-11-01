@@ -187,6 +187,7 @@ export default function RegisterPage() {
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(onboardingPath)}`,
           data: {
             display_name: formData.displayName.trim() || null,
             username: handleValue,

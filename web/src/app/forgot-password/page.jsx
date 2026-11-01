@@ -21,7 +21,7 @@ export default function ForgotPasswordPage() {
     if(busy)return
     setBusy(true);setError("")
     try {
-      const {error}=await client.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin+"/reset-password?next="+encodeURIComponent(next)})
+      const {error}=await client.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin+"/auth/confirm?next="+encodeURIComponent("/reset-password?next="+encodeURIComponent(next))})
       if(error)throw error
       setSubmitted(true)
     } catch(error) {setError(error.message || "The reset link could not be sent. Please try again.")}
