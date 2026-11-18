@@ -72,6 +72,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ han
     .maybeSingle()
   profile.founding_member_number = foundingMember?.active ? Number(foundingMember.member_number) : null
 
+  // Visibility must be enforced in the response, not only by the profile UI.
+  if (profile.show_favorites === false) profile.favorite_media_ids = []
+
   if (profile.show_stats !== false && profile.show_watch_activity === false) {
     const entries: Record<string, any>[] = []
     for (let offset = 0; ; offset += 1000) {
